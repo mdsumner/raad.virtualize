@@ -13,24 +13,22 @@ model; the implementation spans several software projects currently in flux.
 Every array dataset consists of granules (netCDF, HDF5, COG, GRIB) in which
 each chunk of each array occupies a byte range. Cloud-native access to
 archival data — kerchunk, VirtualiZarr, Icechunk, GDAL multidim VRT — all
-reduces to knowing those byte ranges and pointing readers at them. Each of
-those tools currently re-derives the ranges from the files, per dataset, per
-published artifact.
+reduces to knowing those byte ranges and pointing readers at them, but the tools
+store the information in memory or in bespoke file stores. 
 
 This project inverts that model: each granule is scanned once into a durable
 store. Every published form is then a projection of the store — a remap of
 URIs, a selection of files, an assignment of a global index, a serialization.
-The expensive operation (reading chunk indexes out of 16k+ HDF5 files) runs
-once; everything downstream is table transforms.
+The expensive operation (reading chunk indexes out of 16k+ HDF5 files) could in theory be
+run only once. 
 
 ## The store
 
-A plain SQLite database with two kinds of table:
+A plain SQLite database with two tables:
 
 - `files(file_id, source)` — one row per granule harvested
 - one table per array, e.g. `sst(file_id, idx0..idxN, present, offset, size)`
-  keyed on (file_id, within-file chunk coordinate), WITHOUT ROWID so the
-  chunk lookup is a single clustered-key seek
+  keyed on (file_id, within-file chunk coordinate)
 
 The store has no knowledge of time, datasets, mirrors, or Zarr. It answers
 exactly one question: for this source, this array, this chunk — where are the
@@ -46,11 +44,10 @@ to mirror). No remapping knowledge is encoded in the store, because those
 rules differ per dataset and change over time.
 
 Because prelim/final churn arrives as *renamed files*, a given source
-string is immutable content: once scanned, never rescanned. Incremental
-harvest is "scan the sources not already in the store" — the 20-minute
-full scan becomes a seconds-long daily increment. Preliminary and final
+string is immutable content. Incremental
+harvest is "scan the sources not already in the store". Preliminary and final
 versions of a day coexist in the store as distinct sources; choosing
-between them is a projection's job, not the store's.
+between them is a projection.
 
 ## Projections
 
@@ -119,11 +116,3 @@ See [with-oisst-gdal.md](with-oisst-gdal.md) for an example of the general
 store structure with OISST data via GDAL.
 
 
-## Provenance
-
-Builds on GDAL multidim (VRT, GetRawBlockInfo), the kerchunk /
-VirtualiZarr / Icechunk ecosystem, and the raadtools/bowerbird data
-infrastructure at the Australian Antarctic Division. The store schema and
-the source rule emerged from discussion of a draft GDAL RFC for chunk
-reference extraction; the plain SQLite approach follows a suggestion from
-Even Rouault.
