@@ -4,61 +4,63 @@ Virtualization of the raad file collection and related online datasets: one
 central store of byte references, from which published cloud-native forms
 (kerchunk, Icechunk, VRT) are derived as projections.
 
-This repo will change shape, possibly several
-times. This README records the model, the current state is not stable and exists across several software projects in flux. 
+This repo is not stable and will change shape. This README documents the
+model; the implementation spans several software projects currently in flux.
 
 
-## The idea
+## Design
 
-Every array dataset we care about is a pile of granules (netCDF, HDF5, COG,
-GRIB) in which each chunk of each array occupies a byte range. Cloud-native
-access to archival data -- kerchunk, VirtualiZarr, Icechunk, GDAL multidim
-VRT -- all reduces to knowing those byte ranges and pointing readers at
-them. Today each of those tools re-derives the ranges from the files, per
-dataset, per published artifact.
+Every array dataset consists of granules (netCDF, HDF5, COG, GRIB) in which
+each chunk of each array occupies a byte range. Cloud-native access to
+archival data — kerchunk, VirtualiZarr, Icechunk, GDAL multidim VRT — all
+reduces to knowing those byte ranges and pointing readers at them. Each of
+those tools currently re-derives the ranges from the files, per dataset, per
+published artifact.
 
-We prefer to scan each granule once into a durable store. Every
-published form is then a projection of the store and the store can be shared. The
-expensive operation (reading chunk indexes out of 16k+ HDF5 files) happens once, everything downstream is table transforms.
+This project inverts that model: each granule is scanned once into a durable
+store. Every published form is then a projection of the store — a remap of
+URIs, a selection of files, an assignment of a global index, a serialization.
+The expensive operation (reading chunk indexes out of 16k+ HDF5 files) runs
+once; everything downstream is table transforms.
 
 ## The store
 
-A plain SQLite database with two tables:
+A plain SQLite database with two kinds of table:
 
-- `files(file_id, source)` -- one row per granule harvested
+- `files(file_id, source)` — one row per granule harvested
 - one table per array, e.g. `sst(file_id, idx0..idxN, present, offset, size)`
   keyed on (file_id, within-file chunk coordinate), WITHOUT ROWID so the
   chunk lookup is a single clustered-key seek
 
-The store knows nothing about time, datasets,
-mirrors, or Zarr. Where are the bytes for a given key.
+The store has no knowledge of time, datasets, mirrors, or Zarr. It answers
+exactly one question: for this source, this array, this chunk — where are the
+bytes.
 
 ### The source rule
 
-A source is what the source was at harvest time -- `file:///rdsi/...`,
-`https://...`, `/vsis3/...` -- recorded verbatim. That URI is the key that
-byte offsets are bound to. Downstream consumers treat it as "where and what
-was harvested" and remap by their own rules (local root to public https,
-vsis3 to s3://, mirror to mirror). No remapping knowledge is encoded in the
-store, because those rules differ per dataset and change over time.
+A source is the URI at harvest time — `file:///rdsi/...`, `https://...`,
+`/vsis3/...` — recorded verbatim. That URI is the key that byte offsets are
+bound to. Downstream consumers treat it as "where and what was harvested" and
+remap by their own rules (local root to public https, vsis3 to s3://, mirror
+to mirror). No remapping knowledge is encoded in the store, because those
+rules differ per dataset and change over time.
 
 Because prelim/final churn arrives as *renamed files*, a given source
 string is immutable content: once scanned, never rescanned. Incremental
-harvest is "scan the sources not already in the store" -- the 20-minute
+harvest is "scan the sources not already in the store" — the 20-minute
 full scan becomes a seconds-long daily increment. Preliminary and final
 versions of a day coexist in the store as distinct sources; choosing
 between them is a projection's job, not the store's.
 
 ## Projections
 
-Everything dataset-specific lives in projections, applied at read/publish
-time:
+Dataset-specific logic lives in projections, applied at read/publish time:
 
 - date extraction from filenames and assignment of a global time index
 - dedup policy (prefer final over preliminary, or keep both as two canons)
 - URI remapping to whichever endpoint a published form should reference
 - join with array metadata (dtype, chunk shape, codec, fill, coordinates),
-  which the store deliberately does not hold -- it comes from the mdim VRT
+  which the store deliberately does not hold — it comes from the mdim VRT
   or from template-parsing a single representative granule
 
 A "canon" is the store plus a projection: the OISST daily cube is the store
@@ -68,13 +70,13 @@ joined with the VRT concat logic. One store can carry many canons.
 
 Three sibling renderings, none derived from another:
 
-1. **GDAL multidim VRT** -- built by `vrtstack` from the file listing plus a
+1. **GDAL multidim VRT** — built by `vrtstack` from the file listing plus a
    time-pattern rule; updated daily at
    https://projects.pawsey.org.au/aad-index/oisst/oisst-mdim.vrt.
    Carries the array structure, attributes, and inline coordinates; it is
    the metadata half that the store does not duplicate.
-2. **kerchunk (parquet)** -- full-rewrite manifest for fsspec/xarray interop.
-3. **Icechunk** -- the transactional target: bulk-load history once, then
+2. **kerchunk (parquet)** — full-rewrite manifest for fsspec/xarray interop.
+3. **Icechunk** — the transactional target: bulk-load history once, then
    append new days as commits. Records referenced-file mtimes and errors
    clearly if a source file changes under a stale ref, which matters given
    prelim/final churn across three mirrors.
@@ -97,30 +99,31 @@ access at all and can run anywhere the (small) store and VRT are reachable.
   practical at collection scale.
 - **vrtstack** renders the mosaic VRT from a listing plus concat rule.
 
-## Where this goes
+## Roadmap
 
 - Rewire stage 2 (kerchunk/Icechunk emission) to read from the store; the
   scan then happens exactly once per granule across all published forms.
-- Feed the store richly from the raad openstack file cache: every dataset
+- Feed the store from the raad openstack file cache: every dataset
   raadtools handles is a candidate, since the schema is dataset-agnostic.
 - Add online-only datasets harvested remotely: GHRSST COGs (source.coop),
-  Bluelink/BRAN (NCI + THREDDS). The store does not care whether the
-  source was local or remote -- the source rule covers both.
+  Bluelink/BRAN (NCI + THREDDS). The store does not distinguish between
+  local and remote sources — the source rule covers both.
 - A small per-dataset registry (arrays, roots, remap rules, dedup policy)
-  beside the store -- projection config, kept out of the chunk tables.
-- Longer term this store is a working prototype of the reference-extraction
+  beside the store — projection config, kept out of the chunk tables.
+- Longer term this store is a prototype of the reference-extraction
   model proposed for GDAL itself (`gdal mdim` chunk-reference extraction,
   built on `GDALMDArray::GetRawBlockInfo`): the same table, produced by one
   code path for every driver, consumable as a virtual multidim store.
 
-For a taster of what the general store could look like see [with-oisst-gdal.md](with-oisst-gdal.md).
+See [with-oisst-gdal.md](with-oisst-gdal.md) for an example of the general
+store structure with OISST data via GDAL.
 
 
-## Provenance and thanks
+## Provenance
 
 Builds on GDAL multidim (VRT, GetRawBlockInfo), the kerchunk /
 VirtualiZarr / Icechunk ecosystem, and the raadtools/bowerbird data
 infrastructure at the Australian Antarctic Division. The store schema and
 the source rule emerged from discussion of a draft GDAL RFC for chunk
-reference extraction, with thanks to Even Rouault for the push toward
-plain SQLite and generally for incredible code and vision.
+reference extraction; the plain SQLite approach follows a suggestion from
+Even Rouault.
