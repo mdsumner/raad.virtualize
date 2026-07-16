@@ -1,0 +1,9 @@
+.Rproj.user
+*.sqlite-shm
+*.sqlite-wal
+oisst-refs.sqlite
+.Rhistory
+.RData
+.httr-oauth
+.DS_Store
+.quarto
