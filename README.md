@@ -17,11 +17,9 @@ VRT -- all reduces to knowing those byte ranges and pointing readers at
 them. Today each of those tools re-derives the ranges from the files, per
 dataset, per published artifact.
 
-We invert that. Scan each granule once, ever, into a durable store. Every
-published form is then a projection of the store: a remap of URIs, a
-selection of files, an assignment of a global index, a serialization. The
-expensive operation (reading chunk indexes out of 16k+ HDF5 files) happens
-one time; everything downstream is table transforms.
+We prefer to scan each granule once into a durable store. Every
+published form is then a projection of the store and the store can be shared. The
+expensive operation (reading chunk indexes out of 16k+ HDF5 files) happens once, everything downstream is table transforms.
 
 ## The store
 
