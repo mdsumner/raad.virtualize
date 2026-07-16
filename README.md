@@ -23,16 +23,15 @@ expensive operation (reading chunk indexes out of 16k+ HDF5 files) happens once,
 
 ## The store
 
-A plain SQLite database. Two kinds of table:
+A plain SQLite database with two tables:
 
 - `files(file_id, source)` -- one row per granule harvested
 - one table per array, e.g. `sst(file_id, idx0..idxN, present, offset, size)`
   keyed on (file_id, within-file chunk coordinate), WITHOUT ROWID so the
   chunk lookup is a single clustered-key seek
 
-That is the whole schema. The store knows nothing about time, datasets,
-mirrors, or Zarr. It answers exactly one question: for this source, this
-array, this chunk -- where are the bytes.
+The store knows nothing about time, datasets,
+mirrors, or Zarr. Where are the bytes for a given key.
 
 ### The source rule
 
