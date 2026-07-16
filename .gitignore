@@ -7,3 +7,5 @@ oisst-refs.sqlite
 .httr-oauth
 .DS_Store
 .quarto
+.positai
+README.html
