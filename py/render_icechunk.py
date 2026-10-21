@@ -8,10 +8,14 @@ left unwritten (they read as the fill value).
 
 Usage:
   python render_icechunk.py FLAT_DIR REPO_DIR [--target public] [--batch 200000]
+                            [--commit-every 1000000] [--split 365]
 
 --target picks the remap rules in arrays.json that turn the verbatim
 sources into URLs Icechunk can fetch (https://, s3://, or file:// for a
-local path). One virtual chunk container is registered per scheme+host
+local path). Manifests are split every --split chunks along the first axis
+and the session is committed every --commit-every refs, so the pending change
+set and each commit stay bounded: the 22.8M refs of the GHRSST MUR daily series
+in one session or one manifest need more than 14 GB. One virtual chunk container is registered per scheme+host
 (or bucket), with anonymous access; edit `container_for` for credentials.
 
 Zarr v2 codec ids map to Zarr v3: bytes (dtype byte order), then
@@ -111,6 +115,9 @@ def main():
     p.add_argument("repo")
     p.add_argument("--target", default="public")
     p.add_argument("--batch", type=int, default=200_000)
+    p.add_argument("--commit-every", type=int, default=1_000_000)
+    p.add_argument("--split", type=int, default=365,
+                   help="chunks along the first axis per manifest (0: no splitting)")
     a = p.parse_args()
 
     doc = json.load(open(os.path.join(a.flat, "arrays.json")))
@@ -130,6 +137,9 @@ def main():
             containers[prefix] = store
             auth[prefix] = cred
     cfg = icechunk.RepositoryConfig.default()
+    if a.split > 0:
+        cfg.manifest = icechunk.ManifestConfig(splitting=icechunk.ManifestSplittingConfig.from_dict(
+            {icechunk.ManifestSplitCondition.AnyArray(): {icechunk.ManifestSplitDimCondition.Axis(0): a.split}}))
     for prefix, store in containers.items():
         cfg.set_virtual_chunk_container(icechunk.VirtualChunkContainer(prefix, store))
     shutil.rmtree(a.repo, ignore_errors=True)
@@ -147,7 +157,7 @@ def main():
                               dimension_names=r["dims"], attributes=r.get("attrs") or {},
                               fill_value=None)
         z[:] = v
-    nref = 0
+    nref, pending, ncommit = 0, 0, 0
     for r in rows:
         if r["storage"] != "referenced":
             continue
@@ -175,11 +185,18 @@ def main():
             if failed:
                 sys.exit(f"{r['array']}: {len(failed)} refs rejected, first {failed[:3]}")
             nref += len(specs)
+            pending += len(specs)
+            if pending >= a.commit_every:
+                session.commit(f"mdim-refs flat store refs to {nref}")
+                session = repo.writable_session("main")
+                store = session.store
+                root = zarr.open_group(store, mode="r+")
+                pending, ncommit = 0, ncommit + 1
         print(f"  {r['array']}: shape {r['shape']} chunks {r['chunks']}", file=sys.stderr)
     snap = session.commit(f"mdim-refs flat store {os.path.abspath(a.flat)}, target {a.target}")
     size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(a.repo) for f in fs)
     print(f"icechunk: {nref} virtual refs, {len(coords)} coords, containers {sorted(containers)}, "
-          f"snapshot {snap}, {size / 1e6:.1f} MB, {time.time() - t0:.1f} s", file=sys.stderr)
+          f"snapshot {snap} ({ncommit + 1} commits), {size / 1e6:.1f} MB, {time.time() - t0:.1f} s", file=sys.stderr)
 
 
 if __name__ == "__main__":
