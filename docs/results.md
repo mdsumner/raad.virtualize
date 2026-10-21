@@ -69,5 +69,5 @@ chunk per array, plus `scale_factor` and fill value.
 | flat | R | Paths verbatim; remap rules travel in `arrays.json`. |
 | MDIM VRT | R | Loses dimension type and direction, which the store does not hold. |
 | kerchunk | R | Builds the whole positional grid in memory. |
-| Icechunk | Python | One virtual chunk container per host. Consider `ManifestSplittingConfig` along time for many years. |
+| Icechunk | Python | One virtual chunk container per host. Manifests split along the first axis (`--split`, default 365) and the load commits every `--commit-every` refs (default 1M): the GHRSST MUR series, 22.8M refs, builds in 255 s at 4.7 GB peak (568 MB store). |
 | verify | Python | `--published` reads the forms from object storage. |
