@@ -1,118 +1,218 @@
 # raad.virtualize
 
-Virtualization of the raad file collection and related online datasets: one
-central store of byte references, from which published cloud-native forms
-(kerchunk, Icechunk, VRT) are derived as projections.
+Virtualization of archival array collections (local file mirrors and online
+datasets): one central store of byte references, from which published
+cloud-native forms (kerchunk, Icechunk, VRT) are derived as projections.
 
-This repo is not stable and will change shape. This README documents the
-model; the implementation spans several software projects currently in flux.
+This repo is a working stage and will change shape and name. This README
+documents the model and the pipeline that implements it.
 
 
 ## Design
 
 Every array dataset consists of granules (netCDF, HDF5, COG, GRIB) in which
 each chunk of each array occupies a byte range. Cloud-native access to
-archival data — kerchunk, VirtualiZarr, Icechunk, GDAL multidim VRT — all
-reduces to knowing those byte ranges and pointing readers at them, but the tools
-store the information in memory or in bespoke file stores. 
+archival data (kerchunk, VirtualiZarr, Icechunk, GDAL multidim VRT) reduces
+to knowing those byte ranges and pointing readers at them, but the tools
+store the information in memory or in bespoke file stores.
 
-This project inverts that model: each granule is scanned once into a durable
-store. Every published form is then a projection of the store — a remap of
-URIs, a selection of files, an assignment of a global index, a serialization.
-The expensive operation (reading chunk indexes out of 16k+ HDF5 files) could in theory be
-run only once. 
+In this project each granule is scanned once into a durable store. Every
+published form is then a projection of the store: a remap of URIs, a
+selection of files, an assignment of a global index, a serialization. The
+expensive operation (reading chunk indexes out of thousands of HDF5 files)
+runs once per granule.
 
 ## The store
 
-A plain SQLite database with two tables:
+The store is a SQLite database in the mdim-refs/0.2 layout (specification:
+wxylib/design, `specs/mdim-refs-0.2.md`). It has three layers:
 
-- `files(file_id, source)` — one row per granule harvested
-- one table per array, e.g. `sst(file_id, idx0..idxN, present, offset, size)`
-  keyed on (file_id, within-file chunk coordinate)
+- **physical**: `sources` (one row per granule, the URI as harvested, size,
+  mtime) and one chunk table per array, keyed on (source, within-source
+  chunk coordinate), with `present`, `offset`, `size`
+- **plan**: `arrays` (shape, chunks, dtype, codec, fill, attributes) and
+  `placements` (where each source's slab lands in the global array), both
+  taken from a `gdal mdim mosaic` VRT
+- **view**: `refs_<array>` views that join the two into global chunk
+  coordinates
 
-The store has no knowledge of time, datasets, mirrors, or Zarr. It answers
-exactly one question: for this source, this array, this chunk — where are the
-bytes.
+`meta` records the dataset name, format version, creation time, the plan
+file, and the code revision and configuration that built the store.
+`remap` holds URI rewrite rules per publish target.
 
 ### The source rule
 
-A source is the URI at harvest time — `file:///rdsi/...`, `https://...`,
-`/vsis3/...` — recorded verbatim. That URI is the key that byte offsets are
-bound to. Downstream consumers treat it as "where and what was harvested" and
-remap by their own rules (local root to public https, vsis3 to s3://, mirror
-to mirror). No remapping knowledge is encoded in the store, because those
-rules differ per dataset and change over time.
+A source is the URI at harvest time (`/g/data/...`, `https://...`,
+`/vsicurl/...`, `/vsis3/...`) recorded verbatim. That URI is the key that
+byte offsets are bound to. Remap rules are stored beside the chunk tables
+and applied only when a form is rendered (local root to public https,
+/vsicurl/ to https, mirror to mirror); the chunk tables are never rewritten.
 
-Because prelim/final churn arrives as *renamed files*, a given source
-string is immutable content. Incremental
-harvest is "scan the sources not already in the store". Preliminary and final
-versions of a day coexist in the store as distinct sources; choosing
-between them is a projection.
+Because prelim/final churn arrives as *renamed files*, a given source string
+is immutable content. Incremental harvest is "scan the sources not already in
+the store". Preliminary and final versions of a day coexist in the store as
+distinct sources; choosing between them is a projection.
 
 ## Projections
 
-Dataset-specific logic lives in projections, applied at read/publish time:
+Dataset-specific logic lives in projections, applied at publish time:
 
-- date extraction from filenames and assignment of a global time index
+- date extraction and global index assignment, delegated to `gdal mdim
+  mosaic` (the plan)
 - dedup policy (prefer final over preliminary, or keep both as two canons)
 - URI remapping to whichever endpoint a published form should reference
-- join with array metadata (dtype, chunk shape, codec, fill, coordinates),
-  which the store deliberately does not hold — it comes from the mdim VRT
-  or from template-parsing a single representative granule
+- array metadata (dtype, chunk shape, codec, fill, coordinates), read from
+  the plan and the first source
 
 A "canon" is the store plus a projection: the OISST daily cube is the store
-joined with the VRT concat logic. One store can carry many canons.
+joined with the mosaic concatenation. One store can carry many canons.
 
 ## Published forms
 
-Three sibling renderings, none derived from another:
+Four renderings, all from the store and none derived from another:
 
-1. **GDAL multidim VRT** — built by `vrtstack` from the file listing plus a
-   time-pattern rule; updated daily at
-   https://projects.pawsey.org.au/aad-index/oisst/oisst-mdim.vrt.
-   Carries the array structure, attributes, and inline coordinates; it is
-   the metadata half that the store does not duplicate.
-2. **kerchunk (parquet)** — full-rewrite manifest for fsspec/xarray interop.
-3. **Icechunk** — the transactional target: bulk-load history once, then
-   append new days as commits. Records referenced-file mtimes and errors
-   clearly if a source file changes under a stale ref, which matters given
-   prelim/final churn across three mirrors.
+1. **Flat refs store**: `arrays.json`, `refs_<array>.parquet` and
+   `sources.parquet`. Read by wxylib (`wxy-refs`) and by any Parquet reader.
+2. **GDAL multidim VRT**: rebuilt from `placements`, so it can be remapped.
+3. **kerchunk Parquet**: fsspec layout, readable by xarray and by GDAL
+   (`ZARR:"/vsikerchunk_parquet_ref/{DIR}"`).
+4. **Icechunk**: virtual references, one virtual chunk container per source
+   host.
 
-`blocklist::virtualize_mosaic` already produces stage-2 output from the
-VRT; the remaining consolidation is rewiring it to read refs from the store
-instead of rescanning files, at which point publish steps have no file
-access at all and can run anywhere the (small) store and VRT are reachable.
+Each form carries the store's `meta` as root attributes.
+
+## Pipeline
+
+```
+sources --(plan: gdal mdim mosaic)------> plan.vrt
+        --(harvest: py/harvest.py)------> scan/   one Parquet fragment per source
+        --(collate: R/collate.R)--------> store.sqlite   mdim-refs/0.2
+        --(render: R/render.R)----------> out/flat/  out/mdim.vrt  out/kerchunk/
+        --(icechunk: py/render_icechunk.py, from out/flat)--> out/icechunk/
+        --(verify: py/verify.py)--------> every form against GDAL on the sources
+        --(publish, verify-published)---> object storage, then read back and verified
+```
+
+```sh
+bash run.sh config/bransynth.sh                  # synthetic BRAN-shaped, local, about 10 s
+bash run.sh config/oisst.sh                      # OISST Sept 1981 from NOAA S3, about 1 min
+BRAN_VAR=salt BRAN_MONTHS="01 02" bash run.sh config/bran.sh   # BRAN smoke test over THREDDS
+BRAN_YEARS=2010 bash run.sh config/bran.sh       # one BRAN year, about 1.1M refs
+bash run.sh config/bran.sh config/aadc-transfer.sh publish verify-published
+```
+
+Every leading `*.sh` argument is sourced in order (a dataset, then
+optionally a publish target). Steps can be named to run a subset
+(`bash run.sh config/bran.sh collate render`). Work goes to
+`work/<DATASET>/` (or `$E2E_WORK`), and each step logs to `log.txt` there.
+Harvest is restartable: a source whose fragments exist is skipped.
+
+| Variable | Meaning |
+|---|---|
+| `WORKERS` | parallel harvest workers |
+| `HARVEST_ENGINE` | `auto` (h5py for local netCDF4/HDF5, GDAL for remote), `gdal`, `h5py` |
+| `HARVEST_LIMIT` | scan only the first N sources |
+| `BRAN_YEARS`, `BRAN_MONTHS`, `BRAN_VAR`, `BRAN_ROOT` | BRAN selection; a month subset gets its own dataset name |
+| `VERIFY_WINDOWS` | explicit `--window ARRAY:START:COUNT` checks |
+| `PYTHON`, `RSCRIPT`, `GDAL` | executables |
+| `R_LIB` | R library used ahead of the system one (default `./r-lib`) |
+| `PUBLISH`, `AADC_PREFIX` | publish prefix (`/vsis3/...`), set by a publish config |
+
+### Environment
+
+conda-forge:
+
+```sh
+micromamba create -n rv -c conda-forge python=3.12 "gdal>=3.12" libgdal-netcdf \
+  libgdal-hdf5 libgdal-arrow-parquet pyarrow numpy h5py fsspec aiohttp netcdf4 \
+  icechunk zarr xarray r-base r-dbi r-rsqlite r-jsonlite r-xml2 r-arrow r-blob
+```
+
+Or the hypertidy image, with the missing R packages installed once into
+`./r-lib` by the `deps` step:
+
+```sh
+docker run --rm -ti -v $(pwd):$(pwd) -w $(pwd) \
+  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY ghcr.io/hypertidy/gdal-r-python:dev bash
+bash run.sh config/bran.sh deps
+```
+
+The container runs as root, so `work/` and `r-lib/` are root-owned on the
+host. `deps` installs Posit Package Manager binaries for the distro where it
+can, so arrow does not build from source.
+
+### Publishing
+
+`config/aadc-transfer.sh` targets the AADC transfer bucket
+(`transfer.data.aad.gov.au`, path style; private, keys from the AADC
+website). Credentials come from `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` in the environment and are not stored. `publish`
+syncs `out/`, `plan.vrt` and `store.sqlite` to `<prefix>/<DATASET>/`.
+`verify-published` reads the VRT, kerchunk and Icechunk forms back from the
+bucket and checks them against GDAL on the sources.
+
+### Reading the outputs
+
+```python
+import icechunk, xarray as xr, zarr
+zarr.config.set({"async.concurrency": 4})   # THREDDS resets connections at the default of 10
+st = icechunk.local_filesystem_storage("work/bran2023-daily-temp/out/icechunk")
+repo = icechunk.Repository.open(st, authorize_virtual_chunk_access={
+    "https://thredds.nci.org.au/": icechunk.credentials.HttpAccess})
+ds = xr.open_zarr(repo.readonly_session("main").store, consolidated=False)
+```
+
+```sh
+gdal mdim info /vsis3/aadc-transfer/michae_sum/e2e/bran2023-daily-temp/mdim.vrt
+gdal mdim info 'ZARR:"/vsikerchunk_parquet_ref/{work/bran2023-daily-temp/out/kerchunk}"'
+```
+
+Known limits for readers: GDAL's Zarr v3 reader has no `numcodecs.shuffle`,
+so GDAL does not read shuffled arrays from the Icechunk store (kerchunk is
+Zarr v2 and is read). xarray decodes packed int16 to float64 from the
+Icechunk and kerchunk stores, because the JSON attributes do not keep the
+float32 type of `scale_factor`. Results and findings are in
+[docs/results.md](docs/results.md).
+
+## Files
+
+- `run.sh`: driver. `config/*.sh`: datasets (sources, arrays, remap rules,
+  render targets) and publish targets.
+- `py/harvest.py`: harvest engines (GDAL `GetRawBlockInfo`, h5py
+  `chunk_iter`). `py/probe_harvest.py`: request and byte counts for one
+  source. `py/render_icechunk.py`, `py/verify.py`: Icechunk render and
+  verification. `py/make_bran_synth.py`: BRAN-shaped synthetic files with
+  unwritten chunks.
+- `R/mdimrefs.R`: the mdim-refs/0.2 reference implementation, copied with a
+  JSON precision fix. `R/mdimrefs_pipeline.R`: directory ingest, flat store,
+  VRT renderer and the kerchunk writer from blocklist (vendored with the
+  same fix). `R/collate.R`, `R/render.R`: steps 3 and 4.
+  `R/install-deps.R`: the `deps` step.
+- `legacy/`: the earlier two-table OISST store (`store.R`, `oisst_harvest.R`,
+  `oisst_to_icechunk.py`). The release artifact `oisst-refs.sqlite` and
+  [with-oisst-gdal.md](with-oisst-gdal.md) use that layout.
 
 ## Current state
 
-- **OISST** (NOAA v2.1 AVHRR daily, 1981-09-01 to present): fully harvested.
-  16,387 files, four rank-4 arrays (sst, anom, err, ice), scanned on raad
-  openstack against the /rdsi mirror in ~20 minutes with 8 mirai daemons.
-  The store is published as a release artifact: `oisst-refs.sqlite`.
-  Coverage is daily-complete, so the time axis is affine
-  (origin + index * 1 day) and need not be stored.
-- **blocklist** does the per-file scan (`scan_source_chunks`) and the
-  VRT parse (`parse_mosaic_vrt`); recent performance work makes the scan
-  practical at collection scale.
-- **vrtstack** renders the mosaic VRT from a listing plus concat rule.
+- **BRAN2023 daily** over NCI THREDDS: `temp` 2010 (1,116,900 refs;
+  collate 12 s, render 16 s, Icechunk 5 s) verified locally and published to
+  the AADC transfer bucket; `salt` January and February 2010 published and
+  verified from the bucket.
+- **OISST** (NOAA v2.1 AVHRR daily, 1981-09-01 to present): fully harvested
+  in the legacy layout, 16,387 files, published as `oisst-refs.sqlite`. One
+  month runs through the current pipeline as a test.
 
 ## Roadmap
 
-- Rewire stage 2 (kerchunk/Icechunk emission) to read from the store; the
-  scan then happens exactly once per granule across all published forms.
-- Feed the store from the raad openstack file cache: every dataset
-  raadtools handles is a candidate, since the schema is dataset-agnostic.
-- Add online-only datasets harvested remotely: GHRSST COGs (source.coop),
-  Bluelink/BRAN (NCI + THREDDS). The store does not distinguish between
-  local and remote sources — the source rule covers both.
-- A small per-dataset registry (arrays, roots, remap rules, dedup policy)
-  beside the store — projection config, kept out of the chunk tables.
-- Longer term this store is a prototype of the reference-extraction
-  model proposed for GDAL itself (`gdal mdim` chunk-reference extraction,
-  built on `GDALMDArray::GetRawBlockInfo`): the same table, produced by one
-  code path for every driver, consumable as a virtual multidim store.
-
-See [with-oisst-gdal.md](with-oisst-gdal.md) for an example of the general
-store structure with OISST data via GDAL.
-
-
+- Ingest the legacy OISST store into mdim-refs/0.2, or reharvest.
+- Feed the store from local file mirrors (the raad collection on openstack):
+  the schema is dataset-agnostic.
+- More online datasets: GHRSST COGs (source.coop), further BRAN variables
+  and years. Beyond a few years of BRAN, materialise `refs_<array>` (the
+  view has no index) and batch the mosaic.
+- Record attribute types in the store, so readers keep float32 packing.
+- Production publishing to the public endpoints (Pawsey, source.coop).
+- Longer term this store is a prototype of the reference-extraction model
+  proposed for GDAL itself (`gdal mdim` chunk-reference extraction, built on
+  `GDALMDArray::GetRawBlockInfo`): the same table, produced by one code path
+  for every driver, consumable as a virtual multidim store.
