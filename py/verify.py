@@ -152,7 +152,10 @@ def source_scale(plan, name):
     m = gdal.OpenEx(src, gdal.OF_MULTIDIM_RASTER).GetRootGroup().OpenMDArray(name)
     if m.GetScale() is not None:
         return m.GetScale()
-    at = m.GetAttribute("scale_factor")
+    try:
+        at = m.GetAttribute("scale_factor")
+    except RuntimeError:  # unpacked array (e.g. BRAN w); raised under UseExceptions
+        at = None
     return at.ReadAsDouble() if at is not None else 1.0
 
 
