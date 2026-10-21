@@ -12,11 +12,13 @@ Usage:
 
 --target picks the remap rules in arrays.json that turn the verbatim
 sources into URLs Icechunk can fetch (https://, s3://, or file:// for a
-local path). Manifests are split every --split chunks along the first axis
-and the session is committed every --commit-every refs, so the pending change
-set and each commit stay bounded: the 22.8M refs of the GHRSST MUR daily series
-in one session or one manifest need more than 14 GB. One virtual chunk container is registered per scheme+host
+local path). One virtual chunk container is registered per scheme+host
 (or bucket), with anonymous access; edit `container_for` for credentials.
+
+Manifests are split every --split chunks along the first axis and the
+session is committed every --commit-every refs, so the pending change set and
+each commit stay bounded: the 22.8M refs of the GHRSST MUR daily series in one
+session or one manifest need more than 14 GB.
 
 Zarr v2 codec ids map to Zarr v3: bytes (dtype byte order), then
 numcodecs.shuffle, then numcodecs.zlib / gzip / zstd. Anything else stops.
@@ -187,16 +189,18 @@ def main():
             nref += len(specs)
             pending += len(specs)
             if pending >= a.commit_every:
-                session.commit(f"mdim-refs flat store refs to {nref}")
+                snap = session.commit(f"mdim-refs flat store refs to {nref}")
                 session = repo.writable_session("main")
                 store = session.store
                 root = zarr.open_group(store, mode="r+")
                 pending, ncommit = 0, ncommit + 1
         print(f"  {r['array']}: shape {r['shape']} chunks {r['chunks']}", file=sys.stderr)
-    snap = session.commit(f"mdim-refs flat store {os.path.abspath(a.flat)}, target {a.target}")
+    if pending or not ncommit:  # a batch commit may already hold every ref
+        snap = session.commit(f"mdim-refs flat store {os.path.abspath(a.flat)}, target {a.target}")
+        ncommit += 1
     size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(a.repo) for f in fs)
     print(f"icechunk: {nref} virtual refs, {len(coords)} coords, containers {sorted(containers)}, "
-          f"snapshot {snap} ({ncommit + 1} commits), {size / 1e6:.1f} MB, {time.time() - t0:.1f} s", file=sys.stderr)
+          f"snapshot {snap} ({ncommit} commits), {size / 1e6:.1f} MB, {time.time() - t0:.1f} s", file=sys.stderr)
 
 
 if __name__ == "__main__":
