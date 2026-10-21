@@ -21,8 +21,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIGS=()
 while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$1")"); shift; done
 # Provenance stamped into the store meta (and so into every rendered form).
-REV=$(git -C "$HERE" describe --always --dirty 2>/dev/null || echo unversioned)
-REPO=$(git -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#")
+# safe.directory: a container running as root may not own the checkout.
+REV=$(git -c safe.directory="$HERE" -C "$HERE" describe --always --dirty 2>/dev/null || echo unversioned)
+REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#")
 export E2E_GENERATOR="${E2E_REPO:-${REPO:-local}} $REV" E2E_CONFIG="${CONFIGS[*]}"
 STEPS=${*:-plan harvest collate render icechunk verify}
 PYTHON=${PYTHON:-python}; RSCRIPT=${RSCRIPT:-Rscript}; GDAL=${GDAL:-gdal}
