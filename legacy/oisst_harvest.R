@@ -3,7 +3,7 @@
 ## references to LOCAL /rdsi paths (a projection rule, applied HERE, not stored),
 ## scan what's present, and record source = the local URI we actually read.
 ## ----------------------------------------------------------------------------
-source("R/store.R")
+source("legacy/store.R")
 
 ## 1. the files to harvest, from the daily-updated published VRT
 vrt <- tempfile(fileext = ".vrt")

@@ -9,3 +9,6 @@ oisst-refs.sqlite
 .quarto
 .positai
 README.html
+work/
+r-lib/
+__pycache__/
