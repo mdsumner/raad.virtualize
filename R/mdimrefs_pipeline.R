@@ -53,7 +53,7 @@ mr_ingest_scan_dir <- function(con, dir, verbose = TRUE) {
       nm, paste(info, collapse = " | ")))
     mr_add_array(con, nm, dims = unlist(m$dims), chunks = unlist(m$chunks),
                  dtype = m$dtype, fill = m$nodata %||% NA,
-                 codec = if (length(info)) mr_codec_from_info(info, m$dtype) else NULL,
+                 codec = if (length(info)) mr_codec_from_info(info, m$dtype, unlist(m$chunks)) else NULL,
                  attrs = .cf_attrs(m))
     t0 <- Sys.time(); n <- 0
     for (f in frags) {
@@ -216,11 +216,18 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
       for (i in seq_len(nrow(P))) {
         s <- xml2::xml_add_child(node, "Source")
         xml2::xml_add_child(s, "SourceFilename", P$path[i])
-        xml2::xml_add_child(s, "SourceArray", paste0("/", P$source_array[i]))
         cn <- .fj(P$count[i])
-        xml2::xml_add_child(s, "SourceSlab", offset = paste(.fj(P$src_offset[i]), collapse = ","),
-                            count = paste(cn, collapse = ","),
-                            step = paste(rep(1L, length(cn)), collapse = ","))
+        if (startsWith(P$source_array[i], "band:")) {
+          ## a raster band, given a leading length-1 axis (the vrtstack form)
+          xml2::xml_add_child(s, "SourceBand", sub("^band:", "", P$source_array[i]))
+          xml2::xml_add_child(s, "SourceTranspose",
+                              paste(c(-1L, seq_len(length(cn) - 1L) - 1L), collapse = ","))
+        } else {
+          xml2::xml_add_child(s, "SourceArray", paste0("/", P$source_array[i]))
+          xml2::xml_add_child(s, "SourceSlab", offset = paste(.fj(P$src_offset[i]), collapse = ","),
+                              count = paste(cn, collapse = ","),
+                              step = paste(rep(1L, length(cn)), collapse = ","))
+        }
         xml2::xml_add_child(s, "DestSlab", offset = paste(.fj(P$dest[i]), collapse = ","))
       }
     }

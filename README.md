@@ -100,6 +100,7 @@ BRAN_VAR=salt BRAN_MONTHS="01 02" bash run.sh config/bran.sh   # BRAN smoke test
 BRAN_YEARS=2010 bash run.sh config/bran.sh       # one BRAN year, about 1.1M refs
 bash run.sh config/bran.sh config/aadc-transfer.sh publish verify-published
 GHRSST_ROOT=/path/to/MUR/v4.1 GHRSST_YEARS=2024 bash run.sh config/ghrsst.sh   # MUR netCDF, local
+GHRSST_YEARS=2024 bash run.sh config/ghrsst-cog.sh   # MUR COGs on source.coop, one year
 ```
 
 Every leading `*.sh` argument is sourced in order (a dataset, then
@@ -115,6 +116,7 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `HARVEST_LIMIT` | scan only the first N sources |
 | `ICECHUNK_ARGS` | extra `py/render_icechunk.py` options: `--split N` chunks along the first axis per manifest (default 365, 0 for none), `--commit-every N` refs (default 1M) |
 | `BRAN_YEARS`, `BRAN_MONTHS`, `BRAN_VAR`, `BRAN_ROOT` | BRAN selection; a month subset gets its own dataset name |
+| `GHRSST_VAR`, `GHRSST_YEARS`, `GHRSST_COG_ROOT` | GHRSST COG selection (`config/ghrsst-cog.sh`) |
 | `VERIFY_WINDOWS` | explicit `--window ARRAY:START:COUNT` checks |
 | `PYTHON`, `RSCRIPT`, `GDAL` | executables |
 | `R_LIB` | R library used ahead of the system one (default `./r-lib`) |
@@ -127,8 +129,14 @@ conda-forge:
 ```sh
 micromamba create -n rv -c conda-forge python=3.12 "gdal>=3.12" libgdal-netcdf \
   libgdal-hdf5 libgdal-arrow-parquet pyarrow numpy h5py fsspec aiohttp netcdf4 \
-  icechunk zarr xarray r-base r-dbi r-rsqlite r-jsonlite r-xml2 r-arrow r-blob
+  icechunk zarr xarray r-base r-dbi r-rsqlite r-jsonlite r-xml2 r-arrow r-blob \
+  imagecodecs fastparquet
 ```
+
+`imagecodecs` and `fastparquet` are needed only for TIFF sources with a
+predictor (the GHRSST COGs): the Icechunk render and the Python kerchunk
+check in verify use them. In the docker image, `pip install imagecodecs
+fastparquet`.
 
 Or the hypertidy image, with the missing R packages installed once into
 `./r-lib` by the `deps` step:
@@ -169,7 +177,14 @@ gdal mdim info /vsis3/aadc-transfer/michae_sum/e2e/bran2023-daily-temp/mdim.vrt
 gdal mdim info 'ZARR:"/vsikerchunk_parquet_ref/{work/bran2023-daily-temp/out/kerchunk}"'
 ```
 
-Known limits for readers: GDAL's Zarr v3 reader has no `numcodecs.shuffle`,
+Known limits for readers: TIFF `PREDICTOR=2` (horizontal differencing,
+restarted on every row) is written as the `imagecodecs_delta` filter, as
+tifffile writes it; numcodecs `delta` runs over the flattened chunk and
+decodes the first value of every row wrongly. Readers of the kerchunk and
+Icechunk forms then need imagecodecs (`imagecodecs.numcodecs.register_codecs()`
+or `imagecodecs.zarr.register_codecs()`), and GDAL's Zarr driver reads
+neither form; the VRT form reads the TIFFs directly and is unaffected.
+GDAL's Zarr v3 reader has no `numcodecs.shuffle`,
 so GDAL does not read shuffled arrays from the Icechunk store (kerchunk is
 Zarr v2 and is read). xarray decodes packed int16 to float64 from the
 Icechunk and kerchunk stores, because the JSON attributes do not keep the
@@ -181,7 +196,9 @@ float32 type of `scale_factor`. Results and findings are in
 - `run.sh`: driver. `config/*.sh`: datasets (sources, arrays, remap rules,
   render targets) and publish targets.
 - `py/harvest.py`: harvest engines (GDAL `GetRawBlockInfo`, h5py
-  `chunk_iter`). `py/probe_harvest.py`: request and byte counts for one
+  `chunk_iter`, and the TIFF tile index for GeoTIFF sources).
+  `py/plan_cog.py`: the plan for a daily GeoTIFF series, in the
+  hypertidy/vrtstack form (`gdal mdim mosaic` does not take GeoTIFF). `py/probe_harvest.py`: request and byte counts for one
   source. `py/render_icechunk.py`, `py/verify.py`: Icechunk render and
   verification. `py/make_bran_synth.py`: BRAN-shaped synthetic files with
   unwritten chunks.
@@ -200,6 +217,9 @@ float32 type of `scale_factor`. Results and findings are in
   collate 12 s, render 16 s, Icechunk 5 s) verified locally and published to
   the AADC transfer bucket; `salt` January and February 2010 published and
   verified from the bucket.
+- **GHRSST MUR COGs** (source.coop): the TIFF path verified end to end on
+  synthetic COGs of the same encoding (Int16, ZSTD, `PREDICTOR=2`, a sparse
+  tile, a missing day); not yet run against the bucket.
 - **OISST** (NOAA v2.1 AVHRR daily, 1981-09-01 to present): fully harvested
   in the legacy layout, 16,387 files, published as `oisst-refs.sqlite`. One
   month runs through the current pipeline as a test.
@@ -209,8 +229,10 @@ float32 type of `scale_factor`. Results and findings are in
 - Ingest the legacy OISST store into mdim-refs/0.2, or reharvest.
 - Feed the store from local file mirrors (the raad collection on openstack):
   the schema is dataset-agnostic.
-- More online datasets: GHRSST COGs (source.coop), further BRAN variables
-  and years. Beyond a few years of BRAN, materialise `refs_<array>` (the
+- GHRSST COGs (source.coop): the full `analysed_sst` series (about 22.8M
+  refs) as the Icechunk scale test, then the other variables. An async-tiff
+  harvest engine would read the tile indexes faster than GDAL.
+- Further BRAN variables and years. Beyond a few years of BRAN, materialise `refs_<array>` (the
   view has no index) and batch the mosaic.
 - Record attribute types in the store, so readers keep float32 packing.
 - Production publishing to the public endpoints (Pawsey, source.coop).

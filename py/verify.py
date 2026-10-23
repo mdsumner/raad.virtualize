@@ -6,6 +6,9 @@ Readers, all raw (no scale/offset applied):
             the oracle)
   vrt       GDAL multidim on the VRT rendered from the store (R/render.R)
   kerchunk  GDAL on ZARR:"/vsikerchunk_parquet_ref/<dir>" (kerchunk Parquet)
+  kerchunk-py  fsspec + zarr-python on the same Parquet, only when an array
+            carries an imagecodecs filter (TIFF predictor), which GDAL's Zarr
+            driver cannot decode; local OUT_DIR only
   icechunk  zarr-python on the Icechunk repository (virtual refs)
 
 Usage:
@@ -51,6 +54,25 @@ def gdal_reader(path):
     return read
 
 
+def uses_imagecodecs(doc):
+    return any(f.get("id", "").startswith("imagecodecs_")
+               for r in doc["arrays"] for f in ((r.get("codec") or {}).get("filters") or []))
+
+
+def kerchunk_py_reader(path):
+    import fsspec
+    import imagecodecs.numcodecs
+    import zarr
+    imagecodecs.numcodecs.register_codecs()
+    fs = fsspec.filesystem("reference", fo=path, lazy=True)  # protocol per ref
+    g = zarr.open_group(fs.get_mapper(""), mode="r", zarr_format=2)
+
+    def read(name, start, count):
+        return g[name][tuple(slice(s, s + c) for s, c in zip(start, count))]
+    read.attrs = lambda name: dict(g[name].attrs)
+    return read
+
+
 def s3_storage(vsis3):
     """Icechunk storage for a /vsis3/bucket/prefix path, using GDAL's S3 env."""
     import icechunk
@@ -68,6 +90,11 @@ def s3_storage(vsis3):
 def icechunk_reader(repo):
     import icechunk
     import zarr
+    try:  # imagecodecs_delta (TIFF PREDICTOR=2) and friends, if installed
+        import imagecodecs.zarr
+        imagecodecs.zarr.register_codecs()
+    except ImportError:
+        pass
     storage = s3_storage(repo) if repo.startswith("/vsis3/") else icechunk.local_filesystem_storage(repo)
     cfg = icechunk.Repository.fetch_config(storage)
     auth = {c.url_prefix: (icechunk.s3_anonymous_credentials() if c.url_prefix.startswith("s3://")
@@ -179,6 +206,9 @@ def main():
                "vrt": lambda: gdal_reader(base + "/mdim.vrt"),
                "kerchunk": lambda: gdal_reader('ZARR:"/vsikerchunk_parquet_ref/{' + base + '/kerchunk}"'),
                "icechunk": lambda: icechunk_reader(base + "/icechunk")}
+    predictor = uses_imagecodecs(doc)
+    if predictor and not a.published:
+        readers["kerchunk-py"] = lambda: kerchunk_py_reader(base + "/kerchunk")
     if a.published:
         print("reading vrt, kerchunk, icechunk from", base)
     opened = {}
@@ -210,7 +240,11 @@ def main():
             same = ref is not None and v is not None and ref[3] is not None and \
                 v.shape == ref[3].shape and np.array_equal(v.astype("f8"), ref[3].astype("f8"))
             flag = "oracle" if k == "plan" else ("SAME" if same else "DIFFERENT")
-            if k == "kerchunk" and v is None and touches_absent(absent.get(name, ()), chunks[name], start, count):
+            if k == "kerchunk" and v is None and predictor:
+                # imagecodecs_delta (TIFF PREDICTOR=2) is not a GDAL Zarr filter
+                flag = "KNOWN GDAL LIMIT (imagecodecs filter)"
+                known += 1
+            elif k == "kerchunk" and v is None and touches_absent(absent.get(name, ()), chunks[name], start, count):
                 # GDAL 3.13 /vsikerchunk_parquet_ref treats a row with null
                 # path and null raw (fsspec's "no such chunk") as a path to
                 # open, instead of a missing chunk read as fill ("Too large
@@ -218,7 +252,7 @@ def main():
                 flag = "KNOWN GDAL BUG (absent chunk)"
                 known += 1
             bad += flag == "DIFFERENT"
-            print(f"  {k:9s} {h:18s} {dt:4s} {sec:6.2f} s  {flag}")
+            print(f"  {k:11s} {h:18s} {dt:4s} {sec:6.2f} s  {flag}")
 
     if "plan" in opened:
         print("\nscale_factor and fill (GDAL on the plan vs the store and each form)")
@@ -240,7 +274,11 @@ def main():
                 if k == "plan":
                     continue
                 if hasattr(rd, "group"):
-                    m = rd.group.OpenMDArray(r["array"])
+                    try:
+                        m = rd.group.OpenMDArray(r["array"])
+                    except RuntimeError as e:
+                        print(f"    {k:11s} cannot open: {e}")
+                        continue
                     got[k] = (m.GetScale() if m.GetScale() is not None else 1.0, m.GetNoDataValue())
                 elif hasattr(rd, "attrs"):
                     at = rd.attrs(r["array"])
@@ -249,13 +287,13 @@ def main():
             for k, (sf, nd) in got.items():
                 ok = sf == want[0] and (nd == want[1] or (nd is None and want[1] is None))
                 bad += not ok
-                print(f"    {k:9s} scale {sf!r} fill {nd!r} {'ok' if ok else 'MISMATCH'}")
+                print(f"    {k:11s} scale {sf!r} fill {nd!r} {'ok' if ok else 'MISMATCH'}")
     if errors:
         print("\nread errors (full text)")
         for e in errors:
             print("  " + e)
     print("\nverify:", "all readers agree" if not bad else f"{bad} mismatches",
-          f"({known} reads hit the known GDAL kerchunk absent-chunk bug)" if known else "")
+          f"({known} GDAL kerchunk reads hit a known bug or limit)" if known else "")
     sys.exit(1 if bad else 0)
 
 
