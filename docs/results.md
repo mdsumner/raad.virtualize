@@ -17,7 +17,7 @@ chunk per array, plus `scale_factor` and fill value.
 | BRAN2023 `temp` 2010 over THREDDS | 1,116,900 refs. collate 12 s, render 16 s, Icechunk 5 s. VRT and kerchunk identical; Icechunk identical once read concurrency is lowered (finding 6). Published to the AADC transfer bucket; GDAL opens the VRT from there. |
 | BRAN2023 `salt` Jan-Feb 2010 over THREDDS | 180,540 refs. All forms identical, locally and read back from the bucket. |
 | GHRSST MUR `analysed_sst` COGs 2024 (source.coop) | 935,496 refs. harvest 47 s (8 workers), collate 14 s, render 12 s, Icechunk 4 s (18.4 MB). Published; VRT and Icechunk identical read back from the bucket. kerchunk not read by GDAL (finding 10). |
-| GHRSST MUR `analysed_sst` COGs 2002-2026 | 22,771,404 refs from 8,909 files. harvest 1,045 s, collate 385 s (1.2 GB store). Render stopped on the arrow string limit (finding 11), since fixed. |
+| GHRSST MUR `analysed_sst` COGs 2002-2026 | 22,771,404 refs from 8,909 files. harvest 1,045 s, collate 385 s (1.2 GB store). Render first stopped on the arrow string limit (finding 11); after the fix, render 282 s (flat 136 s, kerchunk 139 s), Icechunk 105 s, 568 MB in 23 commits. |
 | Publish to S3 | Tested against a local S3 mock (moto) on OISST and synthetic BRAN, then against the AADC transfer bucket. |
 
 ## Findings

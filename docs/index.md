@@ -50,7 +50,7 @@ sources -> plan (gdal mdim mosaic, or py/plan_cog.py for GeoTIFF)
 | BRAN2023 daily `temp` 2010 | NCI THREDDS (netCDF) | 1,116,900 | all forms verified; published to the AADC transfer bucket |
 | BRAN2023 daily `salt` Jan-Feb 2010 | NCI THREDDS (netCDF) | 180,540 | verified from the bucket |
 | GHRSST MUR `analysed_sst` 2024 | source.coop (COG) | 935,496 | VRT and Icechunk verified from the bucket |
-| GHRSST MUR `analysed_sst` 2002-2026 | source.coop (COG) | 22,771,404 | harvest (17 min) and collate (1.2 GB store) done; render in progress |
+| GHRSST MUR `analysed_sst` 2002-2026 | source.coop (COG) | 22,771,404 | harvest 17 min, collate 6 min (1.2 GB store), render 5 min, Icechunk 105 s (568 MB, 23 commits); verify in progress |
 
 The AADC transfer bucket is private staging. Public publication (Pawsey,
 source.coop) is a later step.
