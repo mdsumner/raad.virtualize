@@ -72,7 +72,7 @@ joined with the mosaic concatenation. One store can carry many canons.
 
 ## Published forms
 
-Four renderings, all from the store and none derived from another:
+Five renderings, all from the store and none derived from another:
 
 1. **Flat refs store**: `arrays.json`, `refs_<array>.parquet` and
    `sources.parquet`. Read by wxylib (`wxy-refs`) and by any Parquet reader.
@@ -81,8 +81,19 @@ Four renderings, all from the store and none derived from another:
    (`ZARR:"/vsikerchunk_parquet_ref/{DIR}"`).
 4. **Icechunk**: virtual references, one virtual chunk container per source
    host.
+5. **STAC**: a static catalog (`stac/collection.json`, `stac/items/`,
+   `stac/items.ndjson`, and `stac/items.parquet` in stac-geoparquet form
+   where `rustac` is installed). The collection describes the whole cube
+   with the datacube extension and carries one asset per form above (VRT,
+   kerchunk, Icechunk, flat refs, store, plan); each item is one source
+   granule, with its time range from the plan placement, its bbox, and the
+   projection fields where the grid is affine and the SRS known. The forms
+   in 1 to 4 serve readers of the cube; STAC serves search, discovery and
+   the granule-level readers (GDAL STACIT and GTI, gdalcubes, odc-stac,
+   stackstac).
 
-Each form carries the store's `meta` as root attributes.
+Each form carries the store's `meta` as root attributes (STAC: `rv:meta` on
+the collection).
 
 ## Pipeline
 
@@ -92,6 +103,7 @@ sources --(plan: gdal mdim mosaic)------> plan.vrt
         --(collate: R/collate.R)--------> store.sqlite   mdim-refs/0.2
         --(render: R/render.R)----------> out/flat/  out/mdim.vrt  out/kerchunk/
         --(icechunk: py/render_icechunk.py, from out/flat)--> out/icechunk/
+        --(stac: R/stac.R, from the store and plan)---------> out/stac/
         --(verify: py/verify.py)--------> every form against GDAL on the sources
         --(publish, verify-published)---> object storage, then read back and verified
 ```
@@ -121,6 +133,9 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `BRAN_YEARS`, `BRAN_MONTHS`, `BRAN_VAR`, `BRAN_ROOT` | BRAN selection; a month subset gets its own dataset name |
 | `GHRSST_VAR`, `GHRSST_YEARS`, `GHRSST_COG_ROOT` | GHRSST COG selection (`config/ghrsst-cog.sh`) |
 | `VERIFY_WINDOWS` | explicit `--window ARRAY:START:COUNT` checks |
+| `STAC_TARGET` | remap target for STAC item hrefs (default `KERCHUNK_TARGET`) |
+| `STAC_BASE` | URL of the published dataset prefix; collection asset hrefs become absolute and carry a GDAL open string (`rv:gdal`). Without it the hrefs are relative to the published layout. |
+| `STAC_ITEM_FILES` | `0` skips `stac/items/` (one file per granule) for long series; the ndjson and stac-geoparquet forms remain |
 | `PYTHON`, `RSCRIPT`, `GDAL` | executables |
 | `R_LIB` | R library used ahead of the system one (default `./r-lib`) |
 | `PUBLISH`, `AADC_PREFIX` | publish prefix (`/vsis3/...`), set by a publish config |
@@ -180,6 +195,25 @@ gdal mdim info /vsis3/aadc-transfer/michae_sum/e2e/bran2023-daily-temp/mdim.vrt
 gdal mdim info 'ZARR:"/vsikerchunk_parquet_ref/{work/bran2023-daily-temp/out/kerchunk}"'
 ```
 
+The STAC catalog, in R (rstac, gdalcubes) and from GDAL:
+
+```r
+coll  <- jsonlite::fromJSON("work/ghrsst-mur-cog-analysed_sst-2024/out/stac/collection.json")
+coll$assets$icechunk$`rv:virtual_chunk_containers`   # prefixes to authorize
+feats <- lapply(readLines(".../out/stac/items.ndjson"), jsonlite::fromJSON, simplifyVector = FALSE)
+ic <- gdalcubes::stac_image_collection(feats, asset_names = "data", url_fun = identity)
+```
+
+```sh
+gdal raster info GTI:work/ghrsst-mur-cog-analysed_sst-2024/out/stac/items.parquet   # 2D mosaic
+ogrinfo -so work/ghrsst-mur-cog-analysed_sst-2024/out/stac/items.parquet items      # items as a vector layer
+```
+
+`url_fun = identity` because gdalcubes prefixes `/vsicurl/` to every href
+by default, which breaks local paths. rstac `read_items()` on a local static
+catalog resolves item links to `:///path` and fails; over https it is
+unaffected.
+
 Known limits for readers: TIFF `PREDICTOR=2` (horizontal differencing,
 restarted on every row) is written as the `imagecodecs_delta` filter, as
 tifffile writes it; numcodecs `delta` runs over the flattened chunk and
@@ -202,7 +236,7 @@ float32 type of `scale_factor`. Results and findings are in
   `chunk_iter`, and the TIFF tile index for GeoTIFF sources).
   `py/plan_cog.py`: the plan for a daily GeoTIFF series, in the
   hypertidy/vrtstack form (`gdal mdim mosaic` does not take GeoTIFF). `py/probe_harvest.py`: request and byte counts for one
-  source. `py/render_icechunk.py`, `py/verify.py`: Icechunk render and
+  source. `R/stac.R`: the STAC render. `py/render_icechunk.py`, `py/verify.py`: Icechunk render and
   verification. `py/make_bran_synth.py`: BRAN-shaped synthetic files with
   unwritten chunks.
 - `R/mdimrefs.R`: the mdim-refs/0.2 reference implementation, copied with a

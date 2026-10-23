@@ -15,10 +15,13 @@
 #      HARVEST_ENGINE (auto | gdal | h5py; see py/harvest.py),
 #      R_LIB (default ./r-lib: R packages installed by the deps step),
 #      ICECHUNK_ARGS (extra py/render_icechunk.py options, e.g. "--split 0"),
-#      PUBLISH (a /vsis3/ prefix; set by config/aadc-transfer.sh).
+#      PUBLISH (a /vsis3/ prefix; set by config/aadc-transfer.sh),
+#      STAC_TARGET (remap target for STAC item hrefs; default KERCHUNK_TARGET),
+#      STAC_BASE (public URL of the published dataset prefix, for absolute
+#      STAC asset hrefs and GDAL open strings).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ $# -ge 1 ] || { sed -n '2,18p' "$0"; exit 1; }
+[ $# -ge 1 ] || { sed -n '2,21p' "$0"; exit 1; }
 CONFIGS=()
 while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$1")"); shift; done
 # Provenance stamped into the store meta (and so into every rendered form).
@@ -26,7 +29,7 @@ while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$
 REV=$(git -c safe.directory="$HERE" -C "$HERE" describe --always --dirty 2>/dev/null || echo unversioned)
 REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#")
 export E2E_GENERATOR="${E2E_REPO:-${REPO:-local}} $REV" E2E_CONFIG="${CONFIGS[*]}"
-STEPS=${*:-plan harvest collate render icechunk verify}
+STEPS=${*:-plan harvest collate render icechunk stac verify}
 PYTHON=${PYTHON:-python}; RSCRIPT=${RSCRIPT:-Rscript}; GDAL=${GDAL:-gdal}
 WORK=${E2E_WORK:-$HERE/work/$DATASET}
 mkdir -p "$WORK"
@@ -73,6 +76,14 @@ for s in $STEPS; do
     icechunk)
       step icechunk "$PYTHON" "$HERE/py/render_icechunk.py" "$WORK/out/flat" \
         "$WORK/out/icechunk" --target "$ICECHUNK_TARGET" ${ICECHUNK_ARGS:-} ;;
+    stac)
+      # after icechunk: the collection lists every form present in out/
+      step stac "$RSCRIPT" "$HERE/R/stac.R" "$WORK/store.sqlite" "$WORK/out" \
+        "${STAC_TARGET-$KERCHUNK_TARGET}" "${STAC_BASE:-}"
+      # stac-geoparquet from the ndjson items, where rustac is installed
+      if command -v rustac > /dev/null; then
+        step stac rustac translate "$WORK/out/stac/items.ndjson" "$WORK/out/stac/items.parquet"
+      fi ;;
     verify)
       step verify "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
         ${VERIFY_WINDOWS:-} ;;
