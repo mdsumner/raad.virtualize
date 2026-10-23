@@ -18,6 +18,9 @@ chunk per array, plus `scale_factor` and fill value.
 | BRAN2023 `salt` Jan-Feb 2010 over THREDDS | 180,540 refs. All forms identical, locally and read back from the bucket. |
 | GHRSST MUR `analysed_sst` COGs 2024 (source.coop) | 935,496 refs. harvest 47 s (8 workers), collate 14 s, render 12 s, Icechunk 4 s (18.4 MB). Published; VRT and Icechunk identical read back from the bucket. kerchunk not read by GDAL (finding 10). |
 | GHRSST MUR `analysed_sst` COGs 2002-2026 | 22,771,404 refs from 8,909 files. harvest 1,045 s, collate 385 s (1.2 GB store). Render first stopped on the arrow string limit (finding 11); after the fix, render 282 s (flat 136 s, kerchunk 139 s), Icechunk 105 s, 568 MB in 23 commits. |
+| STAC render, synthetic BRAN (2 netCDF) and synthetic MUR COGs (3 days, one missing) | Collection and items validate against STAC 1.1.0 core, datacube 2.2.0, xarray-assets 1.0.0, file 2.1.0 and projection 2.0.0 schemas. From the collection: the Icechunk asset opened with its `xarray:open_kwargs` and `rv:virtual_chunk_containers`, and the VRT asset, both match the item's source file. GDAL STACIT opens the items; GDAL GTI opens `items.parquet` (rustac stac-geoparquet) directly; gdalcubes builds a daily cube from the items with the missing day empty. |
+| terra on the rendered VRT | `terra::rast("mdim.vrt", md = TRUE)` reads BRAN-shaped VRTs with time and depth decoded. Before this change the COG VRT had no time units (the plan's `<Unit>` never reached the store), so terra, xarray and STAC saw raw day numbers; collate now takes coordinate units from the plan where the harvest has none. terra still guesses the CRS: the store holds no SRS (finding 13). |
+| STAC render, 8,909 items (GHRSST-shaped store with synthetic placements) | 44 s in R (JSON serialization is most of it); `items.ndjson` 7.7 MB, `items/` 8,909 files, collection 1.1 MB. |
 | Publish to S3 | Tested against a local S3 mock (moto) on OISST and synthetic BRAN, then against the AADC transfer bucket. |
 
 ## Findings
@@ -73,6 +76,11 @@ chunk per array, plus `scale_factor` and fill value.
     one GHRSST day (71 tiles over https) took 252 s through the plan and
     166 s through the rendered VRT; Icechunk read it in 6 s. Cause not yet
     diagnosed.
+13. **The store holds no SRS.** The plan VRT carries it (`<SRS>` on the data
+    array) but collate drops it, so the rendered VRT, kerchunk and Icechunk
+    forms are CRS-less and terra guesses lon/lat. The STAC render reads the
+    SRS from the plan beside the store. Recording it in `arrays` would fix
+    every form.
 
 ## Legs
 
@@ -85,4 +93,5 @@ chunk per array, plus `scale_factor` and fill value.
 | MDIM VRT | R | Loses dimension type and direction, which the store does not hold. |
 | kerchunk | R | Builds the whole positional grid in memory. |
 | Icechunk | Python | One virtual chunk container per host. Manifests split along the first axis (`--split`, default 365) and the load commits every `--commit-every` refs (default 1M): the GHRSST MUR series, 22.8M refs, builds in 255 s at 4.7 GB peak (568 MB store). |
+| STAC | R | Item time range and bbox from placements and coordinates; CRS and dimension types from the plan VRT (the store holds neither). Media types for the kerchunk and Icechunk assets follow no settled convention (`application/vnd+zarr`, `application/vnd.zarr+icechunk`). |
 | verify | Python | `--published` reads the forms from object storage. |

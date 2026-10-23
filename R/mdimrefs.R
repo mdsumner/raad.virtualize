@@ -255,7 +255,9 @@ mr_plan_vrt <- function(vrt) {
     if (!length(srcs)) {
       iv <- xml2::xml_find_first(a, "./InlineValues")
       rs <- xml2::xml_find_first(a, "./RegularlySpacedValues")
+      un <- xml2::xml_text(xml2::xml_find_first(a, "./Unit"))
       out$coords[[nm]] <- list(dims = refs, shape = unname(dim_size[refs]), dtype = dt,
+        unit = if (!is.na(un)) un,
         values = if (!is.na(iv)) as.numeric(strsplit(trimws(xml2::xml_text(iv)), "\\s+")[[1]]),
         affine = if (!is.na(rs)) list(start = as.numeric(xml2::xml_attr(rs, "start")),
                                       step  = as.numeric(xml2::xml_attr(rs, "increment"))))
@@ -321,9 +323,13 @@ mr_set_plan <- function(con, plan, plan_uri = NA_character_) {
     for (nm in names(plan$coords)) {
       C <- plan$coords[[nm]]
       vals <- if (!is.null(C$values)) .values_to_raw(C$values, C$dtype)
+      ## units from the plan where the harvest recorded none (the vrtstack
+      ## plan for GeoTIFF sources has a time coordinate no source holds)
+      at <- coord_attrs[[nm]]
+      if (is.null(at$units) && !is.null(C$unit)) at <- c(at, list(units = C$unit))
       mr_add_array(con, nm, dims = C$dims, chunks = C$shape, dtype = C$dtype,
                    kind = "coord", storage = if (is.null(vals)) "affine" else "inline",
-                   shape = C$shape, attrs = coord_attrs[[nm]], affine = C$affine,
+                   shape = C$shape, attrs = at, affine = C$affine,
                    values = vals)
     }
     dbExecute(con, "INSERT INTO meta(key,value) VALUES('plan',?)
