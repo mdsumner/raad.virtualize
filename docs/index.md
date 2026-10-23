@@ -81,6 +81,10 @@ widen that for R and GDAL users.
 - Serial COG tile fetches when GDAL reads through the VRT.
 - Attribute types in the store, so readers keep float32 packing.
 - GDAL `gdal mdim` block-info for bulk harvest into the flat store.
+- A Lance render: refs until a chunk is needed, then held bytes in the
+  same row, with versions and tags for history (wxylib/design m16).
+- Incremental Icechunk commits per append unit, with manifests split by
+  that unit.
 - Feeding the store from local file mirrors (the collection table) and
   publishing to the public endpoints.
 

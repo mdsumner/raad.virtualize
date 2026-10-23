@@ -20,6 +20,14 @@ session is committed every --commit-every refs, so the pending change set and
 each commit stay bounded: the 22.8M refs of the GHRSST MUR daily series in one
 session or one manifest need more than 14 GB.
 
+The repository is rebuilt from scratch on every run, so the default split
+(365) suits this one-shot render. The split is stored in the repository
+config and applies to later commits too: a repository that is then extended
+one append unit at a time (a day along time) should be rendered with --split
+set to that unit. Over one year of daily commits on the GHRSST MUR COGs,
+manifests measured 22 MB with a 1-day split, 116 MB with 30 days and 1.84 GB
+with 365 days (wxylib/design m16).
+
 Zarr v2 codec ids map to Zarr v3: imagecodecs_delta (array to array, TIFF
 PREDICTOR=2; needs imagecodecs, and so does every reader), then bytes (dtype
 byte order), then numcodecs.shuffle, then numcodecs.zlib / gzip / zstd.
