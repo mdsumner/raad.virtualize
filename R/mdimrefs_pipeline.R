@@ -94,7 +94,7 @@ mr_array_list <- function(con) {
 ## ---- the flat refs store ----------------------------------------------------------
 ## Paths are written verbatim (as scanned) and the remap rules travel in
 ## arrays.json; a reader applies the target it wants (wxy-refs does).
-mr_write_flat <- function(con, dir, verbose = TRUE) {
+mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6) {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
   arrays <- mr_array_list(con)
   for (a in arrays) {
@@ -102,16 +102,23 @@ mr_write_flat <- function(con, dir, verbose = TRUE) {
     t0 <- Sys.time()
     r <- mr_refs(con, a$array)
     n <- length(a$dims)
-    cols <- lapply(.dims(n), function(k) arrow::Array$create(as.numeric(r[[k]]))$cast(arrow::int64()))
+    ## columns are built as chunked arrays of `rows_per_chunk` rows: a single
+    ## utf8 array holds at most 2 GB, and the 22.8M paths of the GHRSST MUR
+    ## series are 3.3 GB
+    idx <- split(seq_len(nrow(r)), (seq_len(nrow(r)) - 1L) %/% rows_per_chunk)
+    ch <- function(x, f) do.call(arrow::chunked_array, unname(lapply(idx, function(i) f(x[i]))))
+    i64 <- function(x) arrow::Array$create(as.numeric(x))$cast(arrow::int64())
+    utf8 <- function(x) arrow::Array$create(as.character(x), type = arrow::utf8())
+    cols <- lapply(.dims(n), function(k) ch(r[[k]], i64))
     names(cols) <- .dims(n)
     tbl <- do.call(arrow::arrow_table, c(cols, list(
-      present = arrow::Array$create(as.integer(r$present))$cast(arrow::int8()),
-      path    = arrow::Array$create(as.character(r$path), type = arrow::utf8()),
-      offset  = arrow::Array$create(as.numeric(r$offset))$cast(arrow::int64()),
-      size    = arrow::Array$create(as.numeric(r$size))$cast(arrow::int64()),
-      info    = arrow::Array$create(as.character(r$info), type = arrow::utf8()),
-      data    = arrow::Array$create(lapply(unclass(r$data), function(x) if (is.null(x)) NULL else as.raw(x)),
-                                    type = arrow::binary()))))
+      present = ch(r$present, function(x) arrow::Array$create(as.integer(x))$cast(arrow::int8())),
+      path    = ch(r$path, utf8),
+      offset  = ch(r$offset, i64),
+      size    = ch(r$size, i64),
+      info    = ch(r$info, utf8),
+      data    = ch(unclass(r$data), function(x) arrow::Array$create(
+        lapply(x, function(v) if (is.null(v)) NULL else as.raw(v)), type = arrow::binary())))))
     arrow::write_parquet(tbl, file.path(dir, sprintf("refs_%s.parquet", a$array)),
                          compression = "zstd")
     if (verbose) message(sprintf("  refs_%s.parquet: %d rows in %.1f s", a$array, nrow(r),
