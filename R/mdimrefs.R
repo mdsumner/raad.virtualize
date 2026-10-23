@@ -170,7 +170,11 @@ mr_merge <- function(con, array, rows) {
 
 ## ---- codec from block-info `info` --------------------------------------------
 ## GDAL reports per-chunk KEY=VALUE pairs; map the array-level set to Zarr v2.
-mr_codec_from_info <- function(info, dtype) {
+## TIFF PREDICTOR=2 is horizontal differencing restarted on every row, which
+## numcodecs `delta` (one run over the flattened chunk) does not reproduce;
+## it maps to imagecodecs `imagecodecs_delta` along the last axis, as tifffile
+## writes it. Readers need imagecodecs; GDAL's Zarr driver has no equivalent.
+mr_codec_from_info <- function(info, dtype, chunks = NULL) {
   kv <- trimws(strsplit(info, ";", fixed = TRUE)[[1]])
   kv <- stats::setNames(sub("^[^=]*=", "", kv), sub("=.*$", "", kv))
   itemsize <- as.integer(sub("^.{2}", "", dtype))
@@ -179,6 +183,12 @@ mr_codec_from_info <- function(info, dtype) {
     if (f == "SHUFFLE") filters[[length(filters) + 1L]] <- list(id = "shuffle", elementsize = itemsize)
     else stop("unsupported FILTER=", f)
   }
+  pred <- if ("PREDICTOR" %in% names(kv)) kv[["PREDICTOR"]] else "1"
+  if (pred == "2") {
+    if (is.null(chunks)) stop("PREDICTOR=2 needs the chunk shape")
+    filters[[length(filters) + 1L]] <- list(id = "imagecodecs_delta", axis = -1L, dist = 1L,
+                                            dtype = dtype, shape = as.integer(chunks))
+  } else if (pred != "1") stop("unsupported PREDICTOR=", pred)
   comp <- kv[["COMPRESSION"]] %||% "NONE"
   compressor <- switch(comp, DEFLATE = list(id = "zlib", level = 1L),
                        ZSTD = list(id = "zstd", level = 1L), NONE = NULL,
@@ -214,7 +224,7 @@ mr_ingest_scan <- function(con, dir) {
     dtype <- m$dtype
     mr_add_array(con, nm, dims = unlist(m$dims), chunks = unlist(m$chunks),
                  dtype = dtype, fill = m$nodata %||% NA,
-                 codec = if (length(info)) mr_codec_from_info(info, dtype) else NULL,
+                 codec = if (length(info)) mr_codec_from_info(info, dtype, unlist(m$chunks)) else NULL,
                  attrs = .cf_attrs(m))
     mr_merge(con, nm, rows)
   }
@@ -258,13 +268,21 @@ mr_plan_vrt <- function(vrt) {
     rank <- length(refs)
     sl <- function(node, attr, default) lapply(xml2::xml_attr(node, attr),
                                                function(x) if (is.na(x)) default else .ints(x))
+    ## a <SourceBand> source (a 2D raster band given a leading length-1 axis
+    ## by <SourceTranspose>-1,0,1</SourceTranspose>, the vrtstack form) is
+    ## recorded as source_array "band:<n>", placed whole
+    sa <- sub("^/", "", xml2::xml_text(xml2::xml_find_first(srcs, "./SourceArray")))
+    sb <- xml2::xml_text(xml2::xml_find_first(srcs, "./SourceBand"))
+    band <- is.na(sa) & !is.na(sb)
+    sa[band] <- paste0("band:", sb[band])
+    band_count <- .jl(c(1L, unname(dim_size[refs])[-1L]))
     out$arrays[[nm]] <- list(
       dims = refs, shape = unname(dim_size[refs]), dtype = dt,
       sources = data.frame(
         source = fn,
-        source_array = sub("^/", "", xml2::xml_text(xml2::xml_find_first(srcs, "./SourceArray"))),
+        source_array = sa,
         src_offset = vapply(sl(ss, "offset", rep(0L, rank)), .jl, ""),
-        count      = vapply(sl(ss, "count",  NA_integer_), .jl, ""),
+        count      = ifelse(band, band_count, vapply(sl(ss, "count",  NA_integer_), .jl, "")),
         step       = vapply(sl(ss, "step",   rep(1L, rank)), .jl, ""),
         dest       = vapply(sl(ds, "offset", rep(0L, rank)), .jl, ""),
         stringsAsFactors = FALSE))

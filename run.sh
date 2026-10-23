@@ -55,7 +55,11 @@ for s in $STEPS; do
       # or multi-year BRAN listing is longer than the argument limit
       sources > "$WORK/sources.txt"
       [ -s "$WORK/sources.txt" ] || { echo "plan: no sources"; exit 1; }
-      step plan "$GDAL" mdim mosaic --overwrite "${arr_flags[@]}" "@$WORK/sources.txt" "$WORK/plan.vrt" ;;
+      # a config may define make_plan (sources.txt -> plan.vrt) for sources
+      # the mosaic does not take, such as GeoTIFF
+      if declare -F make_plan > /dev/null; then step plan make_plan
+      else step plan "$GDAL" mdim mosaic --overwrite "${arr_flags[@]}" "@$WORK/sources.txt" "$WORK/plan.vrt"
+      fi ;;
     harvest)
       step harvest "$PYTHON" "$HERE/py/harvest.py" --plan "$WORK/plan.vrt" --out "$WORK/scan" \
         "${arr_flags[@]}" --workers "$WORKERS" --engine "${HARVEST_ENGINE:-auto}" \

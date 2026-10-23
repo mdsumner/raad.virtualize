@@ -17,6 +17,11 @@ Engines (--engine):
   auto  (default) h5py for local netCDF4/HDF5 sources when h5py is
         installed, gdal otherwise (remote: GDAL fetched far fewer bytes from
         THREDDS). GDAL still supplies the metadata and codec info.
+
+A source that GDAL cannot open as multidimensional (a GeoTIFF or COG placed
+by a <SourceBand> plan, as vrtstack writes) is scanned from its TIFF tile
+index instead (walk_tiff): IFD 0 only, chunk coordinates (0, row, col)
+within the source, dims named after the plan array.
   HARVEST_BLOCK_SIZE (env, default 65536): fsspec read block for remote h5py.
 
 Output layout (--out), one fragment per (source, array), so a long run is
@@ -82,6 +87,76 @@ def plan_sources(vrt, arrays):
             if f not in out:
                 out.append(f)
     return out
+
+
+def plan_dims(vrt, arrays):
+    """Dimension names of each requested array in the plan."""
+    root = ET.parse(vrt).getroot()
+    return {a.get("name"): [d.get("ref") for d in a.findall("DimensionRef")]
+            for a in root.findall("Group/Array") if a.get("name") in arrays}
+
+
+def plan_bands(vrt, arrays):
+    """Band index per (array, source) for <SourceBand> sources."""
+    root = ET.parse(vrt).getroot()
+    base = os.path.dirname(os.path.abspath(vrt))
+    out = {}
+    for arr in root.findall("Group/Array"):
+        if arr.get("name") not in arrays:
+            continue
+        for src in arr.findall("Source"):
+            b = src.find("SourceBand")
+            if b is None:
+                continue
+            f = src.find("SourceFilename").text
+            if not (f.startswith("/") or "://" in f):
+                f = os.path.join(base, f)
+            out[(arr.get("name"), f)] = int(b.text)
+    return out
+
+
+def tiff_info(ds):
+    """Codec of a GeoTIFF in block-info KEY=VALUE form."""
+    st = ds.GetMetadata("IMAGE_STRUCTURE") or {}
+    info = [f"COMPRESSION={st.get('COMPRESSION', 'NONE')}"]
+    if st.get("PREDICTOR", "1") != "1":
+        info.append(f"PREDICTOR={st['PREDICTOR']}")
+    return info
+
+
+def walk_tiff(ds, band):
+    """Rows for one band of a GeoTIFF/COG from its tile index (IFD 0): GDAL's
+    TIFF metadata domain gives BLOCK_OFFSET_x_y and BLOCK_SIZE_x_y; an offset
+    of 0 is a tile never written. Coordinates carry a leading 0 for the axis
+    the plan adds (SourceTranspose -1,...)."""
+    b = ds.GetRasterBand(band)
+    if ds.RasterCount > 1 and (ds.GetMetadata("IMAGE_STRUCTURE") or {}).get("INTERLEAVE") == "PIXEL":
+        sys.exit("pixel-interleaved multiband TIFF: one band is not one chunk grid")
+    bx, by = b.GetBlockSize()
+    nx, ny = math.ceil(ds.RasterXSize / bx), math.ceil(ds.RasterYSize / by)
+    info = tiff_info(ds)
+    rows = []
+    for iy in range(ny):
+        for ix in range(nx):
+            off = int(b.GetMetadataItem(f"BLOCK_OFFSET_{ix}_{iy}", "TIFF") or 0)
+            size = int(b.GetMetadataItem(f"BLOCK_SIZE_{ix}_{iy}", "TIFF") or 0)
+            if off and size:
+                rows.append(((0, iy, ix), 1, off, size, info, None))
+            else:
+                rows.append(((0, iy, ix), 0, None, None, None, None))
+    return rows
+
+
+def describe_tiff(ds, band, dims):
+    b = ds.GetRasterBand(band)
+    bx, by = b.GetBlockSize()
+    code = NUMPY[b.DataType]
+    return {
+        "dims": dims, "shape": [1, ds.RasterYSize, ds.RasterXSize], "chunks": [1, by, bx],
+        "dtype": ("|" if code.endswith("1") else "<") + code,  # GDAL TIFFs are little-endian
+        "nodata": b.GetNoDataValue(), "scale": b.GetScale(), "offset": b.GetOffset(),
+        "unit": b.GetUnitType() or None, "attrs": {}, "info": tiff_info(ds),
+    }
 
 
 def numpy_dtype(arr, info):
@@ -219,16 +294,73 @@ def write_atomic(path, writer):
     os.replace(tmp, path)
 
 
-def scan_source(source, arrays, out, want_meta, engine="auto", tries=4):
-    """scan_source_once() with retries: remote opens fail now and then."""
+def scan_source(source, arrays, out, want_meta, engine="auto", tries=4, tiff=None):
+    """scan_source_once() with retries: remote opens fail now and then.
+    tiff: {"dims": {array: dims}, "bands": {(array, source): band}} for
+    <SourceBand> plans."""
     for i in range(tries):
         try:
+            if tiff and any((nm, source) in tiff["bands"] for nm in arrays):
+                return scan_tiff_once(source, arrays, out, want_meta, tiff)
             return scan_source_once(source, arrays, out, want_meta, engine)
         except RuntimeError as e:
             if i == tries - 1:
                 raise
             print(f"  {source}: {e}; retry in {2 ** (i + 1)} s", file=sys.stderr)
             time.sleep(2 ** (i + 1))
+
+
+def write_rows(rows, source, rank, nm, k, out):
+    cols = {"source": []}
+    cols.update({f"dim_{i}": [] for i in range(rank)})
+    cols.update(present=[], offset=[], size=[], info=[], data=[])
+    first = None
+    for c, present, off, size, info, data in rows:
+        if first is None and present:
+            first = info
+        cols["source"].append(source)
+        for i in range(rank):
+            cols[f"dim_{i}"].append(c[i])
+        cols["present"].append(present)
+        cols["offset"].append(off)
+        cols["size"].append(size)
+        cols["info"].append("; ".join(info) if info else None)
+        cols["data"].append(data)
+    types = {"source": pa.string(), "present": pa.int8(), "offset": pa.int64(),
+             "size": pa.int64(), "info": pa.string(), "data": pa.binary()}
+    tbl = pa.table({c: pa.array(v, types.get(c, pa.int64())) for c, v in cols.items()})
+    write_atomic(os.path.join(out, f"chunks_{nm}", f"{k}.parquet"),
+                 lambda p: pq.write_table(tbl, p, compression="zstd"))
+    return tbl.num_rows, first
+
+
+def write_source(source, out, k, driver, packing):
+    st = gdal.VSIStatL(source)
+    write_atomic(os.path.join(out, "sources", f"{k}.json"), lambda p: json.dump(
+        {"source": source, "size": st.size if st else None,
+         "mtime": st.mtime if st else None, "driver": driver,
+         "packing": packing}, open(p, "w")))
+
+
+def scan_tiff_once(source, arrays, out, want_meta, tiff):
+    """Scan the bands of one GeoTIFF/COG that the plan places (walk_tiff)."""
+    t0 = time.time()
+    k = key_of(source)
+    ds = gdal.Open(source)
+    meta, n, packing = {}, 0, {}
+    for nm in arrays:
+        band = tiff["bands"].get((nm, source))
+        if band is None:
+            continue
+        b = ds.GetRasterBand(band)
+        packing[nm] = {"scale": b.GetScale(), "offset": b.GetOffset(), "nodata": b.GetNoDataValue()}
+        nrow, _ = write_rows(walk_tiff(ds, band), source, 3, nm, k, out)
+        n += nrow
+        if want_meta:
+            meta[nm] = describe_tiff(ds, band, tiff["dims"][nm])
+            meta[nm]["scanned"] = True
+    write_source(source, out, k, ds.GetDriver().ShortName, packing)
+    return source, n, time.time() - t0, meta if want_meta else None
 
 
 def scan_source_once(source, arrays, out, want_meta, engine):
@@ -241,10 +373,6 @@ def scan_source_once(source, arrays, out, want_meta, engine):
     for nm in arrays:
         arr = rg.OpenMDArray(nm)
         rank = arr.GetDimensionCount()
-        cols = {"source": []}
-        cols.update({f"dim_{i}": [] for i in range(rank)})
-        cols.update(present=[], offset=[], size=[], info=[], data=[])
-        first = None
         packing[nm] = cf_packing(arr)
         h5 = ds.GetDriver().ShortName in ("netCDF", "HDF5")
         remote = source.startswith("/vsi") or "://" in source
@@ -263,23 +391,8 @@ def scan_source_once(source, arrays, out, want_meta, engine):
                     raise
                 rows = walk_h5py(source, arr)
                 sparse.append(nm)
-        for c, present, off, size, info, data in rows:
-            if first is None and present:
-                first = info
-            cols["source"].append(source)
-            for i in range(rank):
-                cols[f"dim_{i}"].append(c[i])
-            cols["present"].append(present)
-            cols["offset"].append(off)
-            cols["size"].append(size)
-            cols["info"].append("; ".join(info) if info else None)
-            cols["data"].append(data)
-        types = {"source": pa.string(), "present": pa.int8(), "offset": pa.int64(),
-                 "size": pa.int64(), "info": pa.string(), "data": pa.binary()}
-        tbl = pa.table({c: pa.array(v, types.get(c, pa.int64())) for c, v in cols.items()})
-        write_atomic(os.path.join(out, f"chunks_{nm}", f"{k}.parquet"),
-                     lambda p: pq.write_table(tbl, p, compression="zstd"))
-        n += tbl.num_rows
+        nrow, first = write_rows(rows, source, rank, nm, k, out)
+        n += nrow
         if want_meta:
             meta[nm] = describe(arr, first or [])
             meta[nm]["scanned"] = True
@@ -289,11 +402,7 @@ def scan_source_once(source, arrays, out, want_meta, engine):
                 a = rg.OpenMDArray(nm)
                 meta[nm] = describe(a, [])
                 meta[nm]["scanned"] = False
-    st = gdal.VSIStatL(source)
-    write_atomic(os.path.join(out, "sources", f"{k}.json"), lambda p: json.dump(
-        {"source": source, "size": st.size if st else None,
-         "mtime": st.mtime if st else None, "driver": ds.GetDriver().ShortName,
-         "packing": packing}, open(p, "w")))
+    write_source(source, out, k, ds.GetDriver().ShortName, packing)
     print(f"  {os.path.basename(source)}: engine {used}", file=sys.stderr)
     if sparse:
         print(f"  {source}: sparse ({', '.join(sparse)}), rescanned with h5py",
@@ -319,6 +428,8 @@ def main():
     if a.limit:
         srcs = srcs[:a.limit]
     have_meta = os.path.exists(os.path.join(a.out, "arrays.json"))
+    bands = plan_bands(a.plan, a.array)
+    tiff = {"dims": plan_dims(a.plan, a.array), "bands": bands} if bands else None
 
     def done(s):
         k = key_of(s)
@@ -331,14 +442,14 @@ def main():
     if not have_meta:
         # arrays.json from the first source, scanned in this process
         first = todo.pop(0) if todo else srcs[0]
-        _, n, dt, meta = scan_source(first, a.array, a.out, True, a.engine)
+        _, n, dt, meta = scan_source(first, a.array, a.out, True, a.engine, tiff=tiff)
         with open(os.path.join(a.out, "arrays.json"), "w") as f:
             json.dump(meta, f, indent=1, default=str)
         print(f"  {first}: {n} chunks in {dt:.1f} s (arrays.json written)", file=sys.stderr)
 
     t0, total = time.time(), 0
     with ProcessPoolExecutor(a.workers) as ex:
-        futs = [ex.submit(scan_source, s, a.array, a.out, False, a.engine) for s in todo]
+        futs = [ex.submit(scan_source, s, a.array, a.out, False, a.engine, tiff=tiff) for s in todo]
         for i, f in enumerate(as_completed(futs), 1):
             s, n, dt, _ = f.result()
             total += n

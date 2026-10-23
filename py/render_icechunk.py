@@ -20,8 +20,10 @@ session is committed every --commit-every refs, so the pending change set and
 each commit stay bounded: the 22.8M refs of the GHRSST MUR daily series in one
 session or one manifest need more than 14 GB.
 
-Zarr v2 codec ids map to Zarr v3: bytes (dtype byte order), then
-numcodecs.shuffle, then numcodecs.zlib / gzip / zstd. Anything else stops.
+Zarr v2 codec ids map to Zarr v3: imagecodecs_delta (array to array, TIFF
+PREDICTOR=2; needs imagecodecs, and so does every reader), then bytes (dtype
+byte order), then numcodecs.shuffle, then numcodecs.zlib / gzip / zstd.
+Anything else stops.
 """
 import argparse
 import json
@@ -77,10 +79,14 @@ def v3_codecs(row):
     dt = np.dtype(row["dtype"])
     endian = "big" if dt.byteorder == ">" else "little"
     codec = row.get("codec") or {}
-    out = []
+    out, pre = [], []
     for f in codec.get("filters") or []:
         if f["id"] == "shuffle":
             out.append(nc3.Shuffle(elementsize=int(f.get("elementsize", dt.itemsize))))
+        elif f["id"] == "imagecodecs_delta":
+            from imagecodecs.zarr import Delta, register_codecs
+            register_codecs()
+            pre.append(Delta(axis=int(f.get("axis", -1)), dist=int(f.get("dist", 1))))
         else:
             sys.exit(f"{row['array']}: unsupported filter {f}")
     c = codec.get("compressor")
@@ -93,7 +99,7 @@ def v3_codecs(row):
             out.append(nc3.Zstd(level=int(c.get("level", 1))))
         else:
             sys.exit(f"{row['array']}: unsupported compressor {c}")
-    return BytesCodec(endian=endian) if dt.itemsize > 1 else BytesCodec(), out
+    return pre, BytesCodec(endian=endian) if dt.itemsize > 1 else BytesCodec(), out
 
 
 def fill_of(row):
@@ -163,7 +169,7 @@ def main():
     for r in rows:
         if r["storage"] != "referenced":
             continue
-        ser, comp = v3_codecs(r)
+        pre, ser, comp = v3_codecs(r)
         attrs = dict(r.get("attrs") or {})
         attrs.pop("_FillValue", None)
         fill = fill_of(r)
@@ -171,7 +177,7 @@ def main():
             attrs["_FillValue"] = fill  # xarray masks on this attribute for Zarr v3
         root.create_array(r["array"], shape=r["shape"], chunks=r["chunks"],
                           dtype=np.dtype(r["dtype"]).newbyteorder("="),
-                          serializer=ser, compressors=comp, filters=None,
+                          serializer=ser, compressors=comp, filters=pre or None,
                           fill_value=fill if fill is not None else 0,
                           dimension_names=r["dims"], attributes=attrs)
         n = len(r["dims"])
