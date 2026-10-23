@@ -99,6 +99,7 @@ bash run.sh config/oisst.sh                      # OISST Sept 1981 from NOAA S3,
 BRAN_VAR=salt BRAN_MONTHS="01 02" bash run.sh config/bran.sh   # BRAN smoke test over THREDDS
 BRAN_YEARS=2010 bash run.sh config/bran.sh       # one BRAN year, about 1.1M refs
 bash run.sh config/bran.sh config/aadc-transfer.sh publish verify-published
+GHRSST_ROOT=/path/to/MUR/v4.1 GHRSST_YEARS=2024 bash run.sh config/ghrsst.sh   # MUR netCDF, local
 ```
 
 Every leading `*.sh` argument is sourced in order (a dataset, then
@@ -112,6 +113,7 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `WORKERS` | parallel harvest workers |
 | `HARVEST_ENGINE` | `auto` (h5py for local netCDF4/HDF5, GDAL for remote), `gdal`, `h5py` |
 | `HARVEST_LIMIT` | scan only the first N sources |
+| `ICECHUNK_ARGS` | extra `py/render_icechunk.py` options: `--split N` chunks along the first axis per manifest (default 365, 0 for none), `--commit-every N` refs (default 1M) |
 | `BRAN_YEARS`, `BRAN_MONTHS`, `BRAN_VAR`, `BRAN_ROOT` | BRAN selection; a month subset gets its own dataset name |
 | `VERIFY_WINDOWS` | explicit `--window ARRAY:START:COUNT` checks |
 | `PYTHON`, `RSCRIPT`, `GDAL` | executables |

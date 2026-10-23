@@ -14,10 +14,11 @@
 #      HARVEST_LIMIT (scan only the first N sources; for a smoke test),
 #      HARVEST_ENGINE (auto | gdal | h5py; see py/harvest.py),
 #      R_LIB (default ./r-lib: R packages installed by the deps step),
+#      ICECHUNK_ARGS (extra py/render_icechunk.py options, e.g. "--split 0"),
 #      PUBLISH (a /vsis3/ prefix; set by config/aadc-transfer.sh).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ $# -ge 1 ] || { sed -n '2,17p' "$0"; exit 1; }
+[ $# -ge 1 ] || { sed -n '2,18p' "$0"; exit 1; }
 CONFIGS=()
 while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$1")"); shift; done
 # Provenance stamped into the store meta (and so into every rendered form).
@@ -50,9 +51,11 @@ for s in $STEPS; do
     deps)
       step deps "$RSCRIPT" "$HERE/R/install-deps.R" "$R_LIB" ;;
     plan)
-      mapfile -t SRC < <(sources)
+      # sources go to the mosaic as a response file (@file): a full GHRSST
+      # or multi-year BRAN listing is longer than the argument limit
       sources > "$WORK/sources.txt"
-      step plan "$GDAL" mdim mosaic --overwrite "${arr_flags[@]}" "${SRC[@]}" "$WORK/plan.vrt" ;;
+      [ -s "$WORK/sources.txt" ] || { echo "plan: no sources"; exit 1; }
+      step plan "$GDAL" mdim mosaic --overwrite "${arr_flags[@]}" "@$WORK/sources.txt" "$WORK/plan.vrt" ;;
     harvest)
       step harvest "$PYTHON" "$HERE/py/harvest.py" --plan "$WORK/plan.vrt" --out "$WORK/scan" \
         "${arr_flags[@]}" --workers "$WORKERS" --engine "${HARVEST_ENGINE:-auto}" \
@@ -65,7 +68,7 @@ for s in $STEPS; do
         "$KERCHUNK_TARGET" "$VRT_TARGET" ;;
     icechunk)
       step icechunk "$PYTHON" "$HERE/py/render_icechunk.py" "$WORK/out/flat" \
-        "$WORK/out/icechunk" --target "$ICECHUNK_TARGET" ;;
+        "$WORK/out/icechunk" --target "$ICECHUNK_TARGET" ${ICECHUNK_ARGS:-} ;;
     verify)
       step verify "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
         ${VERIFY_WINDOWS:-} ;;
