@@ -288,6 +288,19 @@ def describe(arr, info):
     }
 
 
+def strict(x):
+    """X with NaN and infinities as the strings "NaN", "Infinity" and
+    "-Infinity" (the Zarr v2 fill_value spelling): json.dump writes them as
+    bare tokens by default, which is not JSON and which jsonlite rejects."""
+    if isinstance(x, float) and not math.isfinite(x):
+        return "NaN" if math.isnan(x) else ("Infinity" if x > 0 else "-Infinity")
+    if isinstance(x, dict):
+        return {k: strict(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [strict(v) for v in x]
+    return x
+
+
 def write_atomic(path, writer):
     tmp = path + ".tmp"
     writer(tmp)
@@ -336,10 +349,10 @@ def write_rows(rows, source, rank, nm, k, out):
 
 def write_source(source, out, k, driver, packing):
     st = gdal.VSIStatL(source)
-    write_atomic(os.path.join(out, "sources", f"{k}.json"), lambda p: json.dump(
+    write_atomic(os.path.join(out, "sources", f"{k}.json"), lambda p: json.dump(strict(
         {"source": source, "size": st.size if st else None,
          "mtime": st.mtime if st else None, "driver": driver,
-         "packing": packing}, open(p, "w")))
+         "packing": packing}), open(p, "w"), allow_nan=False))
 
 
 def scan_tiff_once(source, arrays, out, want_meta, tiff):
@@ -444,7 +457,7 @@ def main():
         first = todo.pop(0) if todo else srcs[0]
         _, n, dt, meta = scan_source(first, a.array, a.out, True, a.engine, tiff=tiff)
         with open(os.path.join(a.out, "arrays.json"), "w") as f:
-            json.dump(meta, f, indent=1, default=str)
+            json.dump(strict(meta), f, indent=1, default=str, allow_nan=False)
         print(f"  {first}: {n} chunks in {dt:.1f} s (arrays.json written)", file=sys.stderr)
 
     t0, total = time.time(), 0

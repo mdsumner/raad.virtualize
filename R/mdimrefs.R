@@ -13,6 +13,8 @@ library(DBI)
 
 MR_FORMAT   <- "mdim-refs/0.2"
 MR_RESERVED <- c("meta", "sources", "arrays", "placements", "remap")
+## meta keys that hold JSON for the renders, not dataset attributes
+MR_META_JSON <- c("coord_attrs", "dimensions")
 
 .q   <- function(con, x) as.character(dbQuoteIdentifier(con, x))
 .j   <- function(x) if (is.null(x)) NA_character_ else
@@ -208,6 +210,26 @@ mr_codec_from_info <- function(info, dtype, chunks = NULL) {
   a
 }
 
+## One fill value per array. An absent chunk reads as the Zarr fill_value,
+## which the renders set to `fill`; a CF reader masks _FillValue and
+## missing_value. If these differ, absent chunks read as data, or readers
+## disagree on what is masked, so ingest stops.
+.check_fill <- function(nm, attrs, fill) {
+  num <- function(x) suppressWarnings(as.numeric(unlist(x)))
+  same <- function(a, b) (is.nan(a) & is.nan(b)) | (!is.na(a) & !is.na(b) & a == b)
+  f <- num(fill); fv <- num(attrs[["_FillValue"]]); mv <- num(attrs$missing_value)
+  if (!length(f) || (is.na(f) && !is.nan(f))) {
+    if (length(fv) || length(mv))
+      warning(sprintf("array '%s': no nodata, but _FillValue/missing_value set", nm), call. = FALSE)
+    return(invisible(TRUE))
+  }
+  bad <- c(if (length(fv) && !all(same(fv, f))) sprintf("_FillValue %s", paste(fv, collapse = ",")),
+           if (length(mv) && !any(same(mv, f))) sprintf("missing_value %s", paste(mv, collapse = ",")))
+  if (length(bad)) stop(sprintf("array '%s': fill %s conflicts with %s", nm, fill,
+                                paste(bad, collapse = " and ")), call. = FALSE)
+  invisible(TRUE)
+}
+
 ## ---- ingest a blockinfo_scan.py output directory ------------------------------
 mr_ingest_scan <- function(con, dir) {
   src <- as.data.frame(arrow::read_parquet(file.path(dir, "sources.parquet")))
@@ -222,6 +244,7 @@ mr_ingest_scan <- function(con, dir) {
       "array '%s': chunks disagree on codec (%s); not virtualizable as one array",
       nm, paste(info, collapse = " | ")))
     dtype <- m$dtype
+    .check_fill(nm, m$attrs %||% list(), m$nodata %||% NA)
     mr_add_array(con, nm, dims = unlist(m$dims), chunks = unlist(m$chunks),
                  dtype = dtype, fill = m$nodata %||% NA,
                  codec = if (length(info)) mr_codec_from_info(info, dtype, unlist(m$chunks)) else NULL,
@@ -246,7 +269,14 @@ mr_plan_vrt <- function(vrt) {
   doc <- xml2::read_xml(vrt); g <- xml2::xml_find_first(doc, ".//Group")
   dm <- xml2::xml_find_all(g, "./Dimension")
   dim_size <- stats::setNames(as.integer(xml2::xml_attr(dm, "size")), xml2::xml_attr(dm, "name"))
-  out <- list(arrays = list(), coords = list())
+  ## dimension roles (HORIZONTAL_X, VERTICAL, TEMPORAL, ...) and directions
+  ## (EAST, UP, ...) as the mosaic wrote them, kept so the renders restate them
+  dim_role <- lapply(dm, function(d) {
+    x <- list(type = xml2::xml_attr(d, "type"), direction = xml2::xml_attr(d, "direction"))
+    x[!is.na(unlist(x))]
+  })
+  names(dim_role) <- names(dim_size)
+  out <- list(arrays = list(), coords = list(), dimensions = Filter(length, dim_role))
   for (a in xml2::xml_find_all(g, "./Array")) {
     nm   <- xml2::xml_attr(a, "name")
     refs <- xml2::xml_attr(xml2::xml_find_all(a, "./DimensionRef"), "ref")
@@ -335,9 +365,20 @@ mr_set_plan <- function(con, plan, plan_uri = NA_character_) {
     dbExecute(con, "INSERT INTO meta(key,value) VALUES('plan',?)
                     ON CONFLICT(key) DO UPDATE SET value=excluded.value",
               params = list(plan_uri))
+    if (length(plan$dimensions))
+      dbExecute(con, "INSERT INTO meta(key,value) VALUES('dimensions',?)
+                      ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                params = list(.j(plan$dimensions)))
   })
   mr_create_views(con)
   invisible(con)
+}
+
+## dimension type and direction from the plan, list(<dim> = list(type, direction))
+mr_dimensions <- function(con) {
+  v <- dbGetQuery(con, "SELECT value FROM meta WHERE key = 'dimensions'")$value
+  if (!length(v)) return(list())
+  jsonlite::fromJSON(v, simplifyVector = FALSE)
 }
 
 .values_to_raw <- function(values, dtype) {

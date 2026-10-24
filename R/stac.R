@@ -202,6 +202,8 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
   unlink(dir, recursive = TRUE); dir.create(file.path(dir, "items"), recursive = TRUE)
   meta <- dbReadTable(con, "meta"); meta <- as.list(stats::setNames(meta$value, meta$key))
   plan <- .stac_plan(plan_file)
+  if (!length(plan$dim_type))  # no plan file beside the store: the store keeps the types
+    plan$dim_type <- unlist(lapply(mr_dimensions(con), `[[`, "type"))
   arrays <- mr_array_list(con); names(arrays) <- vapply(arrays, `[[`, "", "array")
   data <- Filter(function(a) a$storage == "referenced", arrays)
   if (!length(data)) stop("stac: no referenced arrays in the store")
@@ -333,7 +335,7 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
                                     href = paste0(sub("/$", "", base), "/stac/collection.json"))),
       if (items_dir) lapply(items, function(x)
         list(rel = "item", href = sprintf("./items/%s.json", x$id), type = "application/geo+json")))),
-    `rv:meta` = meta[setdiff(names(meta), "coord_attrs")])
+    `rv:meta` = meta[setdiff(names(meta), MR_META_JSON)])
 
   js <- function(x, pretty = FALSE) jsonlite::toJSON(x, auto_unbox = TRUE, digits = I(15),
                                                      null = "null", na = "null", pretty = pretty)
