@@ -76,6 +76,8 @@ Five renderings, all from the store and none derived from another:
 
 1. **Flat refs store**: `arrays.json`, `refs_<array>.parquet` and
    `sources.parquet`. Read by wxylib (`wxy-refs`) and by any Parquet reader.
+   `arrays.json` also states dimension types and directions and, per array,
+   the chunk grid size, present and absent chunks and referenced bytes.
 2. **GDAL multidim VRT**: rebuilt from `placements`, so it can be remapped.
 3. **kerchunk Parquet**: fsspec layout, readable by xarray and by GDAL
    (`ZARR:"/vsikerchunk_parquet_ref/{DIR}"`).

@@ -81,6 +81,16 @@ chunk per array, plus `scale_factor` and fill value.
     forms are CRS-less and terra guesses lon/lat. The STAC render reads the
     SRS from the plan beside the store. Recording it in `arrays` would fix
     every form.
+14. **Stores must state what readers would otherwise guess.** A browser
+    explorer over the two BRAN2023 kerchunk stores in mdsumner/virtualized
+    found every guess was about meaning, not layout: fill values that
+    disagree (`fill_value` -32767 against `_FillValue` -32768 in the
+    VirtualiZarr build), rounded packing (item 4), bare `NaN` in JSON, and
+    dimension roles. Collate now stops when `_FillValue` or `missing_value`
+    disagree with nodata; harvest writes strict JSON; the plan's dimension
+    `type` and `direction` are kept in `meta.dimensions` and written back by
+    the VRT render; `arrays.json` carries `dimensions` and a per-array
+    `summary` (grid chunks, present, absent, referenced bytes).
 
 ## Legs
 

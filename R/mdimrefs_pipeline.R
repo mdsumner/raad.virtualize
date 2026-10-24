@@ -51,6 +51,7 @@ mr_ingest_scan_dir <- function(con, dir, verbose = TRUE) {
     if (length(info) > 1L) stop(sprintf(
       "array '%s': chunks disagree on codec (%s); not virtualizable as one array",
       nm, paste(info, collapse = " | ")))
+    .check_fill(nm, m$attrs %||% list(), m$nodata %||% NA)
     mr_add_array(con, nm, dims = unlist(m$dims), chunks = unlist(m$chunks),
                  dtype = m$dtype, fill = m$nodata %||% NA,
                  codec = if (length(info)) mr_codec_from_info(info, m$dtype, unlist(m$chunks)) else NULL,
@@ -97,10 +98,16 @@ mr_array_list <- function(con) {
 mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6) {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
   arrays <- mr_array_list(con)
-  for (a in arrays) {
+  for (k in seq_along(arrays)) {
+    a <- arrays[[k]]
     if (a$storage != "referenced") next
     t0 <- Sys.time()
     r <- mr_refs(con, a$array)
+    ## what a reader can know before reading: grid size, chunks referenced,
+    ## chunks absent (present = 0 rows, or no row at all), referenced bytes
+    grid <- prod(ceiling(a$shape / a$chunks)); np <- sum(as.integer(r$present) == 1L)
+    arrays[[k]]$summary <- list(chunks = grid, present = np, absent = grid - np,
+                                bytes = sum(as.numeric(r$size[as.integer(r$present) == 1L]), na.rm = TRUE))
     n <- length(a$dims)
     ## columns are built as chunked arrays of `rows_per_chunk` rows: a single
     ## utf8 array holds at most 2 GB, and the 22.8M paths of the GHRSST MUR
@@ -134,7 +141,8 @@ mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6) {
     file.path(dir, "sources.parquet"))
   m <- dbReadTable(con, "meta"); rm <- dbReadTable(con, "remap")
   doc <- list(format_version = MR_FORMAT,
-              meta = .zobj(as.list(stats::setNames(m$value, m$key))[setdiff(m$key, "coord_attrs")]),
+              meta = .zobj(as.list(stats::setNames(m$value, m$key))[setdiff(m$key, MR_META_JSON)]),
+              dimensions = .zobj(mr_dimensions(con)),
               arrays = arrays,
               remap = lapply(seq_len(nrow(rm)), function(i) as.list(rm[i, ])))
   writeLines(jsonlite::toJSON(doc, auto_unbox = TRUE, digits = I(17), null = "null",
@@ -188,16 +196,19 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
   names(arrays) <- vapply(arrays, `[[`, "", "array")
   doc <- xml2::xml_new_root("VRTDataset")
   g <- xml2::xml_add_child(doc, "Group", name = "/")
-  ## dimensions: every dim of every array, sized from the global shapes
+  ## dimensions: every dim of every array, sized from the global shapes, with
+  ## type and direction from the plan
+  dims <- mr_dimensions(con)
   dsz <- list()
   for (a in arrays) for (i in seq_along(a$dims)) dsz[[a$dims[i]]] <- a$shape[i]
   for (d in names(dsz)) {
     attrs <- c(name = d, size = dsz[[d]])
+    attrs <- c(attrs, unlist(dims[[d]]))
     if (!is.null(arrays[[d]]) && arrays[[d]]$kind == "coord") attrs <- c(attrs, indexingVariable = d)
     do.call(xml2::xml_add_child, c(list(g, "Dimension"), as.list(attrs)))
   }
   m <- dbReadTable(con, "meta")
-  m <- m[!m$key %in% "coord_attrs", , drop = FALSE]
+  m <- m[!m$key %in% MR_META_JSON, , drop = FALSE]
   .vrt_attrs(g, as.list(stats::setNames(m$value, m$key)))  # dataset, generator, ...
   for (a in arrays[order(vapply(arrays, `[[`, "", "kind") != "coord")]) {
     node <- xml2::xml_add_child(g, "Array", name = a$array)
@@ -341,7 +352,7 @@ mr_write_kerchunk_parquet <- function(con, root, target = NULL, record_size = 10
     }
   }
   m <- dbReadTable(con, "meta")
-  m <- m[!m$key %in% "coord_attrs", , drop = FALSE]
+  m <- m[!m$key %in% MR_META_JSON, , drop = FALSE]
   mr_kerchunk_writer(root, vars_meta, ref_tables, inline = inline, record_size = record_size,
                      root_attrs = as.list(stats::setNames(m$value, m$key)))
 }
