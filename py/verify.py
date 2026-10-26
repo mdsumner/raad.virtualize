@@ -5,6 +5,8 @@ Readers, all raw (no scale/offset applied):
   plan      GDAL multidim on the `gdal mdim mosaic` VRT (reads the sources:
             the oracle)
   vrt       GDAL multidim on the VRT rendered from the store (R/render.R)
+            (both VRT readers keep only the sources a window touches; see
+            windowed_vrt_reader)
   kerchunk  GDAL on ZARR:"/vsikerchunk_parquet_ref/<dir>" (kerchunk Parquet)
   kerchunk-py  fsspec + zarr-python on the same Parquet, only when an array
             carries an imagecodecs filter (TIFF predictor), which GDAL's Zarr
@@ -31,11 +33,13 @@ scale_factor and fill value against GDAL on the plan. Exit status 1 on any
 mismatch.
 """
 import argparse
+import copy
 import hashlib
 import json
 import os
 import sys
 import time
+import xml.etree.ElementTree as ET
 
 import numpy as np
 from osgeo import gdal
@@ -51,6 +55,86 @@ def gdal_reader(path):
     def read(name, start, count):
         return rg.OpenMDArray(name).ReadAsArray(array_start_idx=start, count=count)
     read.group = rg
+    return read
+
+
+def read_text(path):
+    f = gdal.VSIFOpenL(path, "rb")
+    try:
+        gdal.VSIFSeekL(f, 0, 2)
+        n = gdal.VSIFTellL(f)
+        gdal.VSIFSeekL(f, 0, 0)
+        return gdal.VSIFReadL(1, n, f).decode()
+    finally:
+        gdal.VSIFCloseL(f)
+
+
+def source_extent(src, shape):
+    """(offset, count) of a VRT <Source> in the destination array, or None
+    when the count is not written in the source element."""
+    off = [int(x) for x in src.find("DestSlab").get("offset").split(",")]
+    if src.find("SourceBand") is not None:
+        # a raster band given a leading length-1 axis (SourceTranspose -1,0,1)
+        return off, [1] + list(shape[1:])
+    ss = src.find("SourceSlab")
+    if ss is None or not ss.get("count"):
+        return None
+    return off, [int(x) for x in ss.get("count").split(",")]
+
+
+def windowed_vrt_reader(path, many=64):
+    """GDAL multidim on a VRT, reading each window through a copy of the VRT
+    that keeps only the <Source> elements the window touches.
+
+    GDAL's multidim VRT opens every source of an array, in order, on each read
+    (for /vsicurl/ sources a HEAD and a 16 KB header GET each, about 1 s per
+    source to us-west-2), so a window read over 8909 daily COGs takes hours.
+    The subset VRT reads the same bytes through the same source entries.
+    Arrays with fewer than `many` sources are read through the VRT as is.
+    """
+    text = read_text(path)
+    root = ET.fromstring(text)
+    base = os.path.dirname(path)
+    for fn in root.iter("SourceFilename"):
+        if fn.get("relativeToVRT") == "1":
+            fn.text = base + "/" + fn.text
+            del fn.attrib["relativeToVRT"]
+    group = root.find("Group")
+    dims = {d.get("name"): int(d.get("size")) for d in group.findall("Dimension")}
+    arrays = {a.get("name"): a for a in group.findall("Array")}
+    tag = f"/vsimem/verify_{os.getpid()}_{abs(hash(path))}"
+
+    # a sourceless copy for the attribute checks (scale, nodata)
+    bare = ET.fromstring(ET.tostring(root))
+    for a in bare.find("Group").findall("Array"):
+        for s in a.findall("Source"):
+            a.remove(s)
+    gdal.FileFromMemBuffer(tag + "_bare.vrt", ET.tostring(bare))
+    header = gdal_reader(tag + "_bare.vrt")
+
+    def read(name, start, count):
+        arr = arrays[name]
+        srcs = arr.findall("Source")
+        if len(srcs) < many:
+            return gdal_reader(path)(name, start, count)
+        shape = [dims[d.get("ref")] for d in arr.findall("DimensionRef")]
+        drop = set()
+        for i, src in enumerate(srcs):
+            ext = source_extent(src, shape)
+            if ext is not None and not all(o < st + c and st < o + n
+                                           for o, n, st, c in zip(*ext, start, count)):
+                drop.add(i)
+        sub = copy.deepcopy(root)
+        sub_arr = [x for x in sub.find("Group").findall("Array") if x.get("name") == name][0]
+        for i, src in enumerate(sub_arr.findall("Source")):
+            if i in drop:
+                sub_arr.remove(src)
+        gdal.FileFromMemBuffer(tag + ".vrt", ET.tostring(sub))
+        try:
+            return gdal_reader(tag + ".vrt")(name, start, count)
+        finally:
+            gdal.Unlink(tag + ".vrt")
+    read.group = header.group
     return read
 
 
@@ -207,8 +291,8 @@ def main():
          [int(x) for x in w.split(":")[2].split(",")]) for w in a.window]
 
     base = a.published.rstrip("/") if a.published else os.path.abspath(a.out)
-    readers = {"plan": lambda: gdal_reader(a.plan),
-               "vrt": lambda: gdal_reader(base + "/mdim.vrt"),
+    readers = {"plan": lambda: windowed_vrt_reader(a.plan),
+               "vrt": lambda: windowed_vrt_reader(base + "/mdim.vrt"),
                "kerchunk": lambda: gdal_reader('ZARR:"/vsikerchunk_parquet_ref/{' + base + '/kerchunk}"'),
                "icechunk": lambda: icechunk_reader(base + "/icechunk")}
     predictor = uses_imagecodecs(doc)
