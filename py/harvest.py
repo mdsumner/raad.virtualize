@@ -26,7 +26,10 @@ within the source, dims named after the plan array.
 
 Output layout (--out), one fragment per (source, array), so a long run is
 memory-bounded and restartable (a source whose fragments all exist is
-skipped; fragments are written to a temp name and renamed):
+skipped; fragments are written to a temp name and renamed). --recheck N
+stats the last N sources of the plan again (0 none, -1 all) and rescans any
+whose size or mtime differs from its sources/<key>.json: GHRSST MUR rewrites
+its newest days for about a week after first publication.
 
   sources/<key>.json            {source, size, mtime}       (VSIStatL)
   chunks_<array>/<key>.parquet  source, dim_*, present, offset, size, info, data
@@ -40,6 +43,7 @@ byteref/python/blockinfo_scan.py, so R/mdimrefs.R ingests either.
 
 Usage:
   python harvest.py --plan plan.vrt --out scan/ --array temp [--workers 8] [--engine auto]
+                    [--recheck N]
 
 Workers are processes, not threads: the netCDF and HDF5 drivers hold a
 global lock, so threads do not overlap.
@@ -53,7 +57,7 @@ import os
 import sys
 import time
 import xml.etree.ElementTree as ET
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -347,6 +351,14 @@ def write_rows(rows, source, rank, nm, k, out):
     return tbl.num_rows, first
 
 
+def changed(source, out):
+    """True when the source's size or mtime now differs from its scan record."""
+    with open(os.path.join(out, "sources", f"{key_of(source)}.json")) as f:
+        rec = json.load(f)
+    st = gdal.VSIStatL(source)
+    return st is None or st.size != rec.get("size") or st.mtime != rec.get("mtime")
+
+
 def write_source(source, out, k, driver, packing):
     st = gdal.VSIStatL(source)
     write_atomic(os.path.join(out, "sources", f"{k}.json"), lambda p: json.dump(strict(
@@ -433,6 +445,9 @@ def main():
     p.add_argument("--engine", choices=["auto", "gdal", "h5py"], default="auto",
                    help="auto: h5py chunk_iter for netCDF4/HDF5 when h5py is installed, "
                         "else GDAL GetRawBlockInfo (with an h5py rescan of sparse files)")
+    p.add_argument("--recheck", type=int, default=0,
+                   help="stat the last N sources again and rescan those changed since "
+                        "their scan (0 none, -1 all)")
     a = p.parse_args()
 
     for d in ["sources"] + [f"chunks_{nm}" for nm in a.array]:
@@ -450,6 +465,15 @@ def main():
             os.path.exists(os.path.join(a.out, f"chunks_{nm}", f"{k}.parquet")) for nm in a.array)
 
     todo = [s for s in srcs if not done(s)]
+    if a.recheck:
+        scanned = [s for s in srcs if s not in set(todo)]
+        check = scanned if a.recheck < 0 else scanned[-a.recheck:]
+        with ThreadPoolExecutor(max(8, a.workers * 4)) as ex:
+            stale = [s for s, ch in zip(check, ex.map(lambda s: changed(s, a.out), check)) if ch]
+        for s in stale:
+            print(f"  changed since scan: {s}", file=sys.stderr)
+        print(f"recheck: {len(stale)} of {len(check)} sources changed", file=sys.stderr)
+        todo += stale
     print(f"{len(srcs)} sources in plan, {len(srcs) - len(todo)} already scanned, "
           f"{len(todo)} to scan with {a.workers} workers", file=sys.stderr)
     if not have_meta:
