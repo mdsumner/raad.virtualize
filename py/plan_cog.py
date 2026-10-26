@@ -3,9 +3,12 @@
 The plan step for GeoTIFF and COG collections, which `gdal mdim mosaic`
 does not accept. Writes the form hypertidy/vrtstack writes (one <Source> per
 file: <SourceBand>1</SourceBand>, <SourceTranspose>-1,0,1</SourceTranspose>,
-<DestSlab offset="t,0,0"/>), with two differences: the time index of a file
+<DestSlab offset="t,0,0"/>), with three differences: the time index of a file
 is its date minus the first date, so a missing day is a hole in the array
-rather than a shift of every later day; and scale, offset and unit are kept.
+rather than a shift of every later day; scale, offset and unit are kept; and
+each source states its extent in a <SourceSlab>. Without the count, GDAL
+opens every source in order on each read to learn its shape (about 1 s per
+/vsicurl/ COG); with it, a read opens only the sources it touches.
 
 Every file is assumed to share the grid, type and tiling of the first one
 (only the first is opened). Dates come from the first capture group of
@@ -104,6 +107,7 @@ def plan(sources, array, pattern):
             f"        <SourceFilename>{escape(s)}</SourceFilename>",
             "        <SourceBand>1</SourceBand>",
             "        <SourceTranspose>-1,0,1</SourceTranspose>",
+            f'        <SourceSlab offset="0,0,0" count="1,{ny},{nx}" step="1,1,1"/>',
             f'        <DestSlab offset="{(d - t0).days},0,0"/>',
             "      </Source>",
         ]

@@ -240,6 +240,11 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
           xml2::xml_add_child(s, "SourceBand", sub("^band:", "", P$source_array[i]))
           xml2::xml_add_child(s, "SourceTranspose",
                               paste(c(-1L, seq_len(length(cn) - 1L) - 1L), collapse = ","))
+          ## the extent, so GDAL opens only the sources a read touches
+          ## (without it every source is opened to learn its shape)
+          xml2::xml_add_child(s, "SourceSlab", offset = paste(rep(0L, length(cn)), collapse = ","),
+                              count = paste(cn, collapse = ","),
+                              step = paste(rep(1L, length(cn)), collapse = ","))
         } else {
           xml2::xml_add_child(s, "SourceArray", paste0("/", P$source_array[i]))
           xml2::xml_add_child(s, "SourceSlab", offset = paste(.fj(P$src_offset[i]), collapse = ","),
