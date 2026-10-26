@@ -105,6 +105,17 @@ chunk per array, plus `scale_factor` and fill value.
     plan_cog.py and the VRT render now write the count; plans and VRTs built
     earlier lack it, so verify also reads each window through a copy of the
     VRT holding only the touched sources (arrays with 64 or more sources).
+16. **Sources change after harvest.** GHRSST MUR rewrites its newest days
+    for several days after first publication: of the last 10 days in the
+    full-series store, 5 had a new size and mtime on source.coop three days
+    after the harvest, and their refs failed to decode ("Zstd decompression
+    error") while GDAL on the plan read the new files. Nothing in a byte-ref
+    form detects this. The harvest records size and mtime per source;
+    `harvest.py --recheck N` (`HARVEST_RECHECK` in run.sh) stats the last N
+    sources again and rescans those that changed. A published store goes
+    stale the same way, so an index of a live collection needs the recheck
+    on every update, and a reader cannot tell without a validator (an etag
+    or size check before trusting the refs).
 
 ## Legs
 

@@ -68,7 +68,7 @@ for s in $STEPS; do
     harvest)
       step harvest "$PYTHON" "$HERE/py/harvest.py" --plan "$WORK/plan.vrt" --out "$WORK/scan" \
         "${arr_flags[@]}" --workers "$WORKERS" --engine "${HARVEST_ENGINE:-auto}" \
-        ${HARVEST_LIMIT:+--limit "$HARVEST_LIMIT"} ;;
+        ${HARVEST_LIMIT:+--limit "$HARVEST_LIMIT"} ${HARVEST_RECHECK:+--recheck "$HARVEST_RECHECK"} ;;
     collate)
       step collate "$RSCRIPT" "$HERE/R/collate.R" "$WORK/scan" "$WORK/plan.vrt" \
         "$WORK/store.sqlite" "$DATASET" ${REMAPS[@]+"${REMAPS[@]}"} ;;

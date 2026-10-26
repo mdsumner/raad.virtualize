@@ -10,6 +10,9 @@
 #                    as /vsicurl/https://data.source.coop/...). A local
 #                    directory of the same YYYY/MM/DD layout also works.
 #
+# MUR rewrites its newest days for several days after first publication:
+# rerun with HARVEST_RECHECK=30 to rescan any of the last 30 days that changed.
+#
 # gdal mdim mosaic does not take GeoTIFF, so the plan is py/plan_cog.py (the
 # vrtstack form). PREDICTOR=2 maps to the imagecodecs_delta filter: the
 # kerchunk and Icechunk forms need imagecodecs in the reader, and GDAL reads
