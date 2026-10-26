@@ -93,7 +93,7 @@ def v3_codecs(row):
             out.append(nc3.Shuffle(elementsize=int(f.get("elementsize", dt.itemsize))))
         elif f["id"] == "imagecodecs_delta":
             from imagecodecs.zarr import Delta, register_codecs
-            register_codecs()
+            register_codecs(verbose=False)
             pre.append(Delta(axis=int(f.get("axis", -1)), dist=int(f.get("dist", 1))))
         else:
             sys.exit(f"{row['array']}: unsupported filter {f}")

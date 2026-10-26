@@ -37,6 +37,8 @@ R_LIB=${R_LIB:-$HERE/r-lib}
 export R_LIBS="$R_LIB${R_LIBS:+:$R_LIBS}"
 PUB=${PUBLISH:+${PUBLISH%/}/$DATASET}
 LOG="$WORK/log.txt"
+# unbuffered Python, so log.txt shows each verify window as it finishes
+export PYTHONUNBUFFERED=1
 export GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR GDAL_HTTP_MAX_RETRY=${GDAL_HTTP_MAX_RETRY:-5} \
        GDAL_HTTP_RETRY_DELAY=${GDAL_HTTP_RETRY_DELAY:-2}
 
