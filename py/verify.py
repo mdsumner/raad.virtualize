@@ -63,7 +63,7 @@ def kerchunk_py_reader(path):
     import fsspec
     import imagecodecs.numcodecs
     import zarr
-    imagecodecs.numcodecs.register_codecs()
+    imagecodecs.numcodecs.register_codecs(verbose=False)
     fs = fsspec.filesystem("reference", fo=path, lazy=True)  # protocol per ref
     g = zarr.open_group(fs.get_mapper(""), mode="r", zarr_format=2)
 
@@ -92,7 +92,7 @@ def icechunk_reader(repo):
     import zarr
     try:  # imagecodecs_delta (TIFF PREDICTOR=2) and friends, if installed
         import imagecodecs.zarr
-        imagecodecs.zarr.register_codecs()
+        imagecodecs.zarr.register_codecs(verbose=False)
     except ImportError:
         pass
     storage = s3_storage(repo) if repo.startswith("/vsis3/") else icechunk.local_filesystem_storage(repo)
