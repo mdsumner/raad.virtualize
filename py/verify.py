@@ -64,8 +64,13 @@ def kerchunk_py_reader(path):
     import imagecodecs.numcodecs
     import zarr
     imagecodecs.numcodecs.register_codecs(verbose=False)
-    fs = fsspec.filesystem("reference", fo=path, lazy=True)  # protocol per ref
-    g = zarr.open_group(fs.get_mapper(""), mode="r", zarr_format=2)
+    # asynchronous throughout, as zarr-python 3 stores expect: the reference
+    # filesystem and its target (inferred from the first ref, https or a local
+    # path) must agree, or fsspec refuses the pair
+    fs = fsspec.filesystem("reference", fo=path, lazy=True, asynchronous=True,
+                           skip_instance_cache=True, remote_options={"asynchronous": True})
+    g = zarr.open_group(zarr.storage.FsspecStore(fs, read_only=True, path=""), mode="r",
+                        zarr_format=2)
 
     def read(name, start, count):
         return g[name][tuple(slice(s, s + c) for s, c in zip(start, count))]
