@@ -76,7 +76,7 @@ chunk per array, plus `scale_factor` and fill value.
     one GHRSST day (71 tiles over https) took 252 s through the plan and
     166 s through the rendered VRT; Icechunk read it in 6 s. Probably item
     15 rather than the tile fetch: 366 source opens at 0.5-1 s each covers
-    the time. Not yet re-measured.
+    the time. Not yet re-measured with the counted form.
 13. **The store holds no SRS.** The plan VRT carries it (`<SRS>` on the data
     array) but collate drops it, so the rendered VRT, kerchunk and Icechunk
     forms are CRS-less and terra guesses lon/lat. The STAC render reads the
@@ -92,15 +92,19 @@ chunk per array, plus `scale_factor` and fill value.
     `type` and `direction` are kept in `meta.dimensions` and written back by
     the VRT render; `arrays.json` carries `dimensions` and a per-array
     `summary` (grid chunks, present, absent, referenced bytes).
-15. **GDAL's multidim VRT opens every source on each read.** A one-chunk
-    read of the full GHRSST plan (8909 daily COGs over /vsicurl/) opened the
-    sources in date order, a HEAD and a 16 KB header GET each, at about 1 s
-    per source: hours per window, though only one source holds the chunk.
-    The DestSlab offsets (and SourceSlab counts, or a band source's
-    leading length-1 axis) already say which sources a window touches.
-    verify now reads each window through a copy of the VRT holding only
-    those sources (arrays with 64 or more sources). Readers of the full VRT
-    still pay the cost; the Icechunk and kerchunk forms do not.
+15. **GDAL's multidim VRT opens every source whose extent it does not know.**
+    A one-chunk read of the full GHRSST plan (8909 daily COGs over
+    /vsicurl/) opened the sources in date order, a HEAD and a 16 KB header
+    GET each, at about 1 s per source: hours per window, though only one
+    source holds the chunk. A `<SourceBand>` source with no `<SourceSlab>`
+    count is opened to learn its shape; with
+    `<SourceSlab offset="0,0,0" count="1,ny,nx" step="1,1,1"/>` beside the
+    `<SourceTranspose>`, a read opens only the sources it touches (69
+    synthetic COGs: 3 opens for a 3-day window, against 91 without).
+    `AdviseRead()` on the array does not help: it opens every source too.
+    plan_cog.py and the VRT render now write the count; plans and VRTs built
+    earlier lack it, so verify also reads each window through a copy of the
+    VRT holding only the touched sources (arrays with 64 or more sources).
 
 ## Legs
 
