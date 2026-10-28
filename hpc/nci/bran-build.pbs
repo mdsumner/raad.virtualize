@@ -1,0 +1,35 @@
+#!/bin/bash
+#PBS -q normal
+#PBS -l ncpus=48
+#PBS -l mem=190GB
+#PBS -l walltime=10:00:00
+#PBS -l jobfs=10GB
+#PBS -l wd
+#PBS -j oe
+#PBS -N bran-build
+## BRAN2023 daily store, built in situ on Gadi from /g/data/gb6 (BRAN_ROOT=gdata):
+## plan, harvest, collate, render, Icechunk, STAC. Compute nodes have no
+## internet, so verify and publish run afterwards on copyq (bran-publish.pbs).
+## Submit from the repository root, with your project and its scratch:
+##   qsub -P ab12 -l storage=gdata/gb6+scratch/ab12 \
+##     -v BRAN_VAR=temp,BRAN_YEARS=2010:2023,SIF=/scratch/ab12/$USER/gdal-r-python-extras.sif \
+##     hpc/nci/bran-build.pbs
+## BRAN_YEARS is FIRST:LAST (one year: 2010:2010); default 2010:2023, the
+## BRAN2023 daily years on gb6.
+## E2E_WORK defaults to /scratch/$PROJECT/$USER/raad.virtualize/<dataset>.
+set -euo pipefail
+module load singularity
+: "${SIF:?set SIF to the .sif of ghcr.io/hypertidy/gdal-r-python-extras}"
+export BRAN_ROOT=gdata BRAN_VAR=${BRAN_VAR:-temp}
+## BRAN_YEARS: a FIRST:LAST range (qsub -v cannot carry spaces), default 2010:2023
+y=${BRAN_YEARS:-2010:2023}
+export BRAN_YEARS=$(seq -s ' ' "${y%%:*}" "${y##*:}")
+export WORKERS=${WORKERS:-$PBS_NCPUS}
+## CONFIG: config/bran.sh (BRAN2023 only) or config/bluelink.sh (BRAN2020
+## before BRAN2023, 1993 on; BLUELINK_* there, BRAN_YEARS unused)
+CONFIG=${CONFIG:-config/bran.sh}
+DATASET=$(source "$CONFIG"; echo "$DATASET")
+export E2E_WORK=${E2E_WORK:-/scratch/$PROJECT/$USER/raad.virtualize/$DATASET}
+mkdir -p "$E2E_WORK"
+singularity exec -B /g/data,/scratch "$SIF" \
+  bash run.sh "$CONFIG" plan harvest collate render icechunk stac

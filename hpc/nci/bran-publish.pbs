@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -q copyq
+#PBS -l ncpus=1
+#PBS -l mem=32GB
+#PBS -l walltime=10:00:00
+#PBS -l wd
+#PBS -j oe
+#PBS -N bran-publish
+## After bran-build.pbs: verify every form against GDAL on the sources, publish
+## to the AADC transfer bucket, verify from the bucket. copyq has internet (the
+## forms point at THREDDS once remapped). Same -P, storage and -v as the build,
+## plus the bucket keys from the environment:
+##   qsub -P ab12 -l storage=gdata/gb6+scratch/ab12 -W depend=afterok:<build job id> \
+##     -v BRAN_VAR=temp,SIF=...,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY \
+##     hpc/nci/bran-publish.pbs
+set -euo pipefail
+module load singularity
+: "${SIF:?set SIF to the .sif of ghcr.io/hypertidy/gdal-r-python-extras}"
+: "${AWS_ACCESS_KEY_ID:?pass the bucket keys with -v}"
+export BRAN_ROOT=gdata BRAN_VAR=${BRAN_VAR:-temp}
+## BRAN_YEARS: a FIRST:LAST range (qsub -v cannot carry spaces), default 2010:2023
+y=${BRAN_YEARS:-2010:2023}
+export BRAN_YEARS=$(seq -s ' ' "${y%%:*}" "${y##*:}")
+## CONFIG: config/bran.sh (BRAN2023 only) or config/bluelink.sh (BRAN2020
+## before BRAN2023, 1993 on; BLUELINK_* there, BRAN_YEARS unused)
+CONFIG=${CONFIG:-config/bran.sh}
+DATASET=$(source "$CONFIG"; echo "$DATASET")
+export E2E_WORK=${E2E_WORK:-/scratch/$PROJECT/$USER/raad.virtualize/$DATASET}
+singularity exec -B /g/data,/scratch "$SIF" \
+  bash run.sh "$CONFIG" config/aadc-transfer.sh verify publish verify-published
