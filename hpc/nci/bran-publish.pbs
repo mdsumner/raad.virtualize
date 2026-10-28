@@ -26,5 +26,5 @@ export BRAN_YEARS=$(seq -s ' ' "${y%%:*}" "${y##*:}")
 CONFIG=${CONFIG:-config/bran.sh}
 DATASET=$(source "$CONFIG"; echo "$DATASET")
 export E2E_WORK=${E2E_WORK:-/scratch/$PROJECT/$USER/raad.virtualize/$DATASET}
-singularity exec -B /g/data/gb6,/scratch/$PROJECT "$SIF" \
+singularity exec -B /g/data,/scratch "$SIF" \
   bash run.sh "$CONFIG" config/aadc-transfer.sh verify publish verify-published
