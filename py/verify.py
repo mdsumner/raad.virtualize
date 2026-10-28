@@ -158,7 +158,8 @@ def kerchunk_py_reader(path):
 
     def read(name, start, count):
         return g[name][tuple(slice(s, s + c) for s, c in zip(start, count))]
-    read.attrs = lambda name: dict(g[name].attrs)
+    # v2 keeps the fill in .zarray, not in the attributes
+    read.attrs = lambda name: {**dict(g[name].attrs), "_FillValue": g[name].fill_value}
     return read
 
 

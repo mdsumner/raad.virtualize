@@ -341,8 +341,11 @@ mr_write_kerchunk_parquet <- function(con, root, target = NULL, record_size = 10
   arrays <- mr_array_list(con); vars_meta <- list(); ref_tables <- list(); inline <- list()
   for (a in arrays) {
     nm <- a$array; ref <- a$storage == "referenced"
+    ## Zarr v2 carries the fill in .zarray fill_value (xarray reads it there).
+    ## A copy in .zattrs is a JSON number with no type: GDAL reads it as Int32
+    ## (or Float64), and its netCDF writer refuses a _FillValue whose type
+    ## differs from the variable's.
     at <- a$attrs; at[["_FillValue"]] <- NULL
-    if (!is.null(a$fill)) at[["_FillValue"]] <- .fill_json(a$fill)
     vars_meta[[nm]] <- list(shape = a$shape, chunks = a$chunks, dtype = a$dtype,
                             compressor = if (ref) a$codec$compressor else NULL,
                             filters = if (ref) a$codec$filters else NULL,
