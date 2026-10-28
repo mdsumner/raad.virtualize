@@ -16,9 +16,17 @@
 ##     hpc/nci/bran-build.pbs
 ## BRAN_YEARS is FIRST:LAST (one year: 2010:2010); default 2010:2023, the
 ## BRAN2023 daily years on gb6.
+## STEPS: a subset to rerun, e.g. STEPS="collate render icechunk stac" (qsub -v
+## cannot carry spaces: pass it in the environment with -V instead).
 ## E2E_WORK defaults to /scratch/$PROJECT/$USER/raad.virtualize/<dataset>.
 set -euo pipefail
 module load singularity
+## Keep host R and Python libraries out of the container: singularity binds
+## $HOME and passes the environment, so a personal ~/R library (or R_LIBS*)
+## shadows the image's packages, e.g. an arrow built without zstd, which
+## cannot read the harvest fragments.
+export SINGULARITYENV_R_LIBS_USER=/nonexistent SINGULARITYENV_R_LIBS= \
+       SINGULARITYENV_PYTHONNOUSERSITE=1
 : "${SIF:?set SIF to the .sif of ghcr.io/hypertidy/gdal-r-python-extras}"
 export BRAN_ROOT=gdata BRAN_VAR=${BRAN_VAR:-temp}
 ## BRAN_YEARS: a FIRST:LAST range (qsub -v cannot carry spaces), default 2010:2023
@@ -32,4 +40,4 @@ DATASET=$(source "$CONFIG"; echo "$DATASET")
 export E2E_WORK=${E2E_WORK:-/scratch/$PROJECT/$USER/raad.virtualize/$DATASET}
 mkdir -p "$E2E_WORK"
 singularity exec -B /g/data,/scratch "$SIF" \
-  bash run.sh "$CONFIG" plan harvest collate render icechunk stac
+  bash run.sh "$CONFIG" ${STEPS:-plan harvest collate render icechunk stac}
