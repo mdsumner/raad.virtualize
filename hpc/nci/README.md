@@ -35,7 +35,9 @@ qsub -P ab12 -l storage=gdata/gb6+scratch/ab12 -W depend=afterok:$JOB \
   hpc/nci/bran-publish.pbs
 ```
 
-`BRAN_YEARS` is a `FIRST:LAST` range. Work goes to
+`BRAN_YEARS` is a `FIRST:LAST` range. `CONFIG=config/bluelink.sh` (in both
+`-v` lists) builds the coalesced series instead: BRAN2020 from 1993, BRAN2023
+from 2010 to its last month on disk, about 37M refs for `temp`. Work goes to
 `/scratch/$PROJECT/$USER/raad.virtualize/bran2023-daily-<var>` (override with
 `E2E_WORK`). The harvest restarts where it stopped, so a job that runs out of
 walltime is resubmitted as is.

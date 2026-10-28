@@ -25,8 +25,11 @@ export BRAN_ROOT=gdata BRAN_VAR=${BRAN_VAR:-temp}
 y=${BRAN_YEARS:-2010:2023}
 export BRAN_YEARS=$(seq -s ' ' "${y%%:*}" "${y##*:}")
 export WORKERS=${WORKERS:-$PBS_NCPUS}
-DATASET=bran2023-daily-$BRAN_VAR
+## CONFIG: config/bran.sh (BRAN2023 only) or config/bluelink.sh (BRAN2020
+## before BRAN2023, 1993 on; BLUELINK_* there, BRAN_YEARS unused)
+CONFIG=${CONFIG:-config/bran.sh}
+DATASET=$(source "$CONFIG"; echo "$DATASET")
 export E2E_WORK=${E2E_WORK:-/scratch/$PROJECT/$USER/raad.virtualize/$DATASET}
 mkdir -p "$E2E_WORK"
 singularity exec -B /g/data/gb6,/scratch/$PROJECT "$SIF" \
-  bash run.sh config/bran.sh plan harvest collate render icechunk stac
+  bash run.sh "$CONFIG" plan harvest collate render icechunk stac
