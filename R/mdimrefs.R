@@ -20,6 +20,12 @@ MR_META_JSON <- c("coord_attrs", "dimensions")
 .j   <- function(x) if (is.null(x)) NA_character_ else
   as.character(jsonlite::toJSON(x, auto_unbox = TRUE, digits = I(17), null = "null"))  # 17 significant: exact round trip
 .jl  <- function(x) as.character(jsonlite::toJSON(x, auto_unbox = FALSE))  # always array
+## a number as text, 17 significant digits: as.character() keeps 15, which
+## changes a float32 fill such as -1e20 (-1.0000000200408773e+20)
+.numtext <- function(x) {
+  v <- suppressWarnings(as.numeric(x))
+  if (length(v) != 1L || (is.na(v) && !is.nan(v))) NA_character_ else sprintf("%.17g", v)
+}
 .fj  <- function(x) if (is.na(x)) NULL else jsonlite::fromJSON(x, simplifyVector = TRUE)
 .dims <- function(rank) paste0("dim_", seq_len(rank) - 1L)
 
@@ -105,7 +111,7 @@ mr_add_array <- function(con, array, dims, chunks, dtype, kind = "data",
       "values"=excluded."values"',
     params = list(array, kind, storage, .jl(dims),
                   if (is.null(shape)) NA_character_ else .jl(as.integer(shape)),
-                  .jl(as.integer(chunks)), dtype, as.character(fill),
+                  .jl(as.integer(chunks)), dtype, .numtext(fill),
                   .j(codec), .j(attrs), .j(affine),
                   list(if (is.null(values)) NULL else values)))
   if (storage == "referenced") {
