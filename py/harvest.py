@@ -347,7 +347,9 @@ def write_rows(rows, source, rank, nm, k, out):
              "size": pa.int64(), "info": pa.string(), "data": pa.binary()}
     tbl = pa.table({c: pa.array(v, types.get(c, pa.int64())) for c, v in cols.items()})
     write_atomic(os.path.join(out, f"chunks_{nm}", f"{k}.parquet"),
-                 lambda p: pq.write_table(tbl, p, compression="zstd"))
+                 # snappy, not zstd: some R arrow builds (e.g. the extras image of
+                 # 2026-10) lack zstd, and collate reads these in R
+                 lambda p: pq.write_table(tbl, p, compression="snappy"))
     return tbl.num_rows, first
 
 

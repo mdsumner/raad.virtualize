@@ -127,7 +127,7 @@ mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6) {
       data    = ch(unclass(r$data), function(x) arrow::Array$create(
         lapply(x, function(v) if (is.null(v)) NULL else as.raw(v)), type = arrow::binary())))))
     arrow::write_parquet(tbl, file.path(dir, sprintf("refs_%s.parquet", a$array)),
-                         compression = "zstd")
+                         compression = .pq_codec())
     if (verbose) message(sprintf("  refs_%s.parquet: %d rows in %.1f s", a$array, nrow(r),
                                  as.numeric(Sys.time() - t0, units = "secs")))
   }
@@ -169,6 +169,9 @@ mr_remap <- function(con, path, target = NULL) {
 .numpy_gdal <- stats::setNames(names(.gdal_numpy), sub("^[<>|]", "", .gdal_numpy))
 .gdal_type <- function(dtype) .numpy_gdal[[sub("^[<>|]", "", dtype)]]
 .num <- function(x) sprintf("%.17g", as.numeric(x))
+## zstd where this arrow build has it (some builds lack it), else snappy
+.pq_codec <- function() if (arrow::codec_is_available("zstd")) "zstd" else "snappy"
+
 .lifted <- c("units", "_FillValue", "scale_factor", "add_offset", "missing_value")
 
 .vrt_attrs <- function(node, attrs) {
