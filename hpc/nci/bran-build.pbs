@@ -16,8 +16,9 @@
 ##     hpc/nci/bran-build.pbs
 ## BRAN_YEARS is FIRST:LAST (one year: 2010:2010); default 2010:2023, the
 ## BRAN2023 daily years on gb6.
-## STEPS: a subset to rerun, e.g. STEPS="collate render icechunk stac" (qsub -v
-## cannot carry spaces: pass it in the environment with -V instead).
+## STEPS: a subset to rerun, colon separated, e.g. -v ...,STEPS=collate:render
+## (qsub -v cannot carry spaces or commas). Avoid qsub -V: it carries the login
+## shell's module state into the job and singularity is then not on PATH.
 ## E2E_WORK defaults to /scratch/$PROJECT/$USER/raad.virtualize/<dataset>.
 set -euo pipefail
 module load singularity
@@ -39,5 +40,6 @@ CONFIG=${CONFIG:-config/bran.sh}
 DATASET=$(source "$CONFIG"; echo "$DATASET")
 export E2E_WORK=${E2E_WORK:-/scratch/$PROJECT/$USER/raad.virtualize/$DATASET}
 mkdir -p "$E2E_WORK"
+STEPS=${STEPS:-plan:harvest:collate:render:icechunk:stac}
 singularity exec -B /g/data,/scratch "$SIF" \
-  bash run.sh "$CONFIG" ${STEPS:-plan harvest collate render icechunk stac}
+  bash run.sh "$CONFIG" ${STEPS//:/ }
