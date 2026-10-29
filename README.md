@@ -182,11 +182,13 @@ syncs `out/`, `plan.vrt` and `store.sqlite` to `<prefix>/<DATASET>/`.
 `verify-published` reads the VRT, kerchunk and Icechunk forms back from the
 bucket and checks them against GDAL on the sources.
 
-`config/source-coop.sh` targets a source.coop repository (default
-`ausantarctic/ghrsst-mur-v2`) through the data proxy S3 API, with the
-source.coop API key pair in the same variables. It requires
-`SOURCECOOP_PREFIX` and refuses any prefix outside `dev/` unless
-`SOURCECOOP_PRODUCTION=1`. `verify-published` with `AWS_NO_SIGN_REQUEST=YES`
+`config/source-coop.sh` targets a source.coop product (`SOURCECOOP_REPO`,
+default `ausantarctic/ghrsst-mur-v2`) through the data proxy S3 API, with
+the product's temporary credentials in the same variables plus
+`AWS_SESSION_TOKEN`. It requires `SOURCECOOP_PREFIX`, and in the production
+product refuses any prefix outside `dev/` unless `SOURCECOOP_PRODUCTION=1`.
+`py/sourcecoop_check.py ACCOUNT/PRODUCT` checks that a product takes the
+writes publish and Icechunk need. `verify-published` with `AWS_NO_SIGN_REQUEST=YES`
 reads the forms back anonymously. Layout and promotion:
 [docs/ghrsst-source-coop.md](docs/ghrsst-source-coop.md).
 

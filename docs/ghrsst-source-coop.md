@@ -6,7 +6,9 @@ MDIM VRT, STAC) for the GHRSST MUR COGs in the source.coop repository
 changes to `AustralianAntarcticDivision/ghrsst-cogger` that would take the
 procedure over.
 
-Status: draft. Nothing has been written to source.coop yet.
+Status: draft. Nothing has been written to source.coop yet. Credential and
+product details are from the source.coop documentation (docs.source.coop,
+read 2026-10-29) and are untested here.
 
 ## Repository layout
 
@@ -90,23 +92,80 @@ arrays are smaller (mask is Byte).
 
 ## Trial procedure
 
-`config/source-coop.sh` is the publish target. It refuses any prefix
-outside `dev/` unless `SOURCECOOP_PRODUCTION=1`, and sets `STAC_BASE` to
-the public URL of the dataset directory. Credentials are the source.coop
-API key pair, exported for the publish step only.
+### Test product
+
+The first trial goes to a separate, unlisted source.coop product rather
+than to `dev/` in the production product. A separate product needs no
+change to `ausantarctic/ghrsst-mur-v2`, its credentials cannot write to the
+production data, and it can be emptied or abandoned without coordination.
+The forms reference the COGs in `ausantarctic/ghrsst-mur-v2` by absolute
+URL, so they work from any product.
+
+- Create the product under a personal account or an organization the
+  person is owner or maintainer of (top-right menu, after beta access is
+  granted), for example `mdsumner/ghrsst-mur-virtual-test`. New products
+  are unlisted: readable by URL, absent from search.
+- Product ID rules: 3 to 39 characters, letters, digits and single hyphens,
+  not starting or ending with a hyphen.
+- The source.coop documentation does not describe deleting a product;
+  plan on emptying it instead.
+
+Inside the test product the layout is the production one from the
+`virtual/` level down (`virtual/<DATASET>/...`), so promotion is the same
+copy plus `stac/` re-render described above.
+
+### Credentials
+
+Three ways to get write credentials, all exchanged at the data proxy
+(`https://data.source.coop`; any region value is accepted):
+
+| Method | Use | Lifetime |
+|---|---|---|
+| "View Credentials" on the product page | one-off runs | temporary, expiry shown |
+| `source-coop login`, then `source-coop creds` (AWS `credential_process`) | interactive runs | one hour, renewed by AWS CLI and SDKs; login every 30 days |
+| service account: API key (`sck_...`) or GitHub Actions OIDC | scheduled jobs (cogger) | one hour per exchange; GHA up to 12 h with `role-duration-seconds` |
+
+All three give an `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and
+`AWS_SESSION_TOKEN`. GDAL `/vsis3/` reads these once and does not renew
+them, so a GDAL publish that runs past an hour fails with `ExpiredToken`.
+A one-year trial is well under that; a full-series publish goes in parts or
+through the AWS CLI. Service account keys are exchanged through STS at
+`https://data.source.coop/.sts`, which GDAL does not do, so
+`config/source-coop.sh` sets `CPL_AWS_WEB_IDENTITY_ENABLE=NO` and GDAL
+expects exported keys.
+
+A service account is scoped to products its owner owns, with Read or Read
+and write per product. For cogger, a GitHub Actions trust on the cogger
+repository and branch avoids storing a secret.
+
+### Write check
+
+`py/sourcecoop_check.py` writes under `<product>/_write-check/<time>/` and
+removes what it wrote: a small PUT, a 120 MB multipart PUT, a listing, an
+anonymous https read, an Icechunk repository created and committed twice
+directly on the proxy (conditional writes, needed for later in-place
+commits), and deletes.
 
 ```sh
-# one year, build and verify locally
-GHRSST_YEARS=2024 SOURCECOOP_PREFIX=dev/virtual \
-  bash run.sh config/ghrsst-cog.sh config/source-coop.sh
+# needs the product's AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN exported
+python py/sourcecoop_check.py mdsumner/ghrsst-mur-virtual-test
+```
 
-# publish (source.coop API key pair in AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
-GHRSST_YEARS=2024 SOURCECOOP_PREFIX=dev/virtual \
-  bash run.sh config/ghrsst-cog.sh config/source-coop.sh publish
+### Build, publish, read back
 
+`config/source-coop.sh` is the publish target. `SOURCECOOP_REPO` names the
+product (default `ausantarctic/ghrsst-mur-v2`, where any prefix outside
+`dev/` is refused unless `SOURCECOOP_PRODUCTION=1`), and `STAC_BASE` is set
+to the public URL of the dataset directory.
+
+```sh
+export SOURCECOOP_REPO=mdsumner/ghrsst-mur-virtual-test SOURCECOOP_PREFIX=virtual GHRSST_YEARS=2024
+# build and verify locally
+bash run.sh config/ghrsst-cog.sh config/source-coop.sh
+# publish (product credentials exported)
+bash run.sh config/ghrsst-cog.sh config/source-coop.sh publish
 # read back anonymously, as a public reader
-env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY AWS_NO_SIGN_REQUEST=YES \
-  GHRSST_YEARS=2024 SOURCECOOP_PREFIX=dev/virtual \
+env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN AWS_NO_SIGN_REQUEST=YES \
   bash run.sh config/ghrsst-cog.sh config/source-coop.sh verify-published
 ```
 
@@ -114,11 +173,6 @@ The `stac` step must run with `config/source-coop.sh` sourced, so that the
 collection carries the public base. Because the forms are rendered before
 `publish`, a local build of the same dataset can be published to the AADC
 transfer bucket and to source.coop without a rebuild, apart from `stac/`.
-
-Writes through the data proxy S3 API with source.coop API keys have not
-been tested from this repository. If the proxy does not accept writes for
-this repository, set `SOURCECOOP_ENDPOINT` to the endpoint that cogger
-publishes the COGs with.
 
 ## Checks before anything goes outside dev/
 
