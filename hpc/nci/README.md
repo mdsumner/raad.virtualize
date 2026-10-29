@@ -12,9 +12,13 @@ Once, from a login node or copyq (the pull needs internet):
 
 ```
 module load singularity
-SIF=/scratch/$PROJECT/$USER/gdal-r-python-extras.sif
+SIF=/g/data/$PROJECT/$USER/sif_lib/gdal-r-python-extras_latest.sif
+mkdir -p "$(dirname "$SIF")"
 singularity pull "$SIF" docker://ghcr.io/hypertidy/gdal-r-python-extras:latest
 ```
+
+Both jobs use that path when `SIF` is not set (add `gdata/<project>` to
+`-l storage`); pass `SIF=...` in `-v` for an image elsewhere.
 
 ## Jobs
 
