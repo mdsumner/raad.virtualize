@@ -22,7 +22,8 @@ For each configuration in --configs, a fresh process times:
 and the HTTP requests GDAL made (CPL_VSIL_NETWORK_STATS_ENABLED; requests
 made in the --procs worker processes are not counted). Every step starts
 with cleared caches. Results go
-to stdout as a Markdown table and to OUT/results.jsonl.
+to stdout as a Markdown table, one row as each step finishes, and to
+OUT/results.jsonl.
 
 Configurations (each adds to the environment of the run):
 
@@ -92,16 +93,15 @@ def child(vrt, array, series, procs):
     from osgeo import gdal
     import numpy as np
     gdal.UseExceptions()
-    out = []
-
     def timed(name, f, **extra):
         gdal.NetworkStatsReset()
         t0 = time.time()
         f()
         s = json.loads(gdal.NetworkStatsGetAsSerializedJSON() or "{}").get("methods", {})
-        out.append({"step": name, "seconds": round(time.time() - t0, 3),
-                    "HEAD": s.get("HEAD", {}).get("count", 0), "GET": s.get("GET", {}).get("count", 0),
-                    "MB": round(s.get("GET", {}).get("downloaded_bytes", 0) / 1e6, 3), **extra})
+        row = {"step": name, "seconds": round(time.time() - t0, 3),
+               "HEAD": s.get("HEAD", {}).get("count", 0), "GET": s.get("GET", {}).get("count", 0),
+               "MB": round(s.get("GET", {}).get("downloaded_bytes", 0) / 1e6, 3), **extra}
+        print("ROW " + json.dumps(row), flush=True)  # the parent prints each row as it arrives
 
     def fresh():
         # every step starts cold: no cached sources, headers or blocks
@@ -132,7 +132,6 @@ def child(vrt, array, series, procs):
                     with ProcessPoolExecutor(p, mp_context=spawn) as ex:
                         list(ex.map(_part, [vrt] * p, [array] * p, cuts[:-1], cuts[1:], [px] * p))
             timed(f"series {n}", f, procs=p)
-    print(json.dumps(out))
 
 
 def _part(vrt, array, lo, hi, px):
@@ -169,24 +168,23 @@ def main():
     print(f"kept {', '.join(info)} -> {local} ({len(xml) / 1e6:.1f} MB)\n")
     first = next(iter(info))
 
-    rows = []
-    for c in a.configs.split(","):
-        env = {**os.environ, **CONFIGS[c], "CPL_VSIL_NETWORK_STATS_ENABLED": "YES"}
-        r = subprocess.run([sys.executable, __file__, "x", "--child", local, first, a.series, a.procs],
-                           env=env, capture_output=True, text=True)
-        if r.returncode:
-            print(f"{c}: failed\n{r.stderr[-2000:]}")
-            continue
-        for row in json.loads(r.stdout.strip().splitlines()[-1]):
-            rows.append({"config": c, "arrays": len(info), **row})
-    with open(os.path.join(a.out, "results.jsonl"), "a") as f:
-        for row in rows:
-            f.write(json.dumps({"vrt": a.vrt, "time": time.strftime("%Y-%m-%dT%H:%M:%S"), **row}) + "\n")
     print("| config | step | procs | seconds | HEAD | GET | MB |")
-    print("|---|---|---|---|---|---|---|")
-    for r in rows:
-        print(f"| {r['config']} | {r['step']} | {r.get('procs', '')} | {r['seconds']} | {r['HEAD']} | {r['GET']} | {r['MB']} |")
-
+    print("|---|---|---|---|---|---|---|", flush=True)
+    with open(os.path.join(a.out, "results.jsonl"), "a") as log:
+        for c in a.configs.split(","):
+            env = {**os.environ, **CONFIGS[c], "CPL_VSIL_NETWORK_STATS_ENABLED": "YES"}
+            r = subprocess.Popen([sys.executable, __file__, "x", "--child", local, first, a.series, a.procs],
+                                 env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            for line in r.stdout:
+                if not line.startswith("ROW "):
+                    continue
+                row = {"config": c, "arrays": len(info), **json.loads(line[4:])}
+                print(f"| {c} | {row['step']} | {row.get('procs', '')} | {row['seconds']} | "
+                      f"{row['HEAD']} | {row['GET']} | {row['MB']} |", flush=True)
+                log.write(json.dumps({"vrt": a.vrt, "time": time.strftime("%Y-%m-%dT%H:%M:%S"), **row}) + "\n")
+                log.flush()
+            if r.wait():
+                print(f"{c}: failed\n{r.stderr.read()[-2000:]}", flush=True)
 
 if __name__ == "__main__":
     main()
