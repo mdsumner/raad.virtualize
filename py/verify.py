@@ -170,11 +170,14 @@ def s3_storage(vsis3):
     ep = os.environ.get("AWS_S3_ENDPOINT")
     if ep and "://" not in ep:
         ep = ("http://" if os.environ.get("AWS_HTTPS", "YES").upper() in ("NO", "FALSE", "OFF") else "https://") + ep
+    # AWS_NO_SIGN_REQUEST=YES: read as an anonymous public reader would
+    anon = os.environ.get("AWS_NO_SIGN_REQUEST", "NO").upper() in ("YES", "TRUE", "ON")
+    creds = {"anonymous": True} if anon else {"from_env": True}
     return icechunk.s3_storage(bucket=bucket, prefix=prefix.rstrip("/"), endpoint_url=ep,
                                region=os.environ.get("AWS_REGION", "us-east-1"),
                                force_path_style=os.environ.get("AWS_VIRTUAL_HOSTING", "TRUE").upper()
                                in ("NO", "FALSE", "OFF"),
-                               allow_http=bool(ep and ep.startswith("http://")), from_env=True)
+                               allow_http=bool(ep and ep.startswith("http://")), **creds)
 
 
 def icechunk_reader(repo):

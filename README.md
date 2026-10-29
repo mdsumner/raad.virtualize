@@ -141,6 +141,7 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `PYTHON`, `RSCRIPT`, `GDAL` | executables |
 | `R_LIB` | R library used ahead of the system one (default `./r-lib`) |
 | `PUBLISH`, `AADC_PREFIX` | publish prefix (`/vsis3/...`), set by a publish config |
+| `SOURCECOOP_REPO`, `SOURCECOOP_PREFIX`, `SOURCECOOP_PRODUCTION` | source.coop publish target (`config/source-coop.sh`) |
 
 ### Environment
 
@@ -180,6 +181,14 @@ website). Credentials come from `AWS_ACCESS_KEY_ID` and
 syncs `out/`, `plan.vrt` and `store.sqlite` to `<prefix>/<DATASET>/`.
 `verify-published` reads the VRT, kerchunk and Icechunk forms back from the
 bucket and checks them against GDAL on the sources.
+
+`config/source-coop.sh` targets a source.coop repository (default
+`ausantarctic/ghrsst-mur-v2`) through the data proxy S3 API, with the
+source.coop API key pair in the same variables. It requires
+`SOURCECOOP_PREFIX` and refuses any prefix outside `dev/` unless
+`SOURCECOOP_PRODUCTION=1`. `verify-published` with `AWS_NO_SIGN_REQUEST=YES`
+reads the forms back anonymously. Layout and promotion:
+[docs/ghrsst-source-coop.md](docs/ghrsst-source-coop.md).
 
 ### Reading the outputs
 
