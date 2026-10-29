@@ -21,7 +21,8 @@ module load singularity
 ## cannot read the harvest fragments.
 export SINGULARITYENV_R_LIBS_USER=/nonexistent SINGULARITYENV_R_LIBS= \
        SINGULARITYENV_PYTHONNOUSERSITE=1
-: "${SIF:?set SIF to the .sif of ghcr.io/hypertidy/gdal-r-python-extras}"
+SIF=${SIF:-/g/data/$PROJECT/$USER/sif_lib/gdal-r-python-extras_latest.sif}
+[ -f "$SIF" ] || { echo "no image at $SIF: set SIF to the .sif of ghcr.io/hypertidy/gdal-r-python-extras" >&2; exit 1; }
 : "${AWS_ACCESS_KEY_ID:?pass the bucket keys with -v}"
 export BRAN_ROOT=gdata BRAN_VAR=${BRAN_VAR:-temp}
 ## BRAN_YEARS: a FIRST:LAST range (qsub -v cannot carry spaces), default 2010:2023
