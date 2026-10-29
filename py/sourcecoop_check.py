@@ -6,29 +6,38 @@ that the publish step and Icechunk need.
 Writes under ACCOUNT/PRODUCT/PREFIX/<timestamp>/ through the data proxy
 (https://data.source.coop, S3 API, path style) and removes what it wrote:
 
-  put        a small object (GDAL /vsis3/, as `gdal vsi copy` does)
-  multipart  a 120 MB object (GDAL switches to multipart above 50 MB)
+  put        a small object (obstore, as py/s3_sync.py does)
+  multipart  a 120 MB object (obstore multipart)
   list       the prefix lists both objects
   public     the small object reads back over https with no credentials
   icechunk   an Icechunk repository created and committed twice directly
              on the proxy (conditional writes), then read anonymously
+  gdal-put   a small object through GDAL /vsis3/ (informational: the proxy
+             rejected GDAL's signing on 2026-10-29, "missing SignedHeaders")
   delete     every object written is removed and the prefix lists empty
+
+Needs obstore (pip install obstore). SOURCECOOP_ENDPOINT overrides the
+endpoint (with AWS_HTTPS=NO for a local test server).
 
 Credentials: the temporary key set from the product page ("View
 Credentials") or `source-coop creds`, exported as AWS_ACCESS_KEY_ID,
-AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN. They last one hour; GDAL keeps
-the first set it reads, so run the check soon after exporting them.
+AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN. They last one hour, so run
+the check soon after exporting them.
 """
 import argparse
+import io
 import os
 import sys
 import time
 import urllib.request
 
+import obstore
+from obstore.store import S3Store
 from osgeo import gdal
 
 gdal.UseExceptions()
-ENDPOINT = "data.source.coop"
+ENDPOINT = os.environ.get("SOURCECOOP_ENDPOINT", "data.source.coop")
+SCHEME = "http" if os.environ.get("AWS_HTTPS", "YES").upper() in ("NO", "FALSE", "OFF") else "https"
 results = []
 
 
@@ -48,24 +57,13 @@ def attempt(name, f):
 
 def write_vsi(path, nbytes):
     f = gdal.VSIFOpenL(path, "wb")
-    block = os.urandom(1 << 20)
-    left = nbytes
-    while left > 0:
-        n = min(left, len(block))
-        gdal.VSIFWriteL(block[:n], 1, n, f)
-        left -= n
+    gdal.VSIFWriteL(os.urandom(nbytes), 1, nbytes, f)
     if gdal.VSIFCloseL(f) != 0:
         raise RuntimeError("close failed")
 
 
-def listing(vsi):
-    # ReadDirRecursive returns None both for an empty prefix and for a failed
-    # request, so tell them apart by the error state
-    gdal.ErrorReset()
-    out = gdal.ReadDirRecursive(vsi)
-    if out is None and gdal.GetLastErrorMsg():
-        raise RuntimeError(gdal.GetLastErrorMsg())
-    return sorted(out or [])
+def listing(store):
+    return sorted(o["path"] for batch in obstore.list(store) for o in batch)
 
 
 def icechunk_check(bucket, prefix):
@@ -75,7 +73,7 @@ def icechunk_check(bucket, prefix):
 
     def storage(anonymous):
         creds = {"anonymous": True} if anonymous else {"from_env": True}
-        return icechunk.s3_storage(bucket=bucket, prefix=prefix, endpoint_url=f"https://{ENDPOINT}",
+        return icechunk.s3_storage(bucket=bucket, prefix=prefix, endpoint_url=f"{SCHEME}://{ENDPOINT}",
                                    region=os.environ.get("AWS_REGION", "us-west-2"),
                                    force_path_style=True, **creds)
 
@@ -102,43 +100,51 @@ def main():
     for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"):
         if not os.environ.get(k):
             sys.exit(f"export {k} (and AWS_SESSION_TOKEN) from the product's credentials")
+    region = os.environ.get("AWS_REGION", "us-west-2")
     gdal.SetConfigOption("AWS_S3_ENDPOINT", ENDPOINT)
     gdal.SetConfigOption("AWS_VIRTUAL_HOSTING", "FALSE")
     gdal.SetConfigOption("AWS_HTTPS", "YES")
-    gdal.SetConfigOption("AWS_REGION", os.environ.get("AWS_REGION", "us-west-2"))
+    gdal.SetConfigOption("AWS_REGION", region)
     gdal.SetConfigOption("CPL_AWS_WEB_IDENTITY_ENABLE", "NO")
 
     bucket, _, product = a.product.strip("/").partition("/")
     run = time.strftime("%Y%m%dT%H%M%S")
     key = f"{product}/{a.prefix.strip('/')}/{run}"
-    vsi = f"/vsis3/{bucket}/{key}"
-    print("writing under", vsi, flush=True)
+    cfg = {"endpoint": f"{SCHEME}://{ENDPOINT}", "region": region, "virtual_hosted_style_request": False,
+           "access_key_id": os.environ["AWS_ACCESS_KEY_ID"],
+           "secret_access_key": os.environ["AWS_SECRET_ACCESS_KEY"]}
+    if os.environ.get("AWS_SESSION_TOKEN"):
+        cfg["session_token"] = os.environ["AWS_SESSION_TOKEN"]
+    store = S3Store(bucket, prefix=key, config=cfg, client_options={"allow_http": SCHEME == "http"})
+    print(f"writing under s3://{bucket}/{key}", flush=True)
 
     if "put" not in a.skip:
-        attempt("put", lambda: write_vsi(f"{vsi}/small.bin", 1024))
+        attempt("put", lambda: obstore.put(store, "small.bin", os.urandom(1024)) and None)
     if "multipart" not in a.skip:
-        attempt("multipart", lambda: write_vsi(f"{vsi}/large.bin", 120 << 20))
+        attempt("multipart", lambda: obstore.put(store, "large.bin", io.BytesIO(os.urandom(120 << 20)),
+                                                 use_multipart=True) and None)
     if "list" not in a.skip:
-        attempt("list", lambda: str(listing(vsi)))
+        attempt("list", lambda: str(listing(store)))
     if "public" not in a.skip and dict(results).get("put"):
-        url = f"https://{ENDPOINT}/{bucket}/{key}/small.bin"
+        url = f"{SCHEME}://{ENDPOINT}/{bucket}/{key}/small.bin"
         attempt("public", lambda: f"{len(urllib.request.urlopen(url, timeout=30).read())} bytes from {url}")
     if "icechunk" not in a.skip:
         attempt("icechunk", lambda: icechunk_check(bucket, f"{key}/icechunk"))
+    if "gdal-put" not in a.skip:
+        attempt("gdal-put", lambda: write_vsi(f"/vsis3/{bucket}/{key}/gdal.bin", 1024))
 
     def delete():
-        for name in listing(vsi):
-            full = f"{vsi}/{name}"
-            if gdal.VSIStatL(full) is not None and not gdal.VSIStatL(full).IsDirectory():
-                gdal.Unlink(full)
-        gdal.VSICurlClearCache()
-        left = listing(vsi)
+        names = listing(store)
+        if names:
+            obstore.delete(store, names)
+        left = listing(store)
         if left:
             raise RuntimeError(f"{len(left)} entries left: {left[:5]}")
+        return f"{len(names)} objects"
     if "delete" not in a.skip:
         attempt("delete", delete)
 
-    bad = [n for n, ok in results if not ok]
+    bad = [n for n, ok in results if not ok and n != "gdal-put"]  # gdal-put is informational
     print("\nall checks passed" if not bad else f"\nfailed: {' '.join(bad)}")
     sys.exit(1 if bad else 0)
 

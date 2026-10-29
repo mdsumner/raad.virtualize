@@ -16,11 +16,14 @@
 #                      is accepted in another product
 #   SOURCECOOP_ENDPOINT  default data.source.coop
 #
+# The data proxy rejects GDAL /vsis3/ writes ("missing SignedHeaders"), so
+# publish goes through py/s3_sync.py (obstore; pip install obstore). GDAL
+# anonymous reads work, so verify-published is unchanged.
+#
 # Credentials are NOT kept here. For publish export the product's temporary
 # key set (product page, "View Credentials", or `source-coop creds`):
 # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN. They last
-# one hour and GDAL keeps the first set it reads, so a publish that runs
-# longer fails with ExpiredToken: publish in parts, or with the AWS CLI.
+# one hour; a publish that runs longer fails with ExpiredToken.
 # verify-published needs no keys: with AWS_NO_SIGN_REQUEST=YES it reads the
 # forms back anonymously, as a public reader would.
 SOURCECOOP_REPO=${SOURCECOOP_REPO:-ausantarctic/ghrsst-mur-v2}
@@ -42,3 +45,4 @@ STAC_BASE=${STAC_BASE:-https://$SOURCECOOP_ENDPOINT/$SOURCECOOP_REPO/$SOURCECOOP
 export AWS_S3_ENDPOINT=$SOURCECOOP_ENDPOINT AWS_HTTPS=YES AWS_VIRTUAL_HOSTING=FALSE \
        CPL_AWS_WEB_IDENTITY_ENABLE=NO
 export AWS_REGION=${AWS_REGION:-us-west-2}
+PUBLISH_WITH=obstore

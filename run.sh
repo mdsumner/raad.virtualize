@@ -16,12 +16,13 @@
 #      R_LIB (default ./r-lib: R packages installed by the deps step),
 #      ICECHUNK_ARGS (extra py/render_icechunk.py options, e.g. "--split 0"),
 #      PUBLISH (a /vsis3/ prefix; set by config/aadc-transfer.sh),
+#      PUBLISH_WITH (gdal, or obstore for py/s3_sync.py),
 #      STAC_TARGET (remap target for STAC item hrefs; default KERCHUNK_TARGET),
 #      STAC_BASE (public URL of the published dataset prefix, for absolute
 #      STAC asset hrefs and GDAL open strings).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ $# -ge 1 ] || { sed -n '2,21p' "$0"; exit 1; }
+[ $# -ge 1 ] || { sed -n '2,22p' "$0"; exit 1; }
 CONFIGS=()
 while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$1")"); shift; done
 # Provenance stamped into the store meta (and so into every rendered form).
@@ -91,8 +92,15 @@ for s in $STEPS; do
         ${VERIFY_WINDOWS:-} ;;
     publish)
       [ -n "$PUB" ] || { echo "publish: set PUBLISH or source a publish config"; exit 1; }
-      step publish "$GDAL" vsi sync -r -j 8 "$WORK/out/" "$PUB/"
-      for f in plan.vrt store.sqlite; do step publish "$GDAL" vsi copy "$WORK/$f" "$PUB/$f"; done ;;
+      # PUBLISH_WITH=obstore (config/source-coop.sh): py/s3_sync.py, for
+      # endpoints that reject GDAL's request signing
+      if [ "${PUBLISH_WITH:-gdal}" = obstore ]; then
+        step publish "$PYTHON" "$HERE/py/s3_sync.py" "$WORK/out" "$PUB"
+        for f in plan.vrt store.sqlite; do step publish "$PYTHON" "$HERE/py/s3_sync.py" "$WORK/$f" "$PUB/$f"; done
+      else
+        step publish "$GDAL" vsi sync -r -j 8 "$WORK/out/" "$PUB/"
+        for f in plan.vrt store.sqlite; do step publish "$GDAL" vsi copy "$WORK/$f" "$PUB/$f"; done
+      fi ;;
     verify-published)
       [ -n "$PUB" ] || { echo "verify-published: set PUBLISH or source a publish config"; exit 1; }
       step verify-published "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \

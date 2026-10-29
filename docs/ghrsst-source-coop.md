@@ -126,25 +126,35 @@ Three ways to get write credentials, all exchanged at the data proxy
 | service account: API key (`sck_...`) or GitHub Actions OIDC | scheduled jobs (cogger) | one hour per exchange; GHA up to 12 h with `role-duration-seconds` |
 
 All three give an `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and
-`AWS_SESSION_TOKEN`. GDAL `/vsis3/` reads these once and does not renew
-them, so a GDAL publish that runs past an hour fails with `ExpiredToken`.
-A one-year trial is well under that; a full-series publish goes in parts or
-through the AWS CLI. Service account keys are exchanged through STS at
-`https://data.source.coop/.sts`, which GDAL does not do, so
-`config/source-coop.sh` sets `CPL_AWS_WEB_IDENTITY_ENABLE=NO` and GDAL
-expects exported keys.
+`AWS_SESSION_TOKEN`. Exported keys are not renewed, so a publish that
+runs past an hour fails with `ExpiredToken`. A one-year trial is well under
+that; a full-series publish goes in parts. Service account keys are
+exchanged through STS at `https://data.source.coop/.sts`; GDAL would send
+them to AWS STS instead, so `config/source-coop.sh` sets
+`CPL_AWS_WEB_IDENTITY_ENABLE=NO`.
 
 A service account is scoped to products its owner owns, with Read or Read
 and write per product. For cogger, a GitHub Actions trust on the cogger
 repository and branch avoids storing a secret.
 
+### GDAL writes
+
+On 2026-10-29 the proxy accepted writes from Icechunk with the product's
+temporary keys but rejected every signed GDAL `/vsis3/` request (PUT,
+multipart initiate, list) with `InvalidRequest: missing SignedHeaders`.
+Anonymous GDAL reads work. The likely cause is the proxy's parsing of the
+`Authorization` header that GDAL writes (not confirmed). Until that is
+resolved, `config/source-coop.sh` sets `PUBLISH_WITH=obstore`, and the
+publish step uploads with `py/s3_sync.py` (obstore) instead of
+`gdal vsi sync`. The image needs `pip install obstore`.
+
 ### Write check
 
 `py/sourcecoop_check.py` writes under `<product>/_write-check/<time>/` and
-removes what it wrote: a small PUT, a 120 MB multipart PUT, a listing, an
-anonymous https read, an Icechunk repository created and committed twice
-directly on the proxy (conditional writes, needed for later in-place
-commits), and deletes.
+removes what it wrote: a small PUT and a 120 MB multipart PUT (obstore), a
+listing, an anonymous https read, an Icechunk repository created and
+committed twice directly on the proxy (conditional writes, needed for later
+in-place commits), a GDAL PUT (informational), and deletes.
 
 ```sh
 # needs the product's AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN exported
