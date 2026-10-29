@@ -59,7 +59,13 @@ def write_vsi(path, nbytes):
 
 
 def listing(vsi):
-    return sorted(gdal.ReadDirRecursive(vsi) or [])
+    # ReadDirRecursive returns None both for an empty prefix and for a failed
+    # request, so tell them apart by the error state
+    gdal.ErrorReset()
+    out = gdal.ReadDirRecursive(vsi)
+    if out is None and gdal.GetLastErrorMsg():
+        raise RuntimeError(gdal.GetLastErrorMsg())
+    return sorted(out or [])
 
 
 def icechunk_check(bucket, prefix):
@@ -114,7 +120,7 @@ def main():
         attempt("multipart", lambda: write_vsi(f"{vsi}/large.bin", 120 << 20))
     if "list" not in a.skip:
         attempt("list", lambda: str(listing(vsi)))
-    if "public" not in a.skip:
+    if "public" not in a.skip and dict(results).get("put"):
         url = f"https://{ENDPOINT}/{bucket}/{key}/small.bin"
         attempt("public", lambda: f"{len(urllib.request.urlopen(url, timeout=30).read())} bytes from {url}")
     if "icechunk" not in a.skip:
