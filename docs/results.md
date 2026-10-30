@@ -25,6 +25,9 @@ chunk per array, plus `scale_factor` and fill value.
 
 ## Findings
 
+
+Editor's note: *here 1. "gdal getrawblockinfo is wrong" the llm was using 3.13 and not 3.14 and I hadn't primed it up for an assumption of my own MDS. All this is very early first written from interesting experiments. GDAL gained supremely fast access to the HDF5 byte refs extractor recently. * 
+
 1. **GDAL `GetRawBlockInfo` is wrong for netCDF4/HDF5 files with unwritten
    chunks, and slow.** GDAL 3.13 turns block coordinates into a linear index
    for `H5Dget_chunk_info(index)`, which HDF5 counts over allocated chunks
