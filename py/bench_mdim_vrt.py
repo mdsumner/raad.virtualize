@@ -123,6 +123,8 @@ def child(vrt, array, series, procs):
     for n in series:
         n = min(n, dims[0])
         for p in procs:
+            if p > n:  # a process with no time steps has nothing to read
+                continue
             cuts = np.linspace(0, n, p + 1).astype(int).tolist()
             a = fresh()
             if p == 1:
