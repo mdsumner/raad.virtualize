@@ -1,0 +1,6 @@
+{
+  "id": "bluelink",
+  "title": "Bluelink ReANalysis (BRAN) virtual stores",
+  "description": "Byte-reference indexes of the Bluelink ReANalysis ocean model output on NCI (project gb6): BRAN2020 before 2010 and BRAN2023 from 2010, one array per variable. No model data is copied; every form reads the original netCDF files from NCI THREDDS. Each dataset is published as a GDAL multidimensional VRT, kerchunk Parquet, an Icechunk repository with virtual references, a flat Parquet refs store and a STAC collection. The terms of use of the model output are those of BRAN (CSIRO, Bluelink) at NCI.",
+  "license": "other"
+}
