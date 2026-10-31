@@ -1,0 +1,15 @@
+# Datasets of the product. One row per dataset: dataset name, dataset config,
+# its settings (comma separated, as qsub -v takes them), title. Lines starting
+# with # are skipped. The catalog lists every row; catalog.sh --check fails
+# when a row has no published collection.
+dataset	config	env	title
+bluelink-daily-temp	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=temp	Potential temperature, daily
+bluelink-daily-salt	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=salt	Salinity, daily
+bluelink-daily-eta_t	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=eta_t	Sea surface height, daily
+bluelink-daily-mld	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=mld	Mixed layer depth, daily
+bluelink-daily-u	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=u	Zonal velocity, daily
+bluelink-daily-v	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=v	Meridional velocity, daily
+bluelink-daily-w	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=w,BLUELINK_FIRST=1998	Vertical velocity (from 1998), daily
+bluelink-daily-tx_trans_int_z	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=tx_trans_int_z	Depth-integrated zonal mass transport, daily
+bluelink-daily-ty_trans_int_z	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=ty_trans_int_z	Depth-integrated meridional mass transport, daily
+# bluelink-month-temp	config/bluelink.sh	BLUELINK_FREQ=month,BRAN_VAR=temp	Potential temperature, monthly
