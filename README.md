@@ -192,6 +192,13 @@ writes publish and Icechunk need. `verify-published` with `AWS_NO_SIGN_REQUEST=Y
 reads the forms back anonymously. Layout and promotion:
 [docs/ghrsst-source-coop.md](docs/ghrsst-source-coop.md).
 
+`catalog.sh products/<product>` builds the root STAC catalog of a product
+(`product.json`, `datasets.tsv`, `README.md` under `products/`), one child
+per dataset; `check` fails when a dataset has no published collection, and
+`publish` writes the product files at the prefix root.
+`hpc/nci/submit-product.sh` submits the build and publish jobs for every row.
+Template and layout: [docs/indexes-only-product.md](docs/indexes-only-product.md).
+
 ### Reading the outputs
 
 ```python
@@ -243,6 +250,8 @@ float32 type of `scale_factor`. Results and findings are in
 
 ## Files
 
+- `catalog.sh`, `py/catalog.py`: product catalog. `products/*/`: products
+  (dataset lists, no code).
 - `run.sh`: driver. `config/*.sh`: datasets (sources, arrays, remap rules,
   render targets) and publish targets.
 - `py/harvest.py`: harvest engines (GDAL `GetRawBlockInfo`, h5py
