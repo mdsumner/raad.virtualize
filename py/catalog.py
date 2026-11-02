@@ -64,6 +64,8 @@ def read_json(path):
         f = gdal.VSIFOpenL(path, "rb")
     except RuntimeError:
         return None
+    if f is None:  # some GDAL builds return None instead of raising
+        return None
     try:
         data = b""
         while True:
