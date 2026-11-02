@@ -127,7 +127,8 @@ sources --(plan: gdal mdim mosaic)------> plan.vrt
 
 ```sh
 bash run.sh config/bransynth.sh                  # synthetic BRAN-shaped, local, about 10 s
-bash run.sh config/oisst.sh                      # OISST Sept 1981 from NOAA S3, about 1 min
+OISST_MONTHS=198109 bash run.sh config/oisst.sh  # OISST Sept 1981 from NOAA S3, about 1 min
+bash run.sh config/oisst.sh                      # OISST full daily series (about 16,500 files)
 BRAN_VAR=salt BRAN_MONTHS="01 02" bash run.sh config/bran.sh   # BRAN smoke test over THREDDS
 BRAN_YEARS=2010 bash run.sh config/bran.sh       # one BRAN year, about 1.1M refs
 bash run.sh config/bran.sh config/aadc-transfer.sh publish verify-published
@@ -326,12 +327,13 @@ float32 type of `scale_factor`. Results and findings are in
   synthetic COGs of the same encoding (Int16, ZSTD, `PREDICTOR=2`, a sparse
   tile, a missing day); not yet run against the bucket.
 - **OISST** (NOAA v2.1 AVHRR daily, 1981-09-01 to present): fully harvested
-  in the legacy layout, 16,387 files, published as `oisst-refs.sqlite`. One
-  month runs through the current pipeline as a test.
+  in the legacy layout, 16,387 files, published as `oisst-refs.sqlite`.
+  `config/oisst.sh` reharvests the full series through the current pipeline
+  (plan from `py/plan_daily.py`), to the `oisst/` group of the scratch
+  product.
 
 ## Roadmap
 
-- Ingest the legacy OISST store into mdim-refs/0.2, or reharvest.
 - Feed the store from local file mirrors (the raad collection on openstack):
   the schema is dataset-agnostic.
 - GHRSST COGs (source.coop): the full `analysed_sst` series (about 22.8M
