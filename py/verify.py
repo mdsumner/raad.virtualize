@@ -333,7 +333,7 @@ def main():
         print(f"\n{name} start={start} count={count}")
         for k, (h, dt, sec, v) in res.items():
             same = ref is not None and v is not None and ref[3] is not None and \
-                v.shape == ref[3].shape and np.array_equal(v.astype("f8"), ref[3].astype("f8"))
+                v.shape == ref[3].shape and np.array_equal(v.astype("f8"), ref[3].astype("f8"), equal_nan=True)
             flag = "oracle" if k == "plan" else ("SAME" if same else "DIFFERENT")
             if k == "kerchunk" and v is None and predictor:
                 # imagecodecs_delta (TIFF PREDICTOR=2) is not a GDAL Zarr filter
