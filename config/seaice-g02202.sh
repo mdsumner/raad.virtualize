@@ -26,7 +26,8 @@
 #   SEAICE_MIRROR             a local directory holding
 #                             noaadata.apps.nsidc.org/NOAA/G02202_V6/ (the
 #                             raad layout): sources are read from it and
-#                             remapped to the NSIDC URLs at publish
+#                             remapped to the NSIDC URLs at publish; files
+#                             listed but missing from the mirror are skipped
 #   SEAICE_FILELIST           the file list Parquet (URL or local path)
 SEAICE_HEM=${SEAICE_HEM:-south}
 SEAICE_FREQ=${SEAICE_FREQ:-daily}
@@ -47,7 +48,7 @@ sources() {
   "$PYTHON" "$HERE/py/filelist.py" --filelist "$SEAICE_FILELIST" --cache "$WORK/filelist.parquet" \
     --match "/G02202_V6/$SEAICE_HEM/$SEAICE_FREQ/" --date "$SEAICE_DATE" \
     ${SEAICE_FIRST:+--first "$SEAICE_FIRST"} ${SEAICE_LAST:+--last "$SEAICE_LAST"} \
-    --prefix https:// "$SEAICE_ROOT"
+    --prefix https:// "$SEAICE_ROOT" ${SEAICE_MIRROR:+--exists}
 }
 # Daily plan: py/plan_daily.py (from the OISST work) mosaics the first two
 # files and extends the plan by date, so a missing day (2026-08-09/10) is a
@@ -66,6 +67,9 @@ REMAPS=("public|/vsicurl/https://|https://")
 if [ -n "${SEAICE_MIRROR:-}" ]; then
   REMAPS+=("public|$SEAICE_ROOT|https://" "gdal|$SEAICE_ROOT|/vsicurl/https://")
 fi
+# one STAC item file per day is 17,500 uploads: keep the ndjson and
+# stac-geoparquet item forms only, so a publish fits the source.coop key hour
+if [ "$SEAICE_FREQ" = daily ]; then export STAC_ITEM_FILES=${STAC_ITEM_FILES:-0}; fi
 KERCHUNK_TARGET=public
 ICECHUNK_TARGET=public
 VRT_TARGET=gdal

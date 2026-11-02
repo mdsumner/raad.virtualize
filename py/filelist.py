@@ -19,6 +19,9 @@ date order, for a dataset config's sources() function.
   --prefix OLD NEW
                replace a leading OLD of each URL by NEW (e.g. a local mirror
                root, or /vsicurl/https://)
+  --exists     keep only entries that exist as local files after the prefix
+               swap (a mirror that lags the list); the count dropped goes to
+               stderr
 
 Usage:
   python filelist.py --filelist https://.../cdr_sic_G02202_V6.parquet \
@@ -60,6 +63,7 @@ def main():
     ap.add_argument("--first", default="")
     ap.add_argument("--last", default="")
     ap.add_argument("--prefix", nargs=2, metavar=("OLD", "NEW"))
+    ap.add_argument("--exists", action="store_true")
     a = ap.parse_args()
 
     pats = [re.compile(m) for m in a.match]
@@ -77,6 +81,11 @@ def main():
         if a.prefix and u.startswith(a.prefix[0]):
             u = a.prefix[1] + u[len(a.prefix[0]):]
         out.append((d, u))
+    if a.exists:
+        n = len(out)
+        out = [(d, u) for d, u in out if os.path.isfile(u)]
+        if len(out) < n:
+            sys.stderr.write(f"filelist: {n - len(out)} of {n} listed files not found locally, skipped\n")
     out.sort()
     dup = sorted(d for d, n in collections.Counter(d for d, _ in out).items() if n > 1)
     if dup:
