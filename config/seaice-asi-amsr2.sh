@@ -72,7 +72,7 @@ make_plan() {
   for a in $ARRAYS; do
     # one plan per array would need a merge; the product has one array
     "$PYTHON" "$HERE/py/plan_lift.py" --sources "$WORK/sources.txt" --array "$a" \
-      --pattern "$ASI_PATTERN" ${srs[@]+"${srs[@]}"} --check "${PLAN_CHECK:-8}" "$WORK/plan.vrt"
+      --pattern="$ASI_PATTERN" ${srs[@]+"${srs[@]}"} --check "${PLAN_CHECK:-8}" "$WORK/plan.vrt"
     break
   done
 }
