@@ -1,0 +1,204 @@
+---
+title: "Bluelink temperature: chunk index over time and depth, in DuckDB"
+description: "A table query, not an array read: scan the flat refs store with DuckDB and summarise chunks, bytes and file spans for each (day, depth) pair."
+date: 2026-11-02
+categories: [bluelink, flat, duckdb, sql, python, r]
+---
+
+## Query
+
+| | |
+|---|---|
+| Dataset | `bluelink-daily-temp` ([forms](../../published.md)), the flat refs store `flat/` |
+| Table | `refs_temp.parquet`: one row per chunk, `dim_0 .. dim_3` (chunk grid position), `present`, `path`, `offset`, `size` |
+| Selection | `GROUP BY dim_0, dim_1`: the leading pair of dims, here `Time` x `st_ocean` |
+| Result | one row per (day, depth): chunks listed and present, bytes, files, the byte span in the file, and the gap bytes inside that span |
+
+No array values are read. The flat store is a table of byte references, so
+questions about layout are SQL over Parquet: how many chunks each 2D slab
+has, whether any are absent, which file holds it, and whether one range
+request could fetch the whole slab.
+
+The query is in [`sql/chunk_index.sql`](https://github.com/mdsumner/raad.virtualize/blob/main/sql/chunk_index.sql).
+It reads `arrays.json` for the dims, shape, chunks and coordinates, so it
+works for any array of any flat store: set `base` and `arr`. For a 3D array
+such as sea ice (`time, y, x`) the leading pair is time x row of chunk
+tiles.
+
+## Readers
+
+::: {.panel-tabset}
+
+## DuckDB CLI
+
+[not run]{.status .status-todo} against the published store.
+
+From the repository root:
+
+```sh
+duckdb <<'EOF'
+SET VARIABLE base = 'https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-temp/flat';
+SET VARIABLE arr = 'temp';
+.read sql/chunk_index.sql
+-- per depth: is the land mask constant over time, and how big is a slab?
+SELECT dim_1, label_1 AS st_ocean, count(*) AS days,
+       min(present) AS min_present, max(present) AS max_present,
+       round(avg(bytes) / 1e6, 2) AS mb_per_slab, max(gap) AS max_gap
+FROM idx_labelled GROUP BY ALL ORDER BY dim_1;
+EOF
+```
+
+## DuckDB, Python
+
+[ok]{.status .status-ok} on a local copy of the BRAN pilot table (32 days,
+2010-01-01 to 2010-02-01), Claude, cloud sandbox, DuckDB 2.0.0, 2026-11-02.
+[not run]{.status .status-todo} against the published store.
+
+```python
+import duckdb
+con = duckdb.connect()
+con.sql("SET VARIABLE base = 'https://data.source.coop/ausantarctic/"
+        "ausantarctic-scratch/bluelink/bluelink-daily-temp/flat'")
+con.sql("SET VARIABLE arr = 'temp'")
+con.execute(open("sql/chunk_index.sql").read())  # last statement prints the head of the index
+con.fetchall()
+
+# the dims, shape, chunks and chunk grid
+con.sql("SELECT * FROM meta").show()
+
+# the index itself: one row per (day, depth)
+con.sql("SELECT * EXCLUDE (path) FROM idx_labelled ORDER BY dim_0, dim_1").show(max_rows=10)
+
+# per depth, over all days
+con.sql("""
+  SELECT dim_1, label_1 AS st_ocean, count(*) AS days,
+         min(present) AS min_present, max(present) AS max_present,
+         round(avg(bytes) / 1e6, 2) AS mb_per_slab, max(gap) AS max_gap
+  FROM idx_labelled GROUP BY ALL ORDER BY dim_1""").show()
+
+# per day: chunks, bytes and the file it lives in
+con.sql("""
+  SELECT dim_0, label_0 AS day, sum(present) AS chunks,
+         round(sum(bytes) / 1e6, 1) AS mb, max(files) AS files,
+         regexp_extract(any_value(path), '[^/]+$') AS file
+  FROM idx_labelled GROUP BY ALL ORDER BY dim_0""").show(max_rows=10)
+
+# day x depth matrix of slab sizes (MB) for a corner of the index
+con.sql("""
+  PIVOT (SELECT dim_0, 'z' || lpad(dim_1::VARCHAR, 2, '0') AS z,
+                round(bytes / 1e6, 2) AS mb
+         FROM idx WHERE dim_0 < 5 AND dim_1 < 6)
+  ON z USING first(mb) ORDER BY dim_0""").show()
+
+# completeness: pairs with fewer rows than the grid, or with absent chunks
+con.sql("""
+  SELECT count(*) AS pairs,
+         count(*) FILTER (rows < (SELECT max(rows) FROM idx)) AS short,
+         count(*) FILTER (present < rows) AS with_absent
+  FROM idx""").show()
+
+# keep the index: a small table that answers "where is day d, depth k?"
+con.sql("COPY (SELECT * FROM idx_labelled ORDER BY dim_0, dim_1) "
+        "TO 'bluelink-daily-temp-chunk-index.parquet'")
+```
+
+## DuckDB, R
+
+[not run]{.status .status-todo}
+
+```r
+library(DBI)
+con <- dbConnect(duckdb::duckdb())
+dbExecute(con, "SET VARIABLE base = 'https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-temp/flat'")
+dbExecute(con, "SET VARIABLE arr = 'temp'")
+
+## run the file statement by statement (comment lines dropped first)
+sql <- readLines("sql/chunk_index.sql")
+sql <- paste(sql[!grepl("^\\s*--", sql)], collapse = "\n")
+for (s in strsplit(sql, ";\\s*\n")[[1]]) if (nzchar(trimws(s))) dbExecute(con, s)
+
+idx <- dbGetQuery(con, "SELECT * EXCLUDE (path) FROM idx_labelled ORDER BY dim_0, dim_1")
+head(idx)
+
+## per depth, over all days
+dbGetQuery(con, "
+  SELECT dim_1, label_1 AS st_ocean, count(*) AS days,
+         min(present) AS min_present, max(present) AS max_present,
+         round(avg(bytes) / 1e6, 2) AS mb_per_slab, max(gap) AS max_gap
+  FROM idx_labelled GROUP BY ALL ORDER BY dim_1")
+
+## day x depth matrix of slab bytes, as an R matrix
+m <- xtabs(bytes ~ dim_0 + dim_1, data = idx)
+dim(m)  # days x depths
+```
+
+:::
+
+## What the pilot table shows
+
+Values below are from the BRAN pilot table
+(`wxylib/bran-pilot/table-virtualizarr/refs_temp.parquet`, 32 days from
+`ocean_temp_2010_01.nc` and `ocean_temp_2010_02.nc`), the same chunking as
+the published store: `temp` is `[32, 51, 1500, 3600]` in chunks of
+`[1, 1, 300, 300]`, a chunk grid of `[32, 51, 5, 12]`, so 60 chunks per
+(day, depth) pair and 1,632 pairs.
+
+The index, first rows:
+
+```
+dim_0  label_0              dim_1  label_1   rows  present    bytes  files  span_start  span_end   gap
+    0  2010-01-01 12:00:00      0  2.5         60       60  3754064      1       46353   3800417     0
+    0  2010-01-01 12:00:00      1  7.5         60       60  3801542      1     3800417   7609271  7312
+    0  2010-01-01 12:00:00      2  12.5        60       60  3837070      1     7609271  11453653  7312
+    0  2010-01-01 12:00:00      3  17.5153...  60       60  3854818      1    11453653  15312127  3656
+```
+
+Per depth, over all days:
+
+```
+dim_1  st_ocean   days  min_present  max_present  mb_per_slab  max_gap
+    0  2.5          32           60           60         3.63     7312
+    1  7.5          32           60           60         3.68     7312
+  ...
+   49  3603.10      32           60           60         1.66    13024
+   50  4509.18      32           60           60         1.19     7312
+```
+
+Day x depth slab sizes (MB), first 5 days and 6 depths:
+
+```
+dim_0   z00   z01   z02   z03   z04   z05
+    0  3.75  3.80  3.84  3.85  3.89  3.92
+    1  3.73  3.78  3.81  3.84  3.87  3.90
+    2  3.72  3.77  3.81  3.83  3.87  3.90
+    3  3.70  3.76  3.78  3.81  3.85  3.88
+    4  3.69  3.74  3.77  3.80  3.84  3.87
+```
+
+Read from these tables:
+
+- **No absent chunks.** Every pair has all 60 chunks present, including
+  land tiles at depth, so BRAN files are fully allocated. Compressed land
+  shows up instead as smaller slabs: 3.6 MB near the surface, 1.2 MB at
+  4,509 m.
+- **One file per day.** Each pair references one file, and the per-day
+  query maps days to monthly files (day 31, 2010-02-01, is in
+  `ocean_temp_2010_02.nc`).
+- **Each slab is one byte range.** Within a file, the 60 chunks of a
+  (day, depth) slab sit in one span, and consecutive depths follow each
+  other. The gap inside a span is 0 to 13 KB (likely HDF5 index nodes),
+  0.12% of all referenced bytes. A reader that wants a whole 2D field can
+  issue one range request per slab instead of 60.
+
+On the published store (12,265 days) the same queries should give
+625,515 pairs. The ones to check there: whether the land mask (present per
+depth) and the gap pattern hold across the BRAN2020 to BRAN2023 file
+change, and whether any variable has short or absent pairs.
+
+## Runs
+
+| Reader | Result | Who, where | When |
+|---|---|---|---|
+| DuckDB 2.0.0, Python | as above, on the local pilot table | Claude, cloud sandbox | 2026-11-02 |
+| DuckDB CLI, published store | not run (source.coop and the httpfs extension are blocked from the sandbox) | | |
+| DuckDB, R | not run | | |
