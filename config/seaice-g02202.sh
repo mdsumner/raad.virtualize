@@ -49,6 +49,17 @@ sources() {
     ${SEAICE_FIRST:+--first "$SEAICE_FIRST"} ${SEAICE_LAST:+--last "$SEAICE_LAST"} \
     --prefix https:// "$SEAICE_ROOT"
 }
+# Daily plan: py/plan_daily.py (from the OISST work) mosaics the first two
+# files and extends the plan by date, so a missing day (2026-08-09/10) is a
+# hole and the 17,500 files are not each opened at plan time. Monthly (575
+# files) and checkouts without plan_daily.py use gdal mdim mosaic.
+if [ "$SEAICE_FREQ" = daily ] && [ -f "$HERE/py/plan_daily.py" ]; then
+  make_plan() {
+    local arr=(); for a in $ARRAYS; do arr+=(--array "$a"); done
+    "$PYTHON" "$HERE/py/plan_daily.py" --sources "$WORK/sources.txt" "${arr[@]}" \
+      --pattern "$SEAICE_DATE" --check "${PLAN_CHECK:-8}" --gdal "$GDAL" "$WORK/plan.vrt"
+  }
+fi
 # target|prefix|replacement, applied at publish only (sources stay verbatim);
 # without SEAICE_MIRROR only the first rule matches
 REMAPS=("public|/vsicurl/https://|https://")
