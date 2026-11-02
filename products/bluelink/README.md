@@ -23,12 +23,11 @@ and BRAN2023 from 2010, so each variable is one array from 1993 (w from
 gdal mdim info /vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-temp/mdim.vrt
 ```
 
-Fuller examples (Icechunk, xarray, R): mdsumner/raad.virtualize,
-`docs/reading-published-stores.md`.
+Fuller examples (Icechunk, xarray, R): see Links below.
 
 ## Provenance
 
-Built with mdsumner/raad.virtualize on NCI Gadi, in situ from `/g/data/gb6`,
+Built with [raad.virtualize](https://github.com/mdsumner/raad.virtualize) on NCI Gadi, in situ from `/g/data/gb6`,
 and verified against GDAL reads of the source files before and after
 publication. The store meta records the code revision and configuration.
 Terms of use of the model output are those of BRAN (CSIRO, Bluelink) at NCI.

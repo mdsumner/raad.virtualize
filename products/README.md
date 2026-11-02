@@ -25,5 +25,5 @@ Groups: `bluelink/` (Bluelink ReANalysis), `ghrsst/` (GHRSST MUR),
 gdal mdim info /vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-temp/mdim.vrt
 ```
 
-Fuller examples (Icechunk, xarray, R) and how the stores are built:
-https://github.com/mdsumner/raad.virtualize
+Fuller examples (Icechunk, xarray, R) and how the stores are built: see
+Links below.

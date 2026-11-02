@@ -51,7 +51,10 @@ def main():
     for pj in sorted(ROOT.glob("products/*/product.json")):
         prod = json.loads(pj.read_text())
         base = prod.get("public_base", "").rstrip("/")
-        out += [f"## {prod.get('title', prod['id'])}", "", prod.get("description", ""), ""]
+        # anchors: #<group> on the heading, #<dataset> on each row (linked
+        # from the READMEs that catalog.py publishes)
+        out += [f"## {prod.get('title', prod['id'])} {{#{pj.parent.name}}}", "",
+                prod.get("description", ""), ""]
         if base:
             out += [f"Base: `{base}/<dataset>/`", ""]
         head = "| Dataset | Title |" + "".join(f" {f} |" for f, _ in FORMS)
@@ -59,7 +62,7 @@ def main():
         for r in rows(pj.parent / "datasets.tsv"):
             ds = r["dataset"]
             cells = "".join(f" [{f}]({base}/{ds}/{p}) |" if base else " |" for f, p in FORMS)
-            out.append(f"| `{ds}` | {r['title']} |{cells}")
+            out.append(f"| [`{ds}`]{{#{ds}}} | {r['title']} |{cells}")
         out.append("")
     OUT.write_text("\n".join(out))
     print(f"wrote {OUT.relative_to(ROOT)}")
