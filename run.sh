@@ -90,7 +90,13 @@ for s in $STEPS; do
       step grist "$RSCRIPT" "$HERE/R/grist.R" "$WORK/store.sqlite" "$WORK/out" \
         "${GRIST_TARGET-$VRT_TARGET}" "${GRIST_BASE-${STAC_BASE:-}}" ;;
     stac)
-      # after icechunk and grist: the collection lists every form present in out/
+      # after icechunk and grist: the collection lists every form present in out/.
+      # A projected grid's lon/lat box comes from the plan (GDAL/OSR in Python)
+      if [ -z "${STAC_BBOX:-}" ] && [ -f "$WORK/plan.vrt" ]; then
+        STAC_BBOX=$("$PYTHON" "$HERE/py/plan_bbox.py" "$WORK/plan.vrt" || true)
+        [ -z "$STAC_BBOX" ] || echo "stac: bbox $STAC_BBOX (py/plan_bbox.py)" | tee -a "$LOG"
+      fi
+      export STAC_BBOX
       step stac "$RSCRIPT" "$HERE/R/stac.R" "$WORK/store.sqlite" "$WORK/out" \
         "${STAC_TARGET-$KERCHUNK_TARGET}" "${STAC_BASE:-}"
       # stac-geoparquet from the ndjson items, where rustac is installed

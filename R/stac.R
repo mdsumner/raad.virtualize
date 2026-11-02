@@ -241,8 +241,17 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     c(we[1], sn[1], we[2], sn[2])
   }
   full <- function(d) seq_along(dims[[d]]$values)
-  cbbox <- if (geographic) bbox_of(full(dx), full(dy)) else c(-180, -90, 180, 90)
-  if (!geographic) warning("stac: no geographic x/y found; spatial extent written as the globe")
+  ## a projected grid: the lon/lat box run.sh computes from the plan
+  ## (py/plan_bbox.py, STAC_BBOX=w,s,e,n), else the globe
+  pbox <- suppressWarnings(as.numeric(strsplit(Sys.getenv("STAC_BBOX"), ",")[[1]]))
+  if (geographic) {
+    cbbox <- bbox_of(full(dx), full(dy))
+  } else if (length(pbox) == 4L && all(is.finite(pbox))) {
+    cbbox <- pbox
+  } else {
+    cbbox <- c(-180, -90, 180, 90)
+    warning("stac: no geographic x/y found and no STAC_BBOX; spatial extent written as the globe")
+  }
   ttime <- if (!is.na(dt)) dims[[dt]]$time
 
   ## datacube
