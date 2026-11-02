@@ -152,6 +152,7 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `BRAN_YEARS`, `BRAN_MONTHS`, `BRAN_VAR`, `BRAN_ROOT` | BRAN selection; a month subset gets its own dataset name |
 | `GHRSST_VAR`, `GHRSST_YEARS`, `GHRSST_COG_ROOT` | GHRSST COG selection (`config/ghrsst-cog.sh`) |
 | `SEAICE_HEM`, `SEAICE_FREQ`, `SEAICE_FIRST`, `SEAICE_LAST`, `SEAICE_ARRAYS`, `SEAICE_MIRROR` | G02202 v6 selection (`config/seaice-g02202.sh`); the source list is the aad-filelist collection `cdr_sic_G02202_V6`, read by `py/filelist.py` |
+| `OISST_MONTHS`, `OISST_PRELIMINARY`, `OISST_MIRROR`, `OISST_MD5` | OISST v2.1 selection (`config/oisst.sh`); the source list is an anonymous listing of the NOAA bucket, read by `py/oisst_sources.py` |
 | `VERIFY_WINDOWS` | explicit `--window ARRAY:START:COUNT` checks |
 | `STAC_TARGET` | remap target for STAC item hrefs (default `KERCHUNK_TARGET`) |
 | `STAC_BASE` | URL of the published dataset prefix; collection asset hrefs become absolute and carry a GDAL open string (`rv:gdal`). Without it the hrefs are relative to the published layout. |

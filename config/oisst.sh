@@ -50,6 +50,9 @@ REMAPS=("public|/vsicurl/https://|https://")
 if [ -n "${OISST_MIRROR:-}" ]; then
   REMAPS+=("public|$OISST_MIRROR|$OISST_URL/" "gdal|$OISST_MIRROR|/vsicurl/$OISST_URL/")
 fi
+# one STAC item file per day is 16,500 uploads: keep the ndjson and
+# stac-geoparquet item forms only, so a publish fits the source.coop key hour
+export STAC_ITEM_FILES=${STAC_ITEM_FILES:-0}
 KERCHUNK_TARGET=public
 ICECHUNK_TARGET=public
 VRT_TARGET=gdal
