@@ -13,6 +13,7 @@ long-term homes.
 
 - Code and runbook: [README](https://github.com/mdsumner/raad.virtualize#readme)
 - Run log and findings: [results](results.md)
+- Reading a published Icechunk store: [reading-icechunk](reading-icechunk.md)
 
 ## Model
 

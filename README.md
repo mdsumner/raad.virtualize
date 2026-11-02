@@ -211,6 +211,10 @@ repo = icechunk.Repository.open(st, authorize_virtual_chunk_access={
 ds = xr.open_zarr(repo.readonly_session("main").store, consolidated=False)
 ```
 
+A published store read from source.coop, with concurrency capped at both
+layers: [examples/read_bluelink_icechunk.py](examples/read_bluelink_icechunk.py),
+described in [docs/reading-icechunk.md](docs/reading-icechunk.md).
+
 ```sh
 gdal mdim info /vsis3/aadc-transfer/michae_sum/e2e/bran2023-daily-temp/mdim.vrt
 gdal mdim info 'ZARR:"/vsikerchunk_parquet_ref/{work/bran2023-daily-temp/out/kerchunk}"'
@@ -267,6 +271,7 @@ float32 type of `scale_factor`. Results and findings are in
   VRT renderer and the kerchunk writer from blocklist (vendored with the
   same fix). `R/collate.R`, `R/render.R`: steps 3 and 4.
   `R/install-deps.R`: the `deps` step.
+- `examples/`: reader scripts for published stores.
 - `legacy/`: the earlier two-table OISST store (`store.R`, `oisst_harvest.R`,
   `oisst_to_icechunk.py`). The release artifact `oisst-refs.sqlite` and
   [with-oisst-gdal.md](with-oisst-gdal.md) use that layout.
