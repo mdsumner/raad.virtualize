@@ -10,10 +10,11 @@ procedure over.
 
 Status: draft. Drafts of every index family (GHRSST, bluelink, others) go
 to the scratch product `ausantarctic/ausantarctic-scratch`, so that drafting
-does not touch the production pipeline (decision 2026-11-02). Nothing has
-been written to source.coop yet. Credential and
-product details are from the source.coop documentation (docs.source.coop,
-read 2026-10-29) and are untested here.
+does not touch the production pipeline (decision 2026-11-02). The scratch
+group `ghrsst/` holds one dataset, `ghrsst-mur-cog-analysed_sst` (full
+series, `products/ghrsst/datasets.tsv`); the procedure is under "Full series
+in the scratch group" below. Credential and product details are from the
+source.coop documentation (docs.source.coop, read 2026-10-29).
 
 ## Repository layout
 
@@ -170,7 +171,58 @@ in-place commits), a GDAL PUT (informational), and deletes.
 python py/sourcecoop_check.py ausantarctic/ausantarctic-scratch
 ```
 
-### Build, publish, read back
+### Full series in the scratch group
+
+On a docker host (the Nectar VM), `hpc/vm/docker-run.sh` runs `run.sh` and
+`catalog.sh` in the `gdal-r-python-extras` image and installs obstore,
+imagecodecs and fastparquet into the container. The listing is of the
+whole bucket, so a rebuild picks up every day cogger has written.
+
+The plan step lists the days with no COG and stops when there are more
+than `GHRSST_MAX_MISSING` (default 0): a listing cut short by HTTP 503
+from data.source.coop fails there instead of producing a shorter series.
+The grist check reads a 2048 x 2048 window of each checked field
+(`GRIST_VERIFY_WINDOW`) rather than the 1.3 GB field.
+
+Build and local verify (no keys; about 40 minutes, most of it the harvest):
+
+```sh
+cd ~/Git/raad.virtualize && git pull
+nohup bash hpc/vm/docker-run.sh run.sh config/ghrsst-cog.sh config/source-coop.sh \
+  deps plan harvest collate render icechunk grist stac verify > ghrsst-build.log 2>&1 < /dev/null &
+grep -E '^== |missing|FAIL|DIFFERENT|Error' ghrsst-build.log
+```
+
+The `stac` and `grist` steps must run with `config/source-coop.sh` sourced,
+so that the collection and the catalog `dsn` carry the public URL.
+
+Publish (fresh product keys; about 3 GB, `store.sqlite` 1.2 GB of it). If
+the token expires part way, export new keys and run again with
+`S3_SYNC_ARGS=--skip-same-size`, which leaves out what is already uploaded:
+
+```sh
+# needs AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN of ausantarctic-scratch exported
+cd ~/Git/raad.virtualize
+nohup bash hpc/vm/docker-run.sh run.sh config/ghrsst-cog.sh config/source-coop.sh publish \
+  > ghrsst-publish.log 2>&1 < /dev/null &
+grep -E '^== |s3_sync: [0-9]+ files|Error|Expired' ghrsst-publish.log
+```
+
+Read back anonymously, then the group and root catalogs (keys needed for
+the two `publish` steps only):
+
+```sh
+cd ~/Git/raad.virtualize
+bash hpc/vm/docker-run.sh run.sh config/ghrsst-cog.sh config/source-coop.sh verify-published 2>&1 | tee ghrsst-verify.log
+bash hpc/vm/docker-run.sh catalog.sh products/ghrsst config/source-coop.sh check publish
+bash hpc/vm/docker-run.sh catalog.sh products config/source-coop.sh check publish
+```
+
+verify-published counts the GDAL kerchunk reads as a known limit
+(imagecodecs_delta); the kerchunk form is checked with fsspec and
+imagecodecs instead.
+
+### One-year trial
 
 `config/source-coop.sh` is the publish target. `SOURCECOOP_REPO` names the
 product (default `ausantarctic/ausantarctic-scratch`; any other

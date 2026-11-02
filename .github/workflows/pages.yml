@@ -13,8 +13,10 @@ permissions:
   pages: write
   id-token: write
 
+# one deploy at a time; pull request builds only cancel older builds of the
+# same pull request (a shared group let one PR's build cancel another's)
 concurrency:
-  group: pages
+  group: ${{ github.event_name == 'pull_request' && format('pages-pr-{0}', github.event.pull_request.number) || 'pages' }}
   cancel-in-progress: true
 
 jobs:

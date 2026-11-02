@@ -14,6 +14,11 @@ Every file is assumed to share the grid, type and tiling of the first one
 (only the first is opened). Dates come from the first capture group of
 --pattern applied to the file name, as YYYYMMDD.
 
+Days between the first and last date with no file are listed on stderr.
+--max-missing N stops (exit 1, no plan written) when more than N days are
+missing: a listing that dropped directories (HTTP 503 from the server, for
+example) then fails instead of planning a shorter series. Default -1, no limit.
+
 Usage:
   python plan_cog.py --sources sources.txt --array analysed_sst \
     --pattern '^(\\d{8})090000-.*\\.tif$' plan.vrt
@@ -112,7 +117,8 @@ def plan(sources, array, pattern):
             "      </Source>",
         ]
     lines += ["    </Array>", "  </Group>", "</VRTDataset>", ""]
-    return "\n".join(lines), len(files), nt
+    missing = sorted(set(t0 + dt.timedelta(i) for i in range(nt)) - {d for d, _ in files})
+    return "\n".join(lines), len(files), nt, missing
 
 
 def main():
@@ -120,11 +126,19 @@ def main():
     ap.add_argument("--sources", required=True, help="file of sources, one per line")
     ap.add_argument("--array", required=True)
     ap.add_argument("--pattern", required=True, help="regex on the file name; group 1 is YYYYMMDD")
+    ap.add_argument("--max-missing", type=int, default=-1,
+                    help="fail when more days than this have no file (-1: no limit)")
     ap.add_argument("vrt")
     a = ap.parse_args()
     with open(a.sources) as f:
         sources = [s.strip() for s in f if s.strip()]
-    text, nfiles, nt = plan(sources, a.array, a.pattern)
+    text, nfiles, nt, missing = plan(sources, a.array, a.pattern)
+    if missing:
+        shown = ", ".join(str(d) for d in missing[:20]) + (" ..." if len(missing) > 20 else "")
+        print(f"plan_cog: {len(missing)} of {nt} days have no file: {shown}", file=sys.stderr)
+    if 0 <= a.max_missing < len(missing):
+        sys.exit(f"plan_cog: {len(missing)} missing days, more than --max-missing {a.max_missing}; "
+                 "no plan written (check the listing, or raise the limit)")
     with open(a.vrt, "w") as f:
         f.write(text)
     print(f"plan_cog: {nfiles} files over {nt} days -> {a.vrt}")

@@ -2,5 +2,6 @@
   "id": "ghrsst",
   "title": "GHRSST MUR virtual stores",
   "description": "Byte-reference indexes of the GHRSST MUR v4.1 daily sea surface temperature analysis, read from the cloud-optimised GeoTIFFs in source.coop ausantarctic/ghrsst-mur-v2. No data is copied. Drafts: the production home is ausantarctic/ghrsst-mur-v2.",
-  "license": "other"
+  "license": "other",
+  "public_base": "https://data.source.coop/ausantarctic/ausantarctic-scratch/ghrsst"
 }

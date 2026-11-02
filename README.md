@@ -158,6 +158,8 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `GRIST_TARGET` | remap target for the grist `source` column (default `VRT_TARGET`) |
 | `GRIST_BASE` | URL of the published dataset prefix for the grist `dsn` (default `STAC_BASE`; without either, dsn is the local `out/mdim.vrt`) |
 | `GRIST_VERIFY_BOUNDARIES` | source changes checked per array and level by `py/verify_grist.py` (default 8, plus every change of source directory; `all` for every one) |
+| `GRIST_VERIFY_WINDOW` | side of the window `py/verify_grist.py` reads from each checked field (default 0, the whole field; 2048 in `config/ghrsst-cog.sh`) |
+| `S3_SYNC_ARGS` | extra `py/s3_sync.py` options for an obstore publish, e.g. `--skip-same-size` to resume after an expired token |
 | `PYTHON`, `RSCRIPT`, `GDAL` | executables |
 | `R_LIB` | R library used ahead of the system one (default `./r-lib`) |
 | `PUBLISH`, `AADC_PREFIX` | publish prefix (`/vsis3/...`), set by a publish config |

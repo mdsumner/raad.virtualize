@@ -20,6 +20,7 @@ FORMS = [
     ("kerchunk", "kerchunk/"),
     ("Icechunk", "icechunk/"),
     ("flat refs", "flat/"),
+    ("grist", "grist/catalog.parquet"),
     ("STAC", "stac/collection.json"),
 ]
 
