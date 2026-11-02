@@ -72,7 +72,7 @@ joined with the mosaic concatenation. One store can carry many canons.
 
 ## Published forms
 
-Five renderings, all from the store and none derived from another:
+Six renderings, all from the store and none derived from another:
 
 1. **Flat refs store**: `arrays.json`, `refs_<array>.parquet` and
    `sources.parquet`. Read by wxylib (`wxy-refs`) and by any Parquet reader.
@@ -93,6 +93,18 @@ Five renderings, all from the store and none derived from another:
    in 1 to 4 serve readers of the cube; STAC serves search, discovery and
    the granule-level readers (GDAL STACIT and GTI, gdalcubes, odc-stac,
    stackstac).
+6. **grist catalog**: `grist/catalog.parquet`, the mdim catalog of the
+   [hypertidy/grist](https://github.com/hypertidy/grist) catalog contract,
+   one row per 2D field: `date` (date32), `dsn` (GDAL open string of the
+   published `mdim.vrt`), `array`, `index` (coordinate values of every
+   non-spatial dimension, `Time=1993-01-01,st_ocean=2.5`, never positions)
+   and `source` (the granule behind the field, remapped to `GRIST_TARGET`,
+   default `VRT_TARGET`). Derived from placements and the coordinate arrays;
+   no granule is opened. Levels of the vertical dimension are a projection
+   setting, `GRIST_LEVELS` (comma separated values, or `all`; default the
+   first value). The STAC collection lists it as an asset with role
+   `index`. The Parquet key-value metadata carries `contract` and the store
+   `meta` (as `rv:<key>`).
 
 Each form carries the store's `meta` as root attributes (STAC: `rv:meta` on
 the collection).
@@ -105,8 +117,9 @@ sources --(plan: gdal mdim mosaic)------> plan.vrt
         --(collate: R/collate.R)--------> store.sqlite   mdim-refs/0.2
         --(render: R/render.R)----------> out/flat/  out/mdim.vrt  out/kerchunk/
         --(icechunk: py/render_icechunk.py, from out/flat)--> out/icechunk/
+        --(grist: R/grist.R, from the store)----------------> out/grist/catalog.parquet
         --(stac: R/stac.R, from the store and plan)---------> out/stac/
-        --(verify: py/verify.py)--------> every form against GDAL on the sources
+        --(verify: py/verify.py, py/verify_grist.py)--> every form against GDAL on the sources
         --(publish, verify-published)---> object storage, then read back and verified
 ```
 
@@ -138,6 +151,11 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `STAC_TARGET` | remap target for STAC item hrefs (default `KERCHUNK_TARGET`) |
 | `STAC_BASE` | URL of the published dataset prefix; collection asset hrefs become absolute and carry a GDAL open string (`rv:gdal`). Without it the hrefs are relative to the published layout. |
 | `STAC_ITEM_FILES` | `0` skips `stac/items/` (one file per granule) for long series; the ndjson and stac-geoparquet forms remain |
+| `GRIST_LEVELS` | values of the vertical dimension in the grist catalog, comma separated, or `all` (default the first value) |
+| `GRIST_ARRAYS` | arrays in the grist catalog (default every referenced array) |
+| `GRIST_TARGET` | remap target for the grist `source` column (default `VRT_TARGET`) |
+| `GRIST_BASE` | URL of the published dataset prefix for the grist `dsn` (default `STAC_BASE`; without either, dsn is the local `out/mdim.vrt`) |
+| `GRIST_VERIFY_BOUNDARIES` | source changes checked per array and level by `py/verify_grist.py` (default 8, plus every change of source directory; `all` for every one) |
 | `PYTHON`, `RSCRIPT`, `GDAL` | executables |
 | `R_LIB` | R library used ahead of the system one (default `./r-lib`) |
 | `PUBLISH`, `AADC_PREFIX` | publish prefix (`/vsis3/...`), set by a publish config |
@@ -181,6 +199,18 @@ website). Credentials come from `AWS_ACCESS_KEY_ID` and
 syncs `out/`, `plan.vrt` and `store.sqlite` to `<prefix>/<DATASET>/`.
 `verify-published` reads the VRT, kerchunk and Icechunk forms back from the
 bucket and checks them against GDAL on the sources.
+
+The grist catalog check (`py/verify_grist.py`, in `verify` and
+`verify-published`) takes the first and last row of each array and level and
+the first row after a change of `source`, opens `dsn` with the GDAL
+multidimensional API, resolves `index` against the dsn's indexing variables
+(dates at day resolution, numbers within a relative 1e-6), reads the 2D slice,
+and compares its checksum and values with the same field read from `source`,
+resolved against the source's own coordinates. `verify` opens the local
+`out/mdim.vrt` in place of dsn; `verify-published` reads the catalog from
+`GRIST_BASE` (or `STAC_BASE`) and opens each dsn as written. `grist` and `stac`
+both depend on the published URL, so rerun them with the publish config
+sourced before `publish`.
 
 `config/source-coop.sh` targets a source.coop product (`SOURCECOOP_REPO`,
 default `ausantarctic/ausantarctic-scratch`, the drafting product for all

@@ -41,6 +41,6 @@ CONFIG=${CONFIG:-config/bran.sh}
 DATASET=$(source "$CONFIG"; echo "$DATASET")
 export E2E_WORK=${E2E_WORK:-/scratch/$PROJECT/$USER/raad.virtualize/$DATASET}
 mkdir -p "$E2E_WORK"
-STEPS=${STEPS:-plan:harvest:collate:render:icechunk:stac}
+STEPS=${STEPS:-plan:harvest:collate:render:icechunk:grist:stac}
 singularity exec -B /g/data,/scratch "$SIF" \
   bash run.sh "$CONFIG" ${STEPS//:/ }

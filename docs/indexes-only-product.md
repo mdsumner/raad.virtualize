@@ -43,7 +43,7 @@ root:
   datasets.tsv        copy of the product's list
   product.json
   README.md
-  <dataset>/          mdim.vrt, kerchunk/, icechunk/, flat/, stac/,
+  <dataset>/          mdim.vrt, kerchunk/, icechunk/, flat/, stac/, grist/,
                       plan.vrt, store.sqlite (as in docs/ghrsst-source-coop.md)
 ```
 

@@ -8,7 +8,7 @@
 #   ./run.sh config/bran.sh config/aadc-transfer.sh publish verify-published
 #
 # Every leading *.sh argument is sourced, in order (dataset, then a publish
-# target). Steps: deps plan harvest collate render icechunk verify, and
+# target). Steps: deps plan harvest collate render icechunk grist stac verify, and
 # publish verify-published (not run by default).
 # Env: E2E_WORK (default ./work/<DATASET>), PYTHON, RSCRIPT, GDAL, WORKERS,
 #      HARVEST_LIMIT (scan only the first N sources; for a smoke test),
@@ -19,7 +19,10 @@
 #      PUBLISH_WITH (gdal, or obstore for py/s3_sync.py),
 #      STAC_TARGET (remap target for STAC item hrefs; default KERCHUNK_TARGET),
 #      STAC_BASE (public URL of the published dataset prefix, for absolute
-#      STAC asset hrefs and GDAL open strings).
+#      STAC asset hrefs and GDAL open strings),
+#      GRIST_LEVELS, GRIST_ARRAYS, GRIST_TARGET (default VRT_TARGET),
+#      GRIST_BASE (default STAC_BASE), GRIST_VERIFY_BOUNDARIES (see R/grist.R
+#      and py/verify_grist.py).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ $# -ge 1 ] || { sed -n '2,22p' "$0"; exit 1; }
@@ -30,7 +33,7 @@ while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$
 REV=$(git -c safe.directory="$HERE" -C "$HERE" describe --always --dirty 2>/dev/null || echo unversioned)
 REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#")
 export E2E_GENERATOR="${E2E_REPO:-${REPO:-local}} $REV" E2E_CONFIG="${CONFIGS[*]}"
-STEPS=${*:-plan harvest collate render icechunk stac verify}
+STEPS=${*:-plan harvest collate render icechunk grist stac verify}
 PYTHON=${PYTHON:-python}; RSCRIPT=${RSCRIPT:-Rscript}; GDAL=${GDAL:-gdal}
 WORK=${E2E_WORK:-$HERE/work/$DATASET}
 mkdir -p "$WORK"
@@ -79,8 +82,13 @@ for s in $STEPS; do
     icechunk)
       step icechunk "$PYTHON" "$HERE/py/render_icechunk.py" "$WORK/out/flat" \
         "$WORK/out/icechunk" --target "$ICECHUNK_TARGET" ${ICECHUNK_ARGS:-} ;;
+    grist)
+      # grist catalog (hypertidy/grist mdim contract): one row per date and
+      # level, dsn the published mdim.vrt; before stac, which lists it
+      step grist "$RSCRIPT" "$HERE/R/grist.R" "$WORK/store.sqlite" "$WORK/out" \
+        "${GRIST_TARGET-$VRT_TARGET}" "${GRIST_BASE-${STAC_BASE:-}}" ;;
     stac)
-      # after icechunk: the collection lists every form present in out/
+      # after icechunk and grist: the collection lists every form present in out/
       step stac "$RSCRIPT" "$HERE/R/stac.R" "$WORK/store.sqlite" "$WORK/out" \
         "${STAC_TARGET-$KERCHUNK_TARGET}" "${STAC_BASE:-}"
       # stac-geoparquet from the ndjson items, where rustac is installed
@@ -89,7 +97,12 @@ for s in $STEPS; do
       fi ;;
     verify)
       step verify "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
-        ${VERIFY_WINDOWS:-} ;;
+        ${VERIFY_WINDOWS:-}
+      # the catalog rows against their source granules, through the local VRT
+      if [ -f "$WORK/out/grist/catalog.parquet" ]; then
+        step verify "$PYTHON" "$HERE/py/verify_grist.py" --catalog "$WORK/out/grist/catalog.parquet" \
+          --vrt "$WORK/out/mdim.vrt" --boundaries "${GRIST_VERIFY_BOUNDARIES:-8}"
+      fi ;;
     publish)
       [ -n "$PUB" ] || { echo "publish: set PUBLISH or source a publish config"; exit 1; }
       # PUBLISH_WITH=obstore (config/source-coop.sh): py/s3_sync.py, for
@@ -104,7 +117,15 @@ for s in $STEPS; do
     verify-published)
       [ -n "$PUB" ] || { echo "verify-published: set PUBLISH or source a publish config"; exit 1; }
       step verify-published "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
-        --published "$PUB" ${VERIFY_WINDOWS:-} ;;
+        --published "$PUB" ${VERIFY_WINDOWS:-}
+      # the published catalog read back from its public URL, each row's dsn
+      # opened as written (as grist opens it)
+      if [ -f "$WORK/out/grist/catalog.parquet" ]; then
+        gcat=${GRIST_BASE-${STAC_BASE:-}}; gcat=${gcat:-$PUB}
+        step verify-published "$PYTHON" "$HERE/py/verify_grist.py" \
+          --catalog "${gcat%/}/grist/catalog.parquet" \
+          --boundaries "${GRIST_VERIFY_BOUNDARIES:-8}"
+      fi ;;
     *) echo "unknown step $s"; exit 1 ;;
   esac
 done
