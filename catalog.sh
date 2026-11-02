@@ -19,7 +19,7 @@
 #   check    build, reading every dataset's collection.json from the publish
 #            prefix; fails when one is missing (completeness before publish)
 #   publish  copy catalog.json, datasets.json, datasets.tsv, product.json and
-#            README.md (and any image beside it, e.g. banner.jpg) to the
+#            README.md (and any image beside it, e.g. banner-800.jpg) to the
 #            publish prefix root
 # Env: E2E_WORK (default ./work/<product>), PYTHON, CATALOG_BASE (public URL
 #      of the publish prefix, for the self link; default STAC_BASE of the
