@@ -36,6 +36,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import sys
 import time
@@ -215,6 +216,9 @@ def icechunk_reader(repo):
                 print(f"  icechunk: {str(e).splitlines()[0][:70]}; concurrency -> {4 if n is None else n // 2}")
                 time.sleep(1)
     read.attrs = lambda name: dict(g[name].attrs)
+    # the array's fill_value metadata, for arrays whose _FillValue attribute
+    # is left out (a NaN fill; py/render_icechunk.py)
+    read.fill = lambda name: g[name].metadata.fill_value
     return read
 
 
@@ -277,6 +281,17 @@ def source_scale(plan, name):
     except RuntimeError:  # unpacked array (e.g. BRAN w); raised under UseExceptions
         at = None
     return at.ReadAsDouble() if at is not None else 1.0
+
+
+def same_fill(a, b):
+    """Fill values equal, NaN equal to NaN (also spelled "NaN")."""
+    if a is None or b is None:
+        return a is None and b is None
+    try:
+        a, b = float(a), float(b)
+    except (TypeError, ValueError):
+        return a == b
+    return a == b or (math.isnan(a) and math.isnan(b))
 
 
 def main():
@@ -377,10 +392,13 @@ def main():
                     got[k] = (m.GetScale() if m.GetScale() is not None else 1.0, m.GetNoDataValue())
                 elif hasattr(rd, "attrs"):
                     at = rd.attrs(r["array"])
-                    got[k] = (at.get("scale_factor", 1.0), at.get("_FillValue"))
+                    nd = at.get("_FillValue")
+                    if nd is None and hasattr(rd, "fill"):
+                        nd = rd.fill(r["array"])
+                    got[k] = (at.get("scale_factor", 1.0), nd)
             print(f"  {r['array']}: GDAL scale {want[0]!r} fill {want[1]!r}")
             for k, (sf, nd) in got.items():
-                ok = sf == want[0] and (nd == want[1] or (nd is None and want[1] is None))
+                ok = sf == want[0] and same_fill(nd, want[1])
                 bad += not ok
                 print(f"    {k:11s} scale {sf!r} fill {nd!r} {'ok' if ok else 'MISMATCH'}")
     if errors:
