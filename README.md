@@ -320,6 +320,9 @@ float32 type of `scale_factor`. Results and findings are in
   same fix). `R/collate.R`, `R/render.R`: steps 3 and 4.
   `R/install-deps.R`: the `deps` step.
 - `examples/`: reader scripts for published stores.
+- `sql/chunk_index.sql`: DuckDB chunk index over the leading two dims of
+  any flat refs store (local or https); worked example on the site under
+  Examples.
 - `legacy/`: the earlier two-table OISST store (`store.R`, `oisst_harvest.R`,
   `oisst_to_icechunk.py`). The release artifact `oisst-refs.sqlite` and
   [with-oisst-gdal.md](with-oisst-gdal.md) use that layout.
