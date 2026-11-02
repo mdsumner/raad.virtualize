@@ -11,6 +11,8 @@
 #   BRAN_VAR=temp                 also salt, eta_t, ... (same file pattern
 #                                 ocean_<var>_YYYY_MM.nc; u/v are on another grid)
 DATASET=bran2023-daily-${BRAN_VAR:-temp}${BRAN_MONTHS:+-smoke}
+# product group (products/bluelink/): the scratch prefix on source.coop
+PRODUCT_GROUP=bluelink
 ARRAYS="${BRAN_VAR:-temp}"
 THREDDS="https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/BRAN2023/daily"
 case "${BRAN_ROOT:-thredds}" in

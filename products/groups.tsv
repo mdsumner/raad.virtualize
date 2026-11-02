@@ -1,0 +1,9 @@
+# Groups of the root catalog. One row per group: the directory name under
+# products/ (and the prefix it publishes to), and its title. Each group has
+# its own product.json and datasets.tsv; a group with no datasets yet is an
+# empty catalog. Lines starting with # are skipped.
+group	title
+bluelink	Bluelink ReANalysis (BRAN)
+ghrsst	GHRSST MUR sea surface temperature
+oisst	NOAA OISST sea surface temperature
+seaice	Sea ice concentration

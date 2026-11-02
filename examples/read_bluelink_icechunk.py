@@ -33,7 +33,7 @@ import zarr
 BUCKET = "us-west-2.opendata.source.coop"
 # Other bluelink-daily-* datasets sit beside this one; u and v use
 # xu_ocean/yu_ocean, and 2D variables have no st_ocean.
-PREFIX = "ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-salt/icechunk"
+PREFIX = "ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-salt/icechunk"
 VARIABLE = "salt"
 CONCURRENCY = 4  # simultaneous requests to THREDDS; keep this small
 

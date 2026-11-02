@@ -47,11 +47,38 @@ root:
                       plan.vrt, store.sqlite (as in docs/ghrsst-source-coop.md)
 ```
 
-For source.coop, the dataset directories sit under `virtual/` (the
-`SOURCECOOP_PREFIX`) as in the GHRSST layout; for an indexes-only product
-the product README at the product root is the one source.coop shows;
-`catalog.sh publish` writes README.md to the prefix, and the copy at the
-product root is a separate upload.
+In the source.coop scratch product a product directory is one group: its
+prefix is the group name (`products/bluelink/` publishes to
+`ausantarctic-scratch/bluelink/`), every dataset config in its
+`datasets.tsv` sets the same `PRODUCT_GROUP` (`catalog.sh` checks), and the
+group catalog links up to the root catalog. `products/` itself holds the
+root (`product.json`, `groups.tsv`, `README.md`, the README source.coop
+shows at the product root):
+
+```
+ausantarctic-scratch/
+  catalog.json        STAC catalog, child link per row of groups.tsv
+  groups.json         per group: published or not, dataset count
+  groups.tsv, product.json, README.md
+  bluelink/           a group, laid out as <prefix>/ above
+  ghrsst/  oisst/  seaice/
+```
+
+A new group is a directory `products/<group>/` (product.json, a
+datasets.tsv with only its header to start, a short README), a row in
+`products/groups.tsv`, and `PRODUCT_GROUP=<group>` in its dataset configs.
+Keep the group README short and generic (what the data is, the layout, one
+read example); detailed examples live in this repository, where they are
+cheaper to keep current. Publish order: each group's catalog, then the root:
+
+```sh
+# needs the scratch product keys (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN) already exported
+for g in bluelink ghrsst oisst seaice; do bash catalog.sh products/$g config/source-coop.sh check publish; done
+bash catalog.sh products config/source-coop.sh check publish
+```
+
+On a production product (`SOURCECOOP_PRODUCTION=1`) the prefix stays
+`virtual/` and the group catalog is its own root.
 
 ## Procedure
 

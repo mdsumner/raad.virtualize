@@ -49,7 +49,7 @@ walltime is resubmitted as is.
 `bran-publish.pbs` publishes to the AADC transfer bucket
 (`config/aadc-transfer.sh`) unless `PUBLISH_CONFIG` names another target.
 Drafts go to source.coop, `ausantarctic/ausantarctic-scratch` under
-`virtual/<DATASET>/` (`PUBLISH_CONFIG=config/source-coop.sh`). Its keys last
+the config's group, `bluelink/<DATASET>/` (`PUBLISH_CONFIG=config/source-coop.sh`). Its keys last
 one hour and include `AWS_SESSION_TOKEN`, so that publish is submitted
 after the build finishes rather than held with `-W depend`:
 

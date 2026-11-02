@@ -1,0 +1,6 @@
+{
+  "id": "ausantarctic-scratch",
+  "title": "Australian Antarctic Division virtual stores (drafts)",
+  "description": "Draft byte-reference indexes (virtual stores) of ocean and sea ice datasets, one group per product family. Every form reads the original files where they are published; no data is copied. Contents are drafts: a group moves to its production home when it is ready, and anything here may change or be removed without notice.",
+  "license": "other"
+}

@@ -29,7 +29,7 @@ import time
 import xarray as xr
 
 URL = ("/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/"
-       "virtual/bluelink-daily-salt/mdim.vrt")
+       "bluelink/bluelink-daily-salt/mdim.vrt")
 VARIABLE = "salt"
 
 # Applied around the open and every later read (gdalxarray config_options).
@@ -88,4 +88,4 @@ print(series.to_series().round(3).to_string())
 #
 # and from the command line:
 #
-#   gdal mdim info /vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-salt/mdim.vrt
+#   gdal mdim info /vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-salt/mdim.vrt

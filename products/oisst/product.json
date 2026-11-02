@@ -1,0 +1,6 @@
+{
+  "id": "oisst",
+  "title": "NOAA OISST virtual stores",
+  "description": "Byte-reference indexes of the NOAA 1/4 degree Daily Optimum Interpolation Sea Surface Temperature (OISST v2.1), read from the original netCDF files. No data is copied. Drafts.",
+  "license": "other"
+}

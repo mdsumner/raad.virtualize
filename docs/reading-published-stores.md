@@ -21,7 +21,7 @@ Both forms point at the same BRAN netCDF files on
 The store:
 
 ```
-s3://us-west-2.opendata.source.coop/ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-salt/icechunk/
+s3://us-west-2.opendata.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-salt/icechunk/
 ```
 
 Repository metadata, manifests and coordinates are read anonymously from
@@ -69,7 +69,7 @@ wanted, open with chunks matching the store and compute under
 ## GDAL mdim VRT
 
 ```
-/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-salt/mdim.vrt
+/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-salt/mdim.vrt
 ```
 
 The VRT is about 140 KB with 403 sources, one per monthly netCDF file, each
@@ -105,7 +105,7 @@ from a plain `ZARR:` path:
 ```python
 ds = xr.open_dataset(
     'ZARR:"/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/'
-    'virtual/bluelink-daily-temp/kerchunk/"', engine="gdalxarray")
+    'bluelink/bluelink-daily-temp/kerchunk/"', engine="gdalxarray")
 ```
 
 The explicit form
