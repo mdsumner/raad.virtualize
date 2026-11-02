@@ -16,9 +16,12 @@ AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN.
 Needs obstore (pip install obstore).
 """
 import argparse
+import datetime
 import os
 import sys
 import time
+import urllib.error
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 import obstore
@@ -43,6 +46,27 @@ def store_for(vsis3):
             cfg[c] = env[k]
     opts = {"allow_http": True} if cfg.get("endpoint", "").startswith("http://") else {}
     return S3Store(bucket, prefix=prefix or None, config=cfg, client_options=opts), prefix
+
+
+def delete_one(store, key):
+    """Delete one object with a single DELETE request.
+
+    obstore.delete sends even one path as a batch DeleteObjects
+    (POST /<bucket>?delete), which the source.coop proxy answers with
+    NoSuchBucket. A presigned DELETE (query-string signature, session token
+    included) is a plain DeleteObject. An object already gone is not an
+    error. The explicit user agent: the proxy has answered urllib's default
+    with 403.
+    """
+    url = obstore.sign(store, "DELETE", key, datetime.timedelta(minutes=10))
+    req = urllib.request.Request(url, method="DELETE",
+                                 headers={"User-Agent": "curl/8 raad.virtualize"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            r.read()
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise RuntimeError(f"DELETE {key}: HTTP {e.code} {e.read()[:300]!r}") from None
 
 
 def local_files(src):
@@ -97,7 +121,7 @@ def main():
         # one object per request: the source.coop proxy has no batch
         # DeleteObjects (POST /<account>?delete answers NoSuchBucket)
         for k in stale:
-            obstore.delete(store, k)
+            delete_one(store, k)
         print(f"s3_sync: removed {len(stale)} stale objects")
 
 

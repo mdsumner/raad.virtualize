@@ -35,6 +35,9 @@ import obstore
 from obstore.store import S3Store
 from osgeo import gdal
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from s3_sync import delete_one  # noqa: E402  (one DELETE per object)
+
 gdal.UseExceptions()
 ENDPOINT = os.environ.get("SOURCECOOP_ENDPOINT", "data.source.coop")
 SCHEME = "http" if os.environ.get("AWS_HTTPS", "YES").upper() in ("NO", "FALSE", "OFF") else "https"
@@ -141,7 +144,7 @@ def main():
         # one object per request: the proxy has no batch DeleteObjects
         # (POST /<account>?delete answers NoSuchBucket)
         for n in names:
-            obstore.delete(store, n)
+            delete_one(store, n)
         left = listing(store)
         if left:
             raise RuntimeError(f"{len(left)} entries left: {left[:5]}")

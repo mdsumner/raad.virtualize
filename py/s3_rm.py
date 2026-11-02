@@ -4,8 +4,9 @@
 
 Lists the prefix and prints the object count and size. Without --yes
 nothing is deleted (a dry run). With --yes each object is deleted with its
-own DELETE: the source.coop data proxy has no batch DeleteObjects
-(POST /<account>?delete answers NoSuchBucket). The prefix must have at
+own presigned DELETE request (s3_sync.delete_one): the source.coop data
+proxy has no batch DeleteObjects (POST /<account>?delete answers
+NoSuchBucket), and obstore.delete sends even one path that way. The prefix must have at
 least two path levels below the bucket (account/product/prefix on
 source.coop), so a product or bucket root cannot be emptied by mistake.
 
@@ -21,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 import obstore
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from s3_sync import store_for  # noqa: E402
+from s3_sync import delete_one, store_for  # noqa: E402
 
 
 def main():
@@ -46,7 +47,7 @@ def main():
     keys = [o["path"] for o in objs]
 
     def rm(k):
-        obstore.delete(store, k)
+        delete_one(store, k)
         return k
 
     with ThreadPoolExecutor(a.workers) as ex:
