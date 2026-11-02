@@ -114,7 +114,7 @@ equivalent.
 
 fsspec reads kerchunk Parquet refs through `LazyReferenceMapper`, whose
 default is `engine="fastparquet"`, and `fsspec.filesystem("reference",
-fo=<url>)` has no way to change it. fastparquet (2026.5.0 and 2026.9.0)
+fo=<url>)` has no way to change it. fastparquet 2026.5.0+ under pandas 3
 returns a null `path` for every row after arrow's dictionary-to-plain
 fallback in a `refs.<n>.parq` file, zarr takes that as "no such chunk", and
 xarray returns fill values with no error. On `oisst-v2.1-daily` (published

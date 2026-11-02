@@ -5,7 +5,7 @@ engine="fastparquet" by default, and ReferenceFileSystem(fo=<dir>) gives no
 way to change that. When a refs.<n>.parq file was written by arrow with
 dictionary encoding on the `path` column and the dictionary outgrew arrow's
 1 MiB dictionary page limit, arrow fell back to plain encoding for the rest of
-the column chunk, and fastparquet (2026.5.0, 2026.9.0) returns null for every
+the column chunk, and fastparquet 2026.5.0+ under pandas 3 returns null for every
 path after the fallback (row 8192 in the OISST store). zarr then sees "no
 such chunk" and xarray returns fill values without an error.
 
