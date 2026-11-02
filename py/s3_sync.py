@@ -94,8 +94,10 @@ def main():
     if a.delete and not single:
         keep = {k for _, k in files}
         stale = [k for k in remote_files(store) if k not in keep]
-        if stale:
-            obstore.delete(store, stale)
+        # one object per request: the source.coop proxy has no batch
+        # DeleteObjects (POST /<account>?delete answers NoSuchBucket)
+        for k in stale:
+            obstore.delete(store, k)
         print(f"s3_sync: removed {len(stale)} stale objects")
 
 

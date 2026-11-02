@@ -127,7 +127,10 @@ def main():
         attempt("list", lambda: str(listing(store)))
     if "public" not in a.skip and dict(results).get("put"):
         url = f"{SCHEME}://{ENDPOINT}/{bucket}/{key}/small.bin"
-        attempt("public", lambda: f"{len(urllib.request.urlopen(url, timeout=30).read())} bytes from {url}")
+        # an explicit user agent: on 2026-11-02 the proxy answered urllib's default
+        # (Python-urllib/3.x) with 403 while anonymous S3 reads of the product passed
+        req = urllib.request.Request(url, headers={"User-Agent": "curl/8 sourcecoop_check"})
+        attempt("public", lambda: f"{len(urllib.request.urlopen(req, timeout=30).read())} bytes from {url}")
     if "icechunk" not in a.skip:
         attempt("icechunk", lambda: icechunk_check(bucket, f"{key}/icechunk"))
     if "gdal-put" not in a.skip:
@@ -135,8 +138,10 @@ def main():
 
     def delete():
         names = listing(store)
-        if names:
-            obstore.delete(store, names)
+        # one object per request: the proxy has no batch DeleteObjects
+        # (POST /<account>?delete answers NoSuchBucket)
+        for n in names:
+            obstore.delete(store, n)
         left = listing(store)
         if left:
             raise RuntimeError(f"{len(left)} entries left: {left[:5]}")
