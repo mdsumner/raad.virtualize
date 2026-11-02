@@ -1,6 +1,7 @@
 {
   "id": "oisst",
   "title": "NOAA OISST virtual stores",
-  "description": "Byte-reference indexes of the NOAA 1/4 degree Daily Optimum Interpolation Sea Surface Temperature (OISST v2.1), read from the original netCDF files. No data is copied. Drafts.",
-  "license": "other"
+  "description": "Byte-reference indexes of the NOAA 1/4 degree Daily Optimum Interpolation Sea Surface Temperature (OISST v2.1, AVHRR), read from the original netCDF files in the public NOAA bucket (noaa-cdr-sea-surface-temp-optimum-interpolation-pds). No data is copied. Each dataset is published as a GDAL multidimensional VRT, kerchunk Parquet, an Icechunk repository with virtual references, a flat Parquet refs store and a STAC collection. Drafts.",
+  "license": "other",
+  "public_base": "https://data.source.coop/ausantarctic/ausantarctic-scratch/oisst"
 }
