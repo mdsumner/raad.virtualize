@@ -133,6 +133,7 @@ BRAN_YEARS=2010 bash run.sh config/bran.sh       # one BRAN year, about 1.1M ref
 bash run.sh config/bran.sh config/aadc-transfer.sh publish verify-published
 GHRSST_ROOT=/path/to/MUR/v4.1 GHRSST_YEARS=2024 bash run.sh config/ghrsst.sh   # MUR netCDF, local
 GHRSST_YEARS=2024 bash run.sh config/ghrsst-cog.sh   # MUR COGs on source.coop, one year
+SEAICE_FIRST=20241225 SEAICE_LAST=20250105 bash run.sh config/seaice-g02202.sh   # G02202 v6 south, F17 to AMSR2
 ```
 
 Every leading `*.sh` argument is sourced in order (a dataset, then
@@ -149,6 +150,7 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `ICECHUNK_ARGS` | extra `py/render_icechunk.py` options: `--split N` chunks along the first axis per manifest (default 365, 0 for none; set it to the append unit, such as 1 for daily, for a repository that later takes incremental commits), `--commit-every N` refs (default 1M) |
 | `BRAN_YEARS`, `BRAN_MONTHS`, `BRAN_VAR`, `BRAN_ROOT` | BRAN selection; a month subset gets its own dataset name |
 | `GHRSST_VAR`, `GHRSST_YEARS`, `GHRSST_COG_ROOT` | GHRSST COG selection (`config/ghrsst-cog.sh`) |
+| `SEAICE_HEM`, `SEAICE_FREQ`, `SEAICE_FIRST`, `SEAICE_LAST`, `SEAICE_ARRAYS`, `SEAICE_MIRROR` | G02202 v6 selection (`config/seaice-g02202.sh`); the source list is the aad-filelist collection `cdr_sic_G02202_V6`, read by `py/filelist.py` |
 | `VERIFY_WINDOWS` | explicit `--window ARRAY:START:COUNT` checks |
 | `STAC_TARGET` | remap target for STAC item hrefs (default `KERCHUNK_TARGET`) |
 | `STAC_BASE` | URL of the published dataset prefix; collection asset hrefs become absolute and carry a GDAL open string (`rv:gdal`). Without it the hrefs are relative to the published layout. |
