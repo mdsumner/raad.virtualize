@@ -313,6 +313,17 @@ mr_plan_vrt <- function(vrt) {
     sb <- xml2::xml_text(xml2::xml_find_first(srcs, "./SourceBand"))
     band <- is.na(sa) & !is.na(sb)
     sa[band] <- paste0("band:", sb[band])
+    ## a multidim source given a leading length-1 axis the same way (the
+    ## plan_lift.py form: 2D files stacked on a new time axis) is recorded as
+    ## "lift:<array>"; the rendered VRT writes the transpose back
+    tr <- gsub("\\s", "", xml2::xml_text(xml2::xml_find_first(srcs, "./SourceTranspose")))
+    lift <- !band & !is.na(sa) & !is.na(tr)
+    if (any(lift)) {
+      want <- paste(c(-1L, seq_len(rank - 1L) - 1L), collapse = ",")
+      if (any(tr[lift] != want)) stop(sprintf("array '%s': SourceTranspose %s, only %s (a leading new axis) is supported",
+                                              nm, tr[lift][tr[lift] != want][1], want))
+      sa[lift] <- paste0("lift:", sa[lift])
+    }
     band_count <- .jl(c(1L, unname(dim_size[refs])[-1L]))
     out$arrays[[nm]] <- list(
       dims = refs, shape = unname(dim_size[refs]), dtype = dt,

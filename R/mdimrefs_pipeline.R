@@ -248,6 +248,14 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
           xml2::xml_add_child(s, "SourceSlab", offset = paste(rep(0L, length(cn)), collapse = ","),
                               count = paste(cn, collapse = ","),
                               step = paste(rep(1L, length(cn)), collapse = ","))
+        } else if (startsWith(P$source_array[i], "lift:")) {
+          ## a multidim array given a leading length-1 axis (plan_lift.py)
+          xml2::xml_add_child(s, "SourceArray", paste0("/", sub("^lift:", "", P$source_array[i])))
+          xml2::xml_add_child(s, "SourceTranspose",
+                              paste(c(-1L, seq_len(length(cn) - 1L) - 1L), collapse = ","))
+          xml2::xml_add_child(s, "SourceSlab", offset = paste(.fj(P$src_offset[i]), collapse = ","),
+                              count = paste(cn, collapse = ","),
+                              step = paste(rep(1L, length(cn)), collapse = ","))
         } else {
           xml2::xml_add_child(s, "SourceArray", paste0("/", P$source_array[i]))
           xml2::xml_add_child(s, "SourceSlab", offset = paste(.fj(P$src_offset[i]), collapse = ","),
