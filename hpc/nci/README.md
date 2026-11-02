@@ -45,3 +45,20 @@ from 2010 to its last month on disk, about 37M refs for `temp`. Work goes to
 `/scratch/$PROJECT/$USER/raad.virtualize/bran2023-daily-<var>` (override with
 `E2E_WORK`). The harvest restarts where it stopped, so a job that runs out of
 walltime is resubmitted as is.
+
+`bran-publish.pbs` publishes to the AADC transfer bucket
+(`config/aadc-transfer.sh`) unless `PUBLISH_CONFIG` names another target.
+Drafts go to source.coop, `ausantarctic/ausantarctic-scratch` under
+`virtual/<DATASET>/` (`PUBLISH_CONFIG=config/source-coop.sh`). Its keys last
+one hour and include `AWS_SESSION_TOKEN`, so that publish is submitted
+after the build finishes rather than held with `-W depend`:
+
+```
+# needs the scratch product's AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN already exported
+qsub -P ab12 -l storage=gdata/gb6+scratch/ab12 \
+  -v CONFIG=config/bluelink.sh,BRAN_VAR=temp,PUBLISH_CONFIG=config/source-coop.sh,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN \
+  hpc/nci/bran-publish.pbs
+```
+
+`config/source-coop.sh` publishes with obstore (`py/s3_sync.py`), which the
+image needs.

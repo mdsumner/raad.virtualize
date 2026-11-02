@@ -7,12 +7,18 @@
 #PBS -j oe
 #PBS -N bran-publish
 ## After bran-build.pbs: verify every form against GDAL on the sources, publish
-## to the AADC transfer bucket, verify from the bucket. copyq has internet (the
+## to the target in PUBLISH_CONFIG, verify from there. copyq has internet (the
 ## forms point at THREDDS once remapped). Same -P, storage and -v as the build,
-## plus the bucket keys from the environment:
+## plus the target's keys from the environment:
 ##   qsub -P ab12 -l storage=gdata/gb6+scratch/ab12 -W depend=afterok:<build job id> \
-##     -v BRAN_VAR=temp,SIF=...,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY \
+##     -v BRAN_VAR=temp,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY \
 ##     hpc/nci/bran-publish.pbs
+## PUBLISH_CONFIG: config/aadc-transfer.sh (default, AADC transfer bucket) or
+## config/source-coop.sh (source.coop, drafts in ausantarctic/ausantarctic-scratch;
+## SOURCECOOP_* there). source.coop keys are temporary (one hour, with
+## AWS_SESSION_TOKEN, which also goes in -v): the token can expire while a held
+## job waits for its build, so submit the source.coop publish after the build
+## has finished, without -W depend.
 set -euo pipefail
 module load singularity
 ## Keep host R and Python libraries out of the container: singularity binds
@@ -24,6 +30,9 @@ export SINGULARITYENV_R_LIBS_USER=/nonexistent SINGULARITYENV_R_LIBS= \
 SIF=${SIF:-/g/data/$PROJECT/$USER/sif_lib/gdal-r-python-extras_latest.sif}
 [ -f "$SIF" ] || { echo "no image at $SIF: set SIF to the .sif of ghcr.io/hypertidy/gdal-r-python-extras" >&2; exit 1; }
 : "${AWS_ACCESS_KEY_ID:?pass the bucket keys with -v}"
+PUBLISH_CONFIG=${PUBLISH_CONFIG:-config/aadc-transfer.sh}
+[ -f "$PUBLISH_CONFIG" ] || { echo "no publish config $PUBLISH_CONFIG" >&2; exit 1; }
+[[ $PUBLISH_CONFIG != *source-coop* ]] || : "${AWS_SESSION_TOKEN:?source.coop keys need AWS_SESSION_TOKEN in -v}"
 export BRAN_ROOT=gdata BRAN_VAR=${BRAN_VAR:-temp}
 ## BRAN_YEARS: a FIRST:LAST range (qsub -v cannot carry spaces), default 2010:2023
 y=${BRAN_YEARS:-2010:2023}
@@ -34,4 +43,4 @@ CONFIG=${CONFIG:-config/bran.sh}
 DATASET=$(source "$CONFIG"; echo "$DATASET")
 export E2E_WORK=${E2E_WORK:-/scratch/$PROJECT/$USER/raad.virtualize/$DATASET}
 singularity exec -B /g/data,/scratch "$SIF" \
-  bash run.sh "$CONFIG" config/aadc-transfer.sh verify publish verify-published
+  bash run.sh "$CONFIG" "$PUBLISH_CONFIG" verify publish verify-published
