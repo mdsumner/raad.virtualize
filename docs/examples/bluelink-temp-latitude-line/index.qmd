@@ -1,8 +1,8 @@
 ---
 title: "Bluelink temperature: one latitude line, last day"
-description: "Same 50 values from the mdim VRT and the kerchunk store through gdalxarray; GDAL rejects the Icechunk form."
+description: "Same values from the mdim VRT and kerchunk via gdalxarray and from the VRT via terra; GDAL rejects the Icechunk form."
 date: 2026-11-02
-categories: [bluelink, mdim-vrt, kerchunk, icechunk, python, gdal]
+categories: [bluelink, mdim-vrt, kerchunk, icechunk, python, gdal, r, terra]
 ---
 
 ## Query
@@ -56,7 +56,7 @@ ds.temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5).value
 import xarray
 ds = xarray.open_dataset(
     "/vsiicechunk/{/vsicurl/https://data.source.coop/ausantarctic/"
-    "ausantarctic-scratch/virtual/bluelink-daily-temp/icechunk}",
+    "ausantarctic-scratch/bluelink/bluelink-daily-temp/icechunk}",
     engine="gdalxarray")
 # Skipping array 'temp': //temp: Unsupported codec: numcodecs.shuffle
 ```
@@ -72,7 +72,7 @@ Coordinates open; `temp` is skipped. GDAL's Zarr v3 reader has no
 ```python
 import icechunk as ic, xarray as xr, zarr
 storage = ic.s3_storage(bucket="us-west-2.opendata.source.coop",
-                        prefix="ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-temp/icechunk",
+                        prefix="ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-temp/icechunk",
                         region="us-west-2", anonymous=True)
 repo = ic.Repository.open(storage, authorize_virtual_chunk_access={
     "https://thredds.nci.org.au/": ic.credentials.HttpAccess})
@@ -83,16 +83,32 @@ ds.temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5).value
 
 ## R
 
-[not run]{.status .status-todo}
+[ok]{.status .status-ok} Michael, 2026-11-02; values identical to the VRT
+and kerchunk tabs (terra prints 6 significant digits).
 
 ```r
 library(terra)
-u <- "/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-temp/mdim.vrt"
-r <- rast(u, "temp", md = TRUE)
+u <- "/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-temp/mdim.vrt"
+r <- rast(u, "temp", md = TRUE)   # 625,515 layers = 51 depths x 12,265 days
+
+# Layers run Time fastest, then st_ocean: names are temp_st_ocean=2.5_1,
+# temp_st_ocean=2.5_2, ... so r[[1:50]] is the first 50 days at 2.5 m.
+# Layer for depth index k and day t (both 1-based):
+nt  <- 12265
+lyr <- function(k, t) (k - 1) * nt + t
+
+x  <- r[[lyr(6, nt)]]               # st_ocean index 5 in Python = k 6 (28.17 m), last day
+xy <- cbind(120.05, seq(-44.95, -40.05, length.out = 50))  # by = 0.1 stops at 49
+v  <- extract(x, xy)[[1]]           # expect 8.91857684 ... 11.86025596
+
+# profile at one point on the last day, and a surface series:
+profile <- unlist(extract(r[[lyr(1:51, nt)]], cbind(147, -44)))
+series  <- unlist(extract(r[[lyr(1, (nt - 29):nt)]], cbind(147, -44)))
 ```
 
-terra exposes Time x depth as layers (12,265 x 51); the layer and cell
-indexing for this selection is still to be written and run.
+`extract()` takes coordinates directly; the `raw = TRUE` path needs cell
+numbers, which `cells()` returns only for a SpatVector, not a matrix
+(`cellFromXY(x, xy)` takes a matrix).
 
 :::
 
@@ -102,6 +118,7 @@ indexing for this selection is still to be written and run.
 |---|---|---|---|
 | gdalxarray, mdim VRT | 50 values, as above | Michael | 2026-11-02 |
 | gdalxarray, kerchunk | identical to the VRT | Michael | 2026-11-02 |
+| terra, mdim VRT | identical to the VRT (49 checked; `seq(by = 0.1)` gave 49 points) | Michael | 2026-11-02 |
 | gdalxarray, Icechunk | `temp` skipped: `numcodecs.shuffle` | Michael, Pawsey SIF | 2026-11-02 |
 
 <details><summary>All 50 values</summary>
