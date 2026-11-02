@@ -36,7 +36,7 @@ import icechunk as ic, xarray as xr, zarr
 
 storage = ic.s3_storage(
     bucket="us-west-2.opendata.source.coop",
-    prefix="ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-salt/icechunk",
+    prefix="ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-salt/icechunk",
     region="us-west-2", anonymous=True)
 config = ic.Repository.fetch_config(storage)    # the repo's own config
 config.max_concurrent_requests = 4

@@ -25,7 +25,7 @@ is per source family:
 | GDAL multidim (osgeo.gdal, gdalxarray, `gdal mdim`) | mdim VRT | [ok]{.status .status-ok} | [ok]{.status .status-ok} one HEAD + 2 GET per source; parallel by process |
 | GDAL Zarr driver (`ZARR:"/vsicurl/.../kerchunk/"`) | kerchunk | [ok]{.status .status-ok} same values as the VRT | [no]{.status .status-no} no `imagecodecs_delta` |
 | GDAL `/vsiicechunk/{...}` | Icechunk | [no]{.status .status-no} no `numcodecs.shuffle` in Zarr v3 | [no]{.status .status-no} no `imagecodecs_delta` |
-| terra (`rast(vrt, md = TRUE)`) | mdim VRT | [partial]{.status .status-partial} BRAN-shaped synthetic VRT only; CRS guessed | [ok]{.status .status-ok} with `CPL_VSIL_CURL_CACHE_SIZE` raised |
+| terra (`rast(vrt, md = TRUE)`) | mdim VRT | [ok]{.status .status-ok} 51 x 12,265 layers, Time fastest; values not yet compared | [ok]{.status .status-ok} with `CPL_VSIL_CURL_CACHE_SIZE` raised |
 | wxy-refs | flat refs | [partial]{.status .status-partial} synthetic BRAN only | [no]{.status .status-no} predictor decode pending |
 | gdalraster multidim | mdim VRT | [not run]{.status .status-todo} | [not run]{.status .status-todo} |
 

@@ -56,7 +56,7 @@ ds.temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5).value
 import xarray
 ds = xarray.open_dataset(
     "/vsiicechunk/{/vsicurl/https://data.source.coop/ausantarctic/"
-    "ausantarctic-scratch/virtual/bluelink-daily-temp/icechunk}",
+    "ausantarctic-scratch/bluelink/bluelink-daily-temp/icechunk}",
     engine="gdalxarray")
 # Skipping array 'temp': //temp: Unsupported codec: numcodecs.shuffle
 ```
@@ -72,7 +72,7 @@ Coordinates open; `temp` is skipped. GDAL's Zarr v3 reader has no
 ```python
 import icechunk as ic, xarray as xr, zarr
 storage = ic.s3_storage(bucket="us-west-2.opendata.source.coop",
-                        prefix="ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-temp/icechunk",
+                        prefix="ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-temp/icechunk",
                         region="us-west-2", anonymous=True)
 repo = ic.Repository.open(storage, authorize_virtual_chunk_access={
     "https://thredds.nci.org.au/": ic.credentials.HttpAccess})
@@ -83,16 +83,34 @@ ds.temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5).value
 
 ## R
 
-[not run]{.status .status-todo}
+[not run]{.status .status-todo} for this selection. Opening the VRT with
+terra and extracting layers works (Michael, 2026-11-02); the indexing below
+follows from the layer names he saw and is still to be checked against the
+values above.
 
 ```r
 library(terra)
-u <- "/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-temp/mdim.vrt"
-r <- rast(u, "temp", md = TRUE)
+u <- "/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-temp/mdim.vrt"
+r <- rast(u, "temp", md = TRUE)   # 625,515 layers = 51 depths x 12,265 days
+
+# Layers run Time fastest, then st_ocean: names are temp_st_ocean=2.5_1,
+# temp_st_ocean=2.5_2, ... so r[[1:50]] is the first 50 days at 2.5 m.
+# Layer for depth index k and day t (both 1-based):
+nt  <- 12265
+lyr <- function(k, t) (k - 1) * nt + t
+
+x  <- r[[lyr(6, nt)]]               # st_ocean index 5 in Python = k 6 (28.17 m), last day
+xy <- cbind(120.05, seq(-44.95, -40.05, by = 0.1))
+v  <- extract(x, xy)[[1]]           # expect 8.91857684 ... 11.86025596
+
+# profile at one point on the last day, and a surface series:
+profile <- unlist(extract(r[[lyr(1:51, nt)]], cbind(147, -44)))
+series  <- unlist(extract(r[[lyr(1, (nt - 29):nt)]], cbind(147, -44)))
 ```
 
-terra exposes Time x depth as layers (12,265 x 51); the layer and cell
-indexing for this selection is still to be written and run.
+`extract()` takes coordinates directly; the `raw = TRUE` path needs cell
+numbers, which `cells()` returns only for a SpatVector, not a matrix
+(`cellFromXY(x, xy)` takes a matrix).
 
 :::
 
