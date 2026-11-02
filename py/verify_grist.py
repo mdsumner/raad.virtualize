@@ -12,6 +12,7 @@ scale/offset), by checksum and element by element.
 
 Usage:
   python verify_grist.py --catalog CATALOG [--vrt LOCAL_VRT] [--boundaries N|all]
+                         [--window N]
 
 CATALOG is grist/catalog.parquet: a local path, a GDAL path (/vsis3/...),
 or an https URL (read through /vsicurl/).
@@ -22,6 +23,13 @@ check before publish (the dsn names the published URL).
 BRAN2020 to BRAN2023, is checked as well). "all" checks every change.
 A source that has no multidimensional array of the catalog's name (a COG) is
 read as band 1 of the classic raster API.
+--window N: read an N x N window of each field instead of all of it (0, the
+default, reads the whole field). For large grids such as GHRSST MUR (36000 x
+17999, 1.3 GB per field): the window moves across the field from one checked
+row to the next, so the rows together cover several parts of the grid. Both
+reads of a row use the same window; row and column offsets are those of the
+2D field (the first remaining dimension is rows), which match the band of a
+classic source when the field is not flipped.
 Exit status 1 on any mismatch or read error.
 """
 import argparse
@@ -125,7 +133,21 @@ def resolve(arr, index):
     return start, count, tuple(i for i, d in enumerate(arr.GetDimensions()) if d.GetName() in used)
 
 
-def read_mdim(ds_path, array, index, cache):
+def place(shape, n, k):
+    """Offsets and sizes of the k-th n x n window over a 2D shape (rows,
+    cols), or the whole field when n is 0. Window k sits at fractions
+    (k * phi) mod 1 of the free rows and columns (phi the golden ratio
+    conjugate, columns offset by 1/2) so successive rows sample spread out
+    parts of the grid."""
+    if not n:
+        return (0, 0), tuple(shape)
+    size = (min(n, shape[0]), min(n, shape[1]))
+    f = ((k * 0.6180339887) % 1.0, (k * 0.6180339887 + 0.5) % 1.0)
+    off = tuple(int(f[i] * (shape[i] - size[i])) for i in range(2))
+    return off, size
+
+
+def read_mdim(ds_path, array, index, cache, win=None):
     if ds_path not in cache:
         if len(cache) > 4:  # sources change along the catalog: keep a few open
             cache.clear()
@@ -134,18 +156,28 @@ def read_mdim(ds_path, array, index, cache):
     if arr is None:
         raise ValueError(f"no array {array} in {ds_path}")
     start, count, axes = resolve(arr, index)
+    if win:
+        n, k = win
+        free = [i for i in range(len(start)) if i not in axes]
+        off, size = place([count[i] for i in free], n, k)
+        for j, i in enumerate(free):
+            start[i], count[i] = off[j], size[j]
     v = np.asarray(arr.ReadAsArray(array_start_idx=start, count=count))
     return np.squeeze(v, axis=axes) if axes else v
 
 
-def read_source(src, array, index, cache):
+def read_source(src, array, index, cache, win=None):
     try:
-        return read_mdim(src, array, index, cache)
+        return read_mdim(src, array, index, cache, win)
     except Exception as e:
         ds = gdal.Open(src)  # a classic raster (COG): band 1, no index
         if ds is None:
             raise e
-        return ds.GetRasterBand(1).ReadAsArray()
+        b = ds.GetRasterBand(1)
+        if not win or not win[0]:
+            return b.ReadAsArray()
+        (r0, c0), (nr, nc) = place((ds.RasterYSize, ds.RasterXSize), *win)
+        return b.ReadAsArray(c0, r0, nc, nr)
 
 
 def checksum(v):
@@ -183,6 +215,8 @@ def main():
     p.add_argument("--catalog", required=True)
     p.add_argument("--vrt", help="open this VRT in place of each row's dsn")
     p.add_argument("--boundaries", default="8", help="source changes to check per array and level, or all")
+    p.add_argument("--window", type=int, default=0,
+                   help="read an N x N window of each field (0: the whole field)")
     a = p.parse_args()
 
     t = pq.read_table(io.BytesIO(read_bytes(a.catalog)))
@@ -198,15 +232,18 @@ def main():
         print(f"  reading {a.vrt} in place of dsn {rows[0]['dsn']}")
     bad = 0
     vcache, scache = {}, {}
-    for i in select(rows, a.boundaries):
+    if a.window:
+        print(f"  reading a {a.window} x {a.window} window of each field")
+    for nth, i in enumerate(select(rows, a.boundaries)):
         r = rows[i]
+        win = (a.window, nth) if a.window else None
         index = parse_index(r["index"])
         dsn = a.vrt or r["dsn"]
         res = {}
         for k, f, path in (("dsn", read_mdim, dsn), ("source", read_source, r["source"].split(";")[0])):
             t0 = time.time()
             try:
-                v = f(path, r["array"], index, vcache if k == "dsn" else scache)
+                v = f(path, r["array"], index, vcache if k == "dsn" else scache, win)
                 res[k] = (v, checksum(v), time.time() - t0)
             except Exception as e:
                 res[k] = (None, f"ERROR {e}"[:70], time.time() - t0)

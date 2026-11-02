@@ -9,6 +9,11 @@
 #                    anonymously from data.source.coop; sources are recorded
 #                    as /vsicurl/https://data.source.coop/...). A local
 #                    directory of the same YYYY/MM/DD layout also works.
+#   GHRSST_MAX_MISSING  days between the first and last file allowed to have
+#                    no file (default 0): the plan step stops on more, so a
+#                    listing cut short by server errors is not published
+#   GRIST_VERIFY_WINDOW  side of the window py/verify_grist.py reads from each
+#                    checked field (default 2048; a whole field is 1.3 GB)
 #
 # MUR rewrites its newest days for several days after first publication:
 # rerun with HARVEST_RECHECK=30 to rescan any of the last 30 days that changed.
@@ -37,7 +42,7 @@ sources() (
 )
 make_plan() {
   "$PYTHON" "$HERE/py/plan_cog.py" --sources "$WORK/sources.txt" --array "$GHRSST_VAR" \
-    --pattern "$GHRSST_PATTERN" "$WORK/plan.vrt"
+    --pattern "$GHRSST_PATTERN" --max-missing "${GHRSST_MAX_MISSING:-0}" "$WORK/plan.vrt"
 }
 # target|prefix|replacement, applied at publish only (sources stay verbatim)
 REMAPS=("public|/vsicurl/https://|https://")
@@ -45,3 +50,4 @@ KERCHUNK_TARGET=public
 ICECHUNK_TARGET=public
 VRT_TARGET=""
 WORKERS=${WORKERS:-8}
+GRIST_VERIFY_WINDOW=${GRIST_VERIFY_WINDOW:-2048}

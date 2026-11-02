@@ -1,6 +1,6 @@
 """s3_sync.py -- upload a local directory or file to an S3 prefix with obstore.
 
-  python py/s3_sync.py LOCAL /vsis3/BUCKET/PREFIX [--delete] [--workers N]
+  python py/s3_sync.py LOCAL /vsis3/BUCKET/PREFIX [--delete] [--skip-same-size] [--workers N]
 
 The publish step for targets that reject GDAL's request signing (the
 source.coop data proxy answers GDAL /vsis3/ writes with "missing
@@ -8,6 +8,10 @@ SignedHeaders"). LOCAL is a directory (synced under PREFIX) or a file
 (written to PREFIX itself). Every local file is uploaded; files larger than
 the multipart threshold go up in parts. --delete removes objects under
 PREFIX that have no local counterpart (directory mode only).
+--skip-same-size leaves out files whose object under PREFIX already has the
+same size: for resuming an upload that stopped part way (an expired
+one-hour source.coop token), not for a rebuilt dataset, where a rewritten
+file can keep its size.
 
 Connection settings come from the same environment as GDAL: AWS_S3_ENDPOINT,
 AWS_HTTPS, AWS_VIRTUAL_HOSTING, AWS_REGION, and the credentials
@@ -89,6 +93,8 @@ def main():
     p.add_argument("src")
     p.add_argument("dest", help="/vsis3/BUCKET/PREFIX")
     p.add_argument("--delete", action="store_true", help="remove remote objects with no local file")
+    p.add_argument("--skip-same-size", action="store_true",
+                   help="skip files already uploaded with the same size (resume)")
     p.add_argument("--workers", type=int, default=8)
     a = p.parse_args()
 
@@ -100,6 +106,12 @@ def main():
     else:
         store, _ = store_for(a.dest)
         files = local_files(a.src)
+
+    if a.skip_same_size:
+        have = remote_files(store)
+        n0 = len(files)
+        files = [(f, k) for f, k in files if have.get(k) != os.path.getsize(f)]
+        print(f"s3_sync: {n0 - len(files)} of {n0} files already uploaded with the same size, skipped")
 
     t0 = time.time()
     nbytes = sum(os.path.getsize(f) for f, _ in files)

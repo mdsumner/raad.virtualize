@@ -17,12 +17,14 @@
 #      ICECHUNK_ARGS (extra py/render_icechunk.py options, e.g. "--split 0"),
 #      PUBLISH (a /vsis3/ prefix; set by config/aadc-transfer.sh),
 #      PUBLISH_WITH (gdal, or obstore for py/s3_sync.py),
+#      S3_SYNC_ARGS (extra py/s3_sync.py options, e.g. --skip-same-size to
+#      resume a publish cut off by an expired token),
 #      STAC_TARGET (remap target for STAC item hrefs; default KERCHUNK_TARGET),
 #      STAC_BASE (public URL of the published dataset prefix, for absolute
 #      STAC asset hrefs and GDAL open strings),
 #      GRIST_LEVELS, GRIST_ARRAYS, GRIST_TARGET (default VRT_TARGET),
-#      GRIST_BASE (default STAC_BASE), GRIST_VERIFY_BOUNDARIES (see R/grist.R
-#      and py/verify_grist.py).
+#      GRIST_BASE (default STAC_BASE), GRIST_VERIFY_BOUNDARIES,
+#      GRIST_VERIFY_WINDOW (see R/grist.R and py/verify_grist.py).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ $# -ge 1 ] || { sed -n '2,22p' "$0"; exit 1; }
@@ -101,15 +103,16 @@ for s in $STEPS; do
       # the catalog rows against their source granules, through the local VRT
       if [ -f "$WORK/out/grist/catalog.parquet" ]; then
         step verify "$PYTHON" "$HERE/py/verify_grist.py" --catalog "$WORK/out/grist/catalog.parquet" \
-          --vrt "$WORK/out/mdim.vrt" --boundaries "${GRIST_VERIFY_BOUNDARIES:-8}"
+          --vrt "$WORK/out/mdim.vrt" --boundaries "${GRIST_VERIFY_BOUNDARIES:-8}" \
+          --window "${GRIST_VERIFY_WINDOW:-0}"
       fi ;;
     publish)
       [ -n "$PUB" ] || { echo "publish: set PUBLISH or source a publish config"; exit 1; }
       # PUBLISH_WITH=obstore (config/source-coop.sh): py/s3_sync.py, for
       # endpoints that reject GDAL's request signing
       if [ "${PUBLISH_WITH:-gdal}" = obstore ]; then
-        step publish "$PYTHON" "$HERE/py/s3_sync.py" "$WORK/out" "$PUB"
-        for f in plan.vrt store.sqlite; do step publish "$PYTHON" "$HERE/py/s3_sync.py" "$WORK/$f" "$PUB/$f"; done
+        step publish "$PYTHON" "$HERE/py/s3_sync.py" ${S3_SYNC_ARGS:-} "$WORK/out" "$PUB"
+        for f in plan.vrt store.sqlite; do step publish "$PYTHON" "$HERE/py/s3_sync.py" ${S3_SYNC_ARGS:-} "$WORK/$f" "$PUB/$f"; done
       else
         step publish "$GDAL" vsi sync -r -j 8 "$WORK/out/" "$PUB/"
         for f in plan.vrt store.sqlite; do step publish "$GDAL" vsi copy "$WORK/$f" "$PUB/$f"; done
@@ -127,7 +130,7 @@ for s in $STEPS; do
         gcat=${GRIST_BASE-${STAC_BASE:-}}; gcat=${gcat:-$PUB}
         step verify-published "$PYTHON" "$HERE/py/verify_grist.py" \
           --catalog "${gcat%/}/grist/catalog.parquet" \
-          --boundaries "${GRIST_VERIFY_BOUNDARIES:-8}"
+          --boundaries "${GRIST_VERIFY_BOUNDARIES:-8}" --window "${GRIST_VERIFY_WINDOW:-0}"
       fi ;;
     *) echo "unknown step $s"; exit 1 ;;
   esac
