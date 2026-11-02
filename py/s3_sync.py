@@ -94,8 +94,9 @@ def main():
     if a.delete and not single:
         keep = {k for _, k in files}
         stale = [k for k in remote_files(store) if k not in keep]
-        if stale:
-            obstore.delete(store, stale)
+        # one DELETE each: the source.coop proxy has no bulk delete (POST ?delete)
+        with ThreadPoolExecutor(a.workers) as ex:
+            list(ex.map(lambda k: obstore.delete(store, k), stale))
         print(f"s3_sync: removed {len(stale)} stale objects")
 
 
