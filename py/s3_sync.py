@@ -31,6 +31,9 @@ from concurrent.futures import ThreadPoolExecutor
 import obstore
 from obstore.store import S3Store
 
+IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+               ".svg": "image/svg+xml", ".webp": "image/webp"}
+
 
 def store_for(vsis3):
     if not vsis3.startswith("/vsis3/"):
@@ -118,7 +121,11 @@ def main():
 
     def put(item):
         f, key = item
-        obstore.put(store, key, open(f, "rb"))  # multipart above obstore's threshold
+        # images (README banner) get a Content-Type so browsers show them;
+        # everything else is put as before
+        ct = IMAGE_TYPES.get(os.path.splitext(f)[1].lower())
+        extra = {"attributes": {"Content-Type": ct}} if ct else {}
+        obstore.put(store, key, open(f, "rb"), **extra)  # multipart above obstore's threshold
         return key
 
     with ThreadPoolExecutor(a.workers) as ex:

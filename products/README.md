@@ -1,5 +1,7 @@
 # Virtual stores (drafts)
 
+![Arrays and Ledgers](https://data.source.coop/ausantarctic/ausantarctic-scratch/banner.jpg)
+
 Draft byte-reference indexes ("virtual stores") of ocean and sea ice
 datasets. No data is copied: every form reads the original files where they
 are published. Contents are transient. A group moves to its production home
