@@ -356,3 +356,7 @@ float32 type of `scale_factor`. Results and findings are in
 ---
 
 ![Arrays and tables, better together](docs/images/high-five.jpg)
+
+## Code of Conduct
+
+Please note that the raad.virtualize project is released with a [Contributor Code of Conduct](https://contributor-covenant.org/version/2/1/CODE_OF_CONDUCT.html). By contributing to this project, you agree to abide by its terms.
