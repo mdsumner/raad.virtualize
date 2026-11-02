@@ -37,7 +37,10 @@ for s in $STEPS; do
       "$PYTHON" "$HERE/py/catalog.py" "$PRODUCT_DIR" "$OUT" ${BASE:+--base "$BASE"} ;;
     check)
       [ -n "${PUBLISH:-}" ] || { echo "check: source a publish config"; exit 1; }
-      "$PYTHON" "$HERE/py/catalog.py" "$PRODUCT_DIR" "$OUT" --published "$PUBLISH" --check \
+      # obstore targets (source.coop) are public and their proxy rejects
+      # GDAL's request signing: read the collections back anonymously
+      anon=; [ "${PUBLISH_WITH:-gdal}" = obstore ] && anon=AWS_NO_SIGN_REQUEST=YES
+      env $anon "$PYTHON" "$HERE/py/catalog.py" "$PRODUCT_DIR" "$OUT" --published "$PUBLISH" --check \
         ${BASE:+--base "$BASE"} ;;
     publish)
       [ -n "${PUBLISH:-}" ] || { echo "publish: source a publish config"; exit 1; }
