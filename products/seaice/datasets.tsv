@@ -1,5 +1,10 @@
 # Datasets of the group. One row per dataset: dataset name, dataset config,
 # its settings (comma separated, as qsub -v takes them), title. Lines starting
 # with # are skipped. The catalog lists every row; catalog.sh check fails
-# when a row has no published collection. No datasets yet.
+# when a row has no published collection. Monthly rows are commented out
+# until those stores are built.
 dataset	config	env	title
+g02202-v6-daily-south	config/seaice-g02202.sh	SEAICE_HEM=south,SEAICE_FREQ=daily	NOAA/NSIDC CDR sea ice concentration G02202 v6, daily, south
+g02202-v6-daily-north	config/seaice-g02202.sh	SEAICE_HEM=north,SEAICE_FREQ=daily	NOAA/NSIDC CDR sea ice concentration G02202 v6, daily, north
+#g02202-v6-monthly-south	config/seaice-g02202.sh	SEAICE_HEM=south,SEAICE_FREQ=monthly	NOAA/NSIDC CDR sea ice concentration G02202 v6, monthly, south
+#g02202-v6-monthly-north	config/seaice-g02202.sh	SEAICE_HEM=north,SEAICE_FREQ=monthly	NOAA/NSIDC CDR sea ice concentration G02202 v6, monthly, north
