@@ -116,7 +116,10 @@ for s in $STEPS; do
       fi ;;
     verify-published)
       [ -n "$PUB" ] || { echo "verify-published: set PUBLISH or source a publish config"; exit 1; }
-      step verify-published "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
+      # obstore targets (source.coop) are public and their proxy rejects
+      # GDAL's request signing: read back anonymously, as a public reader
+      anon=; [ "${PUBLISH_WITH:-gdal}" = obstore ] && anon=AWS_NO_SIGN_REQUEST=YES
+      step verify-published env $anon "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
         --published "$PUB" ${VERIFY_WINDOWS:-}
       # the published catalog read back from its public URL, each row's dsn
       # opened as written (as grist opens it)
