@@ -305,13 +305,15 @@ def main():
     if a.published:
         print("reading vrt, kerchunk, icechunk from", base)
     opened = {}
+    unopened = []  # a form that cannot be opened is not verified: a failure (see --skip)
     for k, f in readers.items():
         if k in a.skip:
             continue
         try:
             opened[k] = f()
-        except Exception as e:  # report and carry on with the other readers
+        except Exception as e:  # report, count, and carry on with the other readers
             print(f"{k}: cannot open ({e})")
+            unopened.append(k)
     absent = absent_chunks(doc, os.path.join(a.out, "flat"))
     chunks = {r["array"]: r["chunks"] for r in doc["arrays"]}
     bad = known = 0
@@ -385,7 +387,9 @@ def main():
         print("\nread errors (full text)")
         for e in errors:
             print("  " + e)
+    bad += len(unopened)
     print("\nverify:", "all readers agree" if not bad else f"{bad} mismatches",
+          f"(not opened: {', '.join(unopened)})" if unopened else "",
           f"({known} GDAL kerchunk reads hit a known bug or limit)" if known else "")
     sys.exit(1 if bad else 0)
 
