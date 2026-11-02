@@ -21,13 +21,20 @@ is per source family:
 | Reader | Form | Bluelink | GHRSST COG |
 |---|---|---|---|
 | xarray + icechunk (zarr-python) | Icechunk | [ok]{.status .status-ok} at zarr `async.concurrency` 4 (THREDDS resets at 10) | [ok]{.status .status-ok} with imagecodecs registered |
-| xarray + fsspec (zarr-python) | kerchunk | [ok]{.status .status-ok} | [ok]{.status .status-ok} with imagecodecs registered |
+| xarray + fsspec (zarr-python) | kerchunk | [ok]{.status .status-ok} with `engine="pyarrow"` refs (see below) | [ok]{.status .status-ok} with imagecodecs registered |
 | GDAL multidim (osgeo.gdal, gdalxarray, `gdal mdim`) | mdim VRT | [ok]{.status .status-ok} | [ok]{.status .status-ok} one HEAD + 2 GET per source; parallel by process |
 | GDAL Zarr driver (`ZARR:"/vsicurl/.../kerchunk/"`) | kerchunk | [ok]{.status .status-ok} same values as the VRT | [no]{.status .status-no} no `imagecodecs_delta` |
 | GDAL `/vsiicechunk/{...}` | Icechunk | [no]{.status .status-no} no `numcodecs.shuffle` in Zarr v3 | [no]{.status .status-no} no `imagecodecs_delta` |
 | terra (`rast(vrt, md = TRUE)`) | mdim VRT | [ok]{.status .status-ok} same values as gdalxarray; layers Time fastest, then depth | [ok]{.status .status-ok} with `CPL_VSIL_CURL_CACHE_SIZE` raised |
 | wxy-refs | flat refs | [partial]{.status .status-partial} synthetic BRAN only | [no]{.status .status-no} predictor decode pending |
 | gdalraster multidim | mdim VRT | [not run]{.status .status-todo} | [not run]{.status .status-todo} |
+
+fsspec reads kerchunk refs with fastparquet by default, and fastparquet
+silently drops chunk paths in refs files written with arrow dictionary
+encoding once the dictionary overflows (OISST and sea ice G02202 stores
+published before 2026-11-03; bluelink, GHRSST and ASI were not affected).
+Pass a `LazyReferenceMapper(..., engine="pyarrow")` as shown in [Reading
+published stores](reading-published-stores.md).
 
 xarray decodes the packed int16 to float64 from the Zarr forms because the
 JSON attributes do not keep the float32 type of `scale_factor`.

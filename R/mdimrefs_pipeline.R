@@ -294,6 +294,8 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
 ## BRAN's scale_factor 0.007782219909131527 into 0.0078 in the R-built index.
 ## Vendoring also drops the rhdf5 dependency for this example. Upstream fix:
 ## add `digits = I(17)` to the toJSON() call that writes .zmetadata.
+## Second change: refs.<n>.parq is written with use_dictionary = FALSE (see
+## the comment at the write; upstream needs the same).
 .zfill <- function(x) {
   if (is.null(x) || length(x) == 0) return(NULL)
   x <- x[[1]]
@@ -348,7 +350,12 @@ mr_kerchunk_writer <- function(root, vars_meta, ref_tables, inline = list(),
         raw    = arrow::Array$create(c(raw[idx], vector("list", pad)), type = arrow::binary()))
       tbl$offset <- tbl$offset$cast(arrow::int64())
       tbl$size   <- tbl$size$cast(arrow::int64())
-      arrow::write_parquet(tbl, file.path(vdir, sprintf("refs.%d.parq", p - 1L)))
+      # no dictionary: fastparquet (the fsspec default engine) returns null
+      # paths after arrow falls back from dictionary to plain encoding
+      # (about 1 MB of distinct paths, row 8192 for OISST), so xarray reads
+      # fill values for those chunks without an error
+      arrow::write_parquet(tbl, file.path(vdir, sprintf("refs.%d.parq", p - 1L)),
+                           use_dictionary = FALSE)
     }
   }
   zmeta <- list(metadata = metadata, record_size = unbox(as.integer(record_size)))
