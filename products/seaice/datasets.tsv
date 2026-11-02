@@ -6,5 +6,6 @@
 dataset	config	env	title
 g02202-v6-daily-south	config/seaice-g02202.sh	SEAICE_HEM=south,SEAICE_FREQ=daily	NOAA/NSIDC CDR sea ice concentration G02202 v6, daily, south
 g02202-v6-daily-north	config/seaice-g02202.sh	SEAICE_HEM=north,SEAICE_FREQ=daily	NOAA/NSIDC CDR sea ice concentration G02202 v6, daily, north
+asi-amsr2-v5.4-daily-south	config/seaice-asi-amsr2.sh	SEAICE_HEM=south	University of Bremen ASI AMSR2 sea ice concentration v5.4, 3.125 km, daily, south
 #g02202-v6-monthly-south	config/seaice-g02202.sh	SEAICE_HEM=south,SEAICE_FREQ=monthly	NOAA/NSIDC CDR sea ice concentration G02202 v6, monthly, south
 #g02202-v6-monthly-north	config/seaice-g02202.sh	SEAICE_HEM=north,SEAICE_FREQ=monthly	NOAA/NSIDC CDR sea ice concentration G02202 v6, monthly, north

@@ -9,3 +9,7 @@ dataset, each in its own directory with the forms common to every group
   Record of Passive Microwave Sea Ice Concentration, G02202 Version 6, 25 km
   polar stereographic grids, daily from 1978-10-25. Sources are the netCDF
   files at https://noaadata.apps.nsidc.org/NOAA/G02202_V6/.
+- `asi-amsr2-v5.4-daily-south`: University of Bremen ASI sea ice
+  concentration from AMSR2, version 5.4, 3.125 km polar stereographic grid,
+  daily from 2012-08-01. Sources are the netCDF files at
+  https://data.seaice.uni-bremen.de/amsr2/asi_daygrid_swath/s3125/netcdf/.

@@ -21,7 +21,9 @@ Engines (--engine):
 A source that GDAL cannot open as multidimensional (a GeoTIFF or COG placed
 by a <SourceBand> plan, as vrtstack writes) is scanned from its TIFF tile
 index instead (walk_tiff): IFD 0 only, chunk coordinates (0, row, col)
-within the source, dims named after the plan array.
+within the source, dims named after the plan array. A netCDF/HDF5 source
+that the plan gives a new axis (<SourceArray> with <SourceTranspose>-1,0,1,
+the plan_lift.py form) gets a 0 coordinate on that axis in the same way.
   HARVEST_BLOCK_SIZE (env, default 65536): fsspec read block for remote h5py.
 
 Output layout (--out), one fragment per (source, array), so a long run is
@@ -117,6 +119,43 @@ def plan_bands(vrt, arrays):
                 f = os.path.join(base, f)
             out[(arr.get("name"), f)] = int(b.text)
     return out
+
+
+def plan_lifts(vrt, arrays):
+    """Arrays whose multidim sources are given new axes by the plan
+    (<SourceArray> with a <SourceTranspose> holding -1, the plan_lift.py
+    form for 2D files stacked on a new time axis): {array: (transpose, dims)},
+    from the first source of each array. The other entries must be the
+    source axes in order (0, 1, ...)."""
+    root = ET.parse(vrt).getroot()
+    out = {}
+    for arr in root.findall("Group/Array"):
+        if arr.get("name") not in arrays:
+            continue
+        src = arr.find("Source")
+        if src is None or src.find("SourceArray") is None or src.find("SourceTranspose") is None:
+            continue
+        t = [int(x) for x in src.find("SourceTranspose").text.split(",")]
+        if -1 not in t:
+            continue
+        if [x for x in t if x >= 0] != list(range(len(t) - t.count(-1))):
+            sys.exit(f"harvest: array {arr.get('name')}: SourceTranspose {t} reorders source axes")
+        out[arr.get("name")] = (t, [d.get("ref") for d in arr.findall("DimensionRef")])
+    return out
+
+
+def lift_rows(rows, t):
+    """Chunk coordinates within the source, given the plan's new axes (0)."""
+    return [(tuple(0 if k < 0 else r[0][k] for k in t),) + tuple(r[1:]) for r in rows]
+
+
+def lift_meta(m, t, dims):
+    """arrays.json entry of a lifted array: the plan's dims, length-1 new axes."""
+    m = dict(m)
+    m["dims"] = dims
+    m["shape"] = [1 if k < 0 else m["shape"][k] for k in t]
+    m["chunks"] = [1 if k < 0 else m["chunks"][k] for k in t]
+    return m
 
 
 def tiff_info(ds):
@@ -311,15 +350,15 @@ def write_atomic(path, writer):
     os.replace(tmp, path)
 
 
-def scan_source(source, arrays, out, want_meta, engine="auto", tries=4, tiff=None):
+def scan_source(source, arrays, out, want_meta, engine="auto", tries=4, tiff=None, lifts=None):
     """scan_source_once() with retries: remote opens fail now and then.
     tiff: {"dims": {array: dims}, "bands": {(array, source): band}} for
-    <SourceBand> plans."""
+    <SourceBand> plans; lifts: plan_lifts() of the plan."""
     for i in range(tries):
         try:
             if tiff and any((nm, source) in tiff["bands"] for nm in arrays):
                 return scan_tiff_once(source, arrays, out, want_meta, tiff)
-            return scan_source_once(source, arrays, out, want_meta, engine)
+            return scan_source_once(source, arrays, out, want_meta, engine, lifts)
         except RuntimeError as e:
             if i == tries - 1:
                 raise
@@ -390,7 +429,7 @@ def scan_tiff_once(source, arrays, out, want_meta, tiff):
     return source, n, time.time() - t0, meta if want_meta else None
 
 
-def scan_source_once(source, arrays, out, want_meta, engine):
+def scan_source_once(source, arrays, out, want_meta, engine, lifts=None):
     """Scan one source; returns (source, nrows, seconds, arrays meta or None)."""
     t0 = time.time()
     k = key_of(source)
@@ -418,10 +457,17 @@ def scan_source_once(source, arrays, out, want_meta, engine):
                     raise
                 rows = walk_h5py(source, arr)
                 sparse.append(nm)
+        lift = (lifts or {}).get(nm)
+        if lift:
+            if len(lift[0]) - lift[0].count(-1) != rank:
+                sys.exit(f"{source}: {nm} has {rank} dimensions, the plan places {lift[0]}")
+            rows, rank = lift_rows(rows, lift[0]), len(lift[0])
         nrow, first = write_rows(rows, source, rank, nm, k, out)
         n += nrow
         if want_meta:
             meta[nm] = describe(arr, first or [])
+            if lift:
+                meta[nm] = lift_meta(meta[nm], *lift)
             meta[nm]["scanned"] = True
     if want_meta:
         for nm in rg.GetMDArrayNames():
@@ -460,6 +506,7 @@ def main():
     have_meta = os.path.exists(os.path.join(a.out, "arrays.json"))
     bands = plan_bands(a.plan, a.array)
     tiff = {"dims": plan_dims(a.plan, a.array), "bands": bands} if bands else None
+    lifts = plan_lifts(a.plan, a.array) or None
 
     def done(s):
         k = key_of(s)
@@ -481,14 +528,14 @@ def main():
     if not have_meta:
         # arrays.json from the first source, scanned in this process
         first = todo.pop(0) if todo else srcs[0]
-        _, n, dt, meta = scan_source(first, a.array, a.out, True, a.engine, tiff=tiff)
+        _, n, dt, meta = scan_source(first, a.array, a.out, True, a.engine, tiff=tiff, lifts=lifts)
         with open(os.path.join(a.out, "arrays.json"), "w") as f:
             json.dump(strict(meta), f, indent=1, default=str, allow_nan=False)
         print(f"  {first}: {n} chunks in {dt:.1f} s (arrays.json written)", file=sys.stderr)
 
     t0, total = time.time(), 0
     with ProcessPoolExecutor(a.workers) as ex:
-        futs = [ex.submit(scan_source, s, a.array, a.out, False, a.engine, tiff=tiff) for s in todo]
+        futs = [ex.submit(scan_source, s, a.array, a.out, False, a.engine, tiff=tiff, lifts=lifts) for s in todo]
         for i, f in enumerate(as_completed(futs), 1):
             s, n, dt, _ = f.result()
             total += n
