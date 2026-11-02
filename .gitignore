@@ -7,7 +7,7 @@ oisst-refs.sqlite
 .httr-oauth
 .DS_Store
 .quarto
-.positai
+.posit/assistant
 README.html
 work/
 r-lib/
