@@ -19,7 +19,7 @@ if [ "${DRY_RUN:-0}" != 1 ]; then
 fi
 run() { if [ "${DRY_RUN:-0}" = 1 ]; then echo "$*" >&2; echo DRYRUN; else "$@"; fi; }
 want=" $* "
-grep -v '^#' "$TSV" | tail -n +2 | while IFS=$'\t' read -r dataset config env title; do
+grep -v '^#' "$TSV" | tail -n +2 | tr '\t' '\037' | while IFS=$'\037' read -r dataset config env title; do
   [ -n "$dataset" ] || continue
   [ $# -eq 0 ] || [[ $want == *" $dataset "* ]] || continue
   # the row's name must be the one the config gives, or the catalog points
