@@ -211,9 +211,11 @@ repo = icechunk.Repository.open(st, authorize_virtual_chunk_access={
 ds = xr.open_zarr(repo.readonly_session("main").store, consolidated=False)
 ```
 
-A published store read from source.coop, with concurrency capped at both
-layers: [examples/read_bluelink_icechunk.py](examples/read_bluelink_icechunk.py),
-described in [docs/reading-icechunk.md](docs/reading-icechunk.md).
+A published dataset read from source.coop, as Icechunk with concurrency
+capped ([examples/read_bluelink_icechunk.py](examples/read_bluelink_icechunk.py))
+and as mdim VRT through gdalxarray
+([examples/read_bluelink_mdimvrt.py](examples/read_bluelink_mdimvrt.py)),
+described in [docs/reading-published-stores.md](docs/reading-published-stores.md).
 
 ```sh
 gdal mdim info /vsis3/aadc-transfer/michae_sum/e2e/bran2023-daily-temp/mdim.vrt

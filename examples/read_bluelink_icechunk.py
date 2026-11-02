@@ -3,7 +3,7 @@ Read the bluelink-daily-salt virtual Icechunk store on source.coop.
 
 Draft workflow illustration: one published store, read from Python with
 icechunk + xarray, with request concurrency capped. See
-docs/reading-icechunk.md.
+docs/reading-published-stores.md.
 
 The repository lives in the public source.coop bucket (anonymous S3 read).
 Its chunks are *virtual*: byte ranges inside the original BRAN netCDF files
