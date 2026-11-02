@@ -13,6 +13,8 @@
 # file holds one 2D field (z, concentration 0..100) with no time dimension,
 # so the plan is py/plan_lift.py, which stacks the files on a new time axis
 # (the date in the file name); missing days (up to 3 in a row) are holes.
+# z is float32, fill NaN, 0..100, in row chunks of 1 x 2528 with shuffle and
+# deflate 9 (2656 chunks a file); x and y are contiguous float64.
 #
 #   SEAICE_HEM=south          south (s3125) or north (n3125); the raad
 #                             collection holds south only (2026-11-02)
@@ -30,8 +32,13 @@
 #                             old mirror file is not the published file.
 #   SEAICE_OFFLINE=1          list the mirror only, no server check (refs
 #                             are remapped unchecked; for a smoke test)
-#   SEAICE_SRS                the grid's PROJ string, used when the file
-#                             carries no SRS
+#   SEAICE_SRS                the plan's SRS. Default: the Hughes 1980 polar
+#                             stereographic PROJ string below (the NSIDC
+#                             grid the product is defined on, EPSG:3412 for
+#                             the south, as raadtools reads it). The files
+#                             label themselves EPSG:3976 (WGS 84 ellipsoid,
+#                             written by GDAL CreateCopy); SEAICE_SRS=file
+#                             keeps that.
 SEAICE_HEM=${SEAICE_HEM:-south}
 case "$SEAICE_HEM" in
   south) ASI_GRID=s3125
@@ -60,11 +67,12 @@ sources() {
     ${flags[@]+"${flags[@]}"}
 }
 make_plan() {
-  local a
+  local a srs=()
+  [ "$SEAICE_SRS" = file ] || srs=(--srs "$SEAICE_SRS" --srs-override)
   for a in $ARRAYS; do
     # one plan per array would need a merge; the product has one array
     "$PYTHON" "$HERE/py/plan_lift.py" --sources "$WORK/sources.txt" --array "$a" \
-      --pattern "$ASI_PATTERN" --srs "$SEAICE_SRS" --check "${PLAN_CHECK:-8}" "$WORK/plan.vrt"
+      --pattern "$ASI_PATTERN" ${srs[@]+"${srs[@]}"} --check "${PLAN_CHECK:-8}" "$WORK/plan.vrt"
     break
   done
 }
