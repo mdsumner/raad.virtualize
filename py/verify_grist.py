@@ -20,7 +20,9 @@ or an https URL (read through /vsicurl/).
 check before publish (the dsn names the published URL).
 --boundaries: how many source changes to check per array and level (default
 8, evenly spaced; every change where the source directory changes, such as
-BRAN2020 to BRAN2023, is checked as well). "all" checks every change.
+BRAN2020 to BRAN2023, is checked as well, when there are at most 16 such
+changes or N; a layout with one directory per granule adds none). "all"
+checks every change.
 A source that has no multidimensional array of the catalog's name (a COG) is
 read as band 1 of the classic raster API.
 --window N: read an N x N window of each field instead of all of it (0, the
@@ -204,8 +206,14 @@ def select(rows, nb):
             n = int(nb)
             if n > 0:
                 sel.update(ch[int(round(j))] for j in np.linspace(0, len(ch) - 1, n))
-            sel.update(i for i in ch
-                       if os.path.dirname(rows[i]["source"]) != os.path.dirname(rows[ix[ix.index(i) - 1]]["source"]))
+            # a change of source directory (BRAN2020 to BRAN2023) is checked
+            # too, unless directories change at most rows (GHRSST keeps one
+            # directory per day), where it would mean checking every row
+            pos = {i: k for k, i in enumerate(ix)}
+            dirs = [i for i in ch
+                    if os.path.dirname(rows[i]["source"]) != os.path.dirname(rows[ix[pos[i] - 1]]["source"])]
+            if len(dirs) <= max(n, 16):
+                sel.update(dirs)
         pick.extend(sorted(sel, key=lambda i: rows[i]["date"]))
     return pick
 
