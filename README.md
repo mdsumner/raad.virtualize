@@ -352,3 +352,7 @@ float32 type of `scale_factor`. Results and findings are in
   proposed for GDAL itself (`gdal mdim` chunk-reference extraction, built on
   `GDALMDArray::GetRawBlockInfo`): the same table, produced by one code path
   for every driver, consumable as a virtual multidim store.
+
+---
+
+![Arrays and tables, better together](docs/images/high-five.jpg)
