@@ -22,6 +22,8 @@ to the last BRAN2023 month.
     `refs_<var>.parquet`)
   - `stac/`: STAC collection (one asset per form) and one item per source
     file
+  - `grist/catalog.parquet`: catalog for hypertidy/grist, one row per day at
+    the surface level (`date`, `dsn`, `array`, `index`, `source`)
   - `plan.vrt`, `store.sqlite`: the concatenation plan and the mdim-refs/0.2
     store the forms are rendered from
 

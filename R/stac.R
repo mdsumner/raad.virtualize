@@ -186,6 +186,12 @@ STAC_EXT <- c(
       title = "Flat refs store (arrays.json + refs_<array>.parquet)", roles = list("metadata", "references"),
       description = "Chunk references as Parquet, one table per array, read by wxy-refs, DuckDB and arrow.",
       `rv:form` = "flat-refs")
+  if (file.exists(file.path(out, "grist", "catalog.parquet")))
+    a$grist <- list(href = rel("grist/catalog.parquet"), type = "application/vnd.apache.parquet",
+      title = "grist catalog", roles = list("index"),
+      description = paste("One row per 2D field (date, dsn, array, index, source) for hypertidy/grist:",
+                          "dsn is the mdim VRT, index the coordinate values of the non-spatial dimensions."),
+      `rv:form` = "grist-catalog")
   a$store <- list(href = rel("store.sqlite"), type = "application/vnd.sqlite3",
     title = "mdim-refs/0.2 store", roles = list("metadata", "references"),
     `rv:form` = "mdim-refs")
