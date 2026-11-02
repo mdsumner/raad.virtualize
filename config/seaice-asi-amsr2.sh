@@ -32,13 +32,12 @@
 #                             old mirror file is not the published file.
 #   SEAICE_OFFLINE=1          list the mirror only, no server check (refs
 #                             are remapped unchecked; for a smoke test)
-#   SEAICE_SRS                the plan's SRS. Default: the Hughes 1980 polar
-#                             stereographic PROJ string below (the NSIDC
-#                             grid the product is defined on, EPSG:3412 for
-#                             the south, as raadtools reads it). The files
-#                             label themselves EPSG:3976 (WGS 84 ellipsoid,
-#                             written by GDAL CreateCopy); SEAICE_SRS=file
-#                             keeps that.
+#   SEAICE_SRS=file           the plan's SRS. Default file: the files' own
+#                             label, EPSG:3976 (WGS 84 / NSIDC Sea Ice Polar
+#                             Stereographic, WGS 84 ellipsoid). Any other
+#                             value (PROJ string, EPSG:n, WKT) overrides it;
+#                             hughes gives the Hughes 1980 form raadtools has
+#                             long used (a 6378273), which is wrong for v5.4.
 SEAICE_HEM=${SEAICE_HEM:-south}
 case "$SEAICE_HEM" in
   south) ASI_GRID=s3125
@@ -47,7 +46,8 @@ case "$SEAICE_HEM" in
          ASI_SRS='+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +x_0=0 +y_0=0 +a=6378273 +b=6356889.449 +units=m +no_defs' ;;
   *) echo "SEAICE_HEM must be south or north" >&2; exit 1 ;;
 esac
-SEAICE_SRS=${SEAICE_SRS:-$ASI_SRS}
+SEAICE_SRS=${SEAICE_SRS:-file}
+if [ "$SEAICE_SRS" = hughes ]; then SEAICE_SRS=$ASI_SRS; fi
 ASI_URL=https://data.seaice.uni-bremen.de/amsr2/asi_daygrid_swath/$ASI_GRID/netcdf
 DATASET=asi-amsr2-v5.4-daily-$SEAICE_HEM${SEAICE_FIRST:+-$SEAICE_FIRST}${SEAICE_LAST:+-$SEAICE_LAST}
 # product group (products/seaice/): the scratch prefix on source.coop
