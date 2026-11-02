@@ -11,8 +11,8 @@
 --   EOF
 --
 -- base is a directory (local path or https URL, no trailing slash), arr is the
--- array name. Needs DuckDB 1.3 or later (lambda syntax). https reads load the
--- httpfs extension on first use. Leaves tables meta, coords, idx, labels and
+-- array name. Tested with DuckDB 1.1.3, 1.3.2 and 2.0.0. https reads load the
+-- httpfs extension on first use. Leaves tables meta, coords, grid, idx, labels and
 -- views refs, idx_labelled in the session. Runs from Python with
 -- con.execute(open("sql/chunk_index.sql").read()).
 
@@ -23,7 +23,7 @@ SELECT a->>'$.array' AS name,
        CAST(a->'$.shape'  AS BIGINT[])  AS shape,
        CAST(a->'$.chunks' AS BIGINT[])  AS chunks
 FROM (SELECT unnest(json->'$.arrays[*]') AS a
-      FROM read_json_objects(getvariable('base') || '/arrays.json'))
+      FROM read_json_objects(getvariable('base') || '/arrays.json', format = 'auto'))
 WHERE a->>'$.array' = getvariable('arr');
 
 -- coordinate arrays held in arrays.json (affine start/step or inline values)
@@ -35,14 +35,21 @@ SELECT a->>'$.array' AS name,
        CAST(a->'$.values' AS DOUBLE[])      AS vals,
        a->>'$.attrs.units' AS units
 FROM (SELECT unnest(json->'$.arrays[*]') AS a
-      FROM read_json_objects(getvariable('base') || '/arrays.json'))
+      FROM read_json_objects(getvariable('base') || '/arrays.json', format = 'auto'))
 WHERE a->>'$.kind' = 'coord';
 
-SELECT name, dims, shape, chunks,
-       list_transform(list_zip(shape, chunks), lambda p: (p[1] + p[2] - 1) // p[2]) AS grid,
-       list_product(list_transform(list_zip(shape[3:], chunks[3:]),
-                                   lambda p: (p[1] + p[2] - 1) // p[2]))::BIGINT AS per_pair
-FROM meta;
+-- the chunk grid, one row per dim (k from 1)
+CREATE OR REPLACE TEMP TABLE grid AS
+SELECT r.k, m.dims[r.k] AS dim, m.shape[r.k] AS shape, m.chunks[r.k] AS chunk,
+       (m.shape[r.k] + m.chunks[r.k] - 1) // m.chunks[r.k] AS n
+FROM meta m, range(1, 33) r(k)
+WHERE r.k <= len(m.dims);
+
+SELECT (SELECT name FROM meta) AS name,
+       list(dim ORDER BY k) AS dims, list(shape ORDER BY k) AS shape,
+       list(chunk ORDER BY k) AS chunks, list(n ORDER BY k) AS grid,
+       CAST(coalesce(product(n) FILTER (k > 2), 1) AS BIGINT) AS per_pair
+FROM grid;
 
 CREATE OR REPLACE TEMP VIEW refs AS
 SELECT * FROM read_parquet(getvariable('base') || '/refs_' || getvariable('arr') || '.parquet');
@@ -71,16 +78,15 @@ GROUP BY dim_0, dim_1;
 -- timestamp where its units are "days since" or "seconds since"
 CREATE OR REPLACE TEMP TABLE labels AS
 WITH d AS (
-  SELECT k - 1 AS axis, m.dims[k] AS dim, m.chunks[k] AS chunk,
-         (m.shape[k] + m.chunks[k] - 1) // m.chunks[k] AS n
-  FROM meta m, range(1, 3) r(k)
+  SELECT k - 1 AS axis, dim, chunk, unnest(range(n)) AS i
+  FROM grid WHERE k <= 2
 )
-SELECT d.axis, i.i AS idx, d.dim,
-       coalesce(c.vals[i.i * d.chunk + 1], c.start + c.step * i.i * d.chunk) AS value,
+SELECT d.axis, d.i AS idx, d.dim,
+       coalesce(c.vals[d.i * d.chunk + 1], c.start + c.step * d.i * d.chunk) AS value,
        CASE WHEN c.units LIKE 'days since %' THEN 86400e6
             WHEN c.units LIKE 'seconds since %' THEN 1e6 END AS us,
        try_cast(regexp_extract(c.units, 'since ([0-9]{4}-[0-9]{1,2}-[0-9]{1,2})', 1) AS TIMESTAMP) AS epoch
-FROM d, range(d.n) i(i)
+FROM d
 LEFT JOIN coords c ON c.name = d.dim;
 
 CREATE OR REPLACE TEMP VIEW idx_labelled AS
