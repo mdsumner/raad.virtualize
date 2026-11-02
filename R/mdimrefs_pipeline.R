@@ -19,7 +19,15 @@
 .zobj <- function(x) if (length(x)) x else stats::setNames(list(), character(0))
 
 ## ---- ingest a harvest.py directory --------------------------------------------
-mr_ingest_scan_dir <- function(con, dir, verbose = TRUE) {
+## harvest fragments (one schema, written by harvest.py) read as one table
+.scan_frags <- function(files, cols = NULL) {
+  ds <- arrow::open_dataset(files, format = "parquet")
+  sc <- if (is.null(cols)) arrow::Scanner$create(ds) else arrow::Scanner$create(ds, projection = cols)
+  sc$ToTable()
+}
+
+mr_ingest_scan_dir <- function(con, dir, verbose = TRUE, batch = 2000L,
+                               batch_bytes = 64e6) {
   sj <- list.files(file.path(dir, "sources"), pattern = "[.]json$", full.names = TRUE)
   src <- do.call(rbind, lapply(sj, function(f) {
     x <- jsonlite::fromJSON(f)
@@ -44,8 +52,16 @@ mr_ingest_scan_dir <- function(con, dir, verbose = TRUE) {
     frags <- file.path(dir, paste0("chunks_", nm), paste0(src$key, ".parquet"))
     frags <- frags[file.exists(frags)]
     ## one codec per array, checked over every fragment before anything is written
-    info <- unique(unlist(lapply(frags, function(f) {
-      x <- arrow::read_parquet(f, col_select = c("present", "info"))
+    ## fragments are read as datasets of up to `batch` files and about
+    ## `batch_bytes` of Parquet: one read and one merge per fragment costs
+    ## about 25 ms, 28 min for the 66k small fragments of OISST (one source
+    ## per day, four arrays); the byte cap keeps large fragments (a BRAN
+    ## month is ~90k rows) memory-bounded
+    sz <- file.size(frags)
+    batches <- unname(split(frags, paste((seq_along(frags) - 1L) %/% batch,
+                                         floor(cumsum(as.numeric(sz)) / batch_bytes))))
+    info <- unique(unlist(lapply(batches, function(fs) {
+      x <- as.data.frame(.scan_frags(fs, c("present", "info")))
       unique(stats::na.omit(x$info[x$present == 1L]))
     })))
     if (length(info) > 1L) stop(sprintf(
@@ -57,8 +73,8 @@ mr_ingest_scan_dir <- function(con, dir, verbose = TRUE) {
                  codec = if (length(info)) mr_codec_from_info(info, m$dtype, unlist(m$chunks)) else NULL,
                  attrs = .cf_attrs(m))
     t0 <- Sys.time(); n <- 0
-    for (f in frags) {
-      rows <- as.data.frame(arrow::read_parquet(f))
+    for (fs in batches) {
+      rows <- as.data.frame(.scan_frags(fs))
       n <- n + mr_merge(con, nm, rows)
     }
     if (verbose) message(sprintf("  %s: %d rows from %d sources in %.1f s", nm, n,
