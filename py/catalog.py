@@ -8,7 +8,8 @@ PRODUCT_DIR holds product.json (id, title, description, license) and
 datasets.tsv (dataset, config, env, title; # lines skipped). OUT_DIR gets
 catalog.json, with one child link per dataset to
 ./<dataset>/stac/collection.json, and copies of product.json, datasets.tsv
-and README.md (when present). OUT_DIR is synced to the publish prefix, so
+and README.md (when present), plus any images beside them (README banner).
+OUT_DIR is synced to the publish prefix, so
 the catalog sits beside the dataset directories that run.sh publishes.
 
 --published PREFIX: where the dataset directories are (a local directory,
@@ -38,6 +39,8 @@ import json
 import os
 import shutil
 import sys
+
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".svg", ".webp")
 
 STAC_VERSION = "1.1.0"
 
@@ -175,7 +178,9 @@ def main():
     with open(os.path.join(a.out_dir, status_file), "w") as f:
         json.dump(status, f, indent=2)
         f.write("\n")
-    for name in ("product.json", listing, "README.md"):
+    images = sorted(n for n in os.listdir(a.product_dir)
+                    if os.path.splitext(n)[1].lower() in IMAGE_EXT)
+    for name in ("product.json", listing, "README.md", *images):
         src = os.path.join(a.product_dir, name)
         if os.path.exists(src):
             shutil.copyfile(src, os.path.join(a.out_dir, name))
