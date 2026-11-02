@@ -99,8 +99,26 @@ GDAL's own Icechunk reader (`/vsiicechunk/{...}`) opens the store but skips
 chunks are HDF5 shuffle + zlib, and GDAL's Zarr v3 codec list has no
 `numcodecs.shuffle` (GDAL master, 2026-11-01; its shuffle filter exists
 for Zarr v2 only). GDAL readers of these bytes use the mdim VRT or the
-kerchunk Parquet form (Zarr v2):
-`ZARR:"/vsikerchunk_parquet_ref/{/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-salt/kerchunk}"`.
+kerchunk Parquet form (Zarr v2). GDAL recognises the kerchunk directory
+from a plain `ZARR:` path:
+
+```python
+ds = xr.open_dataset(
+    'ZARR:"/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/'
+    'bluelink/bluelink-daily-temp/kerchunk/"', engine="gdalxarray")
+```
+
+The explicit form
+`ZARR:"/vsikerchunk_parquet_ref/{/vsicurl/https://.../kerchunk}"` is
+equivalent.
+
+### One index, three readers
+
+`temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5)`
+on `bluelink-daily-temp` (2026-11-02) returned the same 50 values through
+gdalxarray on the mdim VRT and through gdalxarray on the kerchunk store
+(GDAL Zarr driver). The Icechunk store holds the same references; GDAL
+does not read it (shuffle codec, above), zarr-python does.
 
 ## Other bluelink datasets
 
