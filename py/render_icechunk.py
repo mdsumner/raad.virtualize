@@ -110,6 +110,18 @@ def v3_codecs(row):
     return pre, BytesCodec(endian=endian) if dt.itemsize > 1 else BytesCodec(), out
 
 
+def json_safe(x):
+    """X with non-finite floats as the strings "NaN", "Infinity", "-Infinity"
+    (the Zarr spelling): attributes are written as JSON, which has no NaN."""
+    if isinstance(x, float) and not np.isfinite(x):
+        return "NaN" if np.isnan(x) else ("Infinity" if x > 0 else "-Infinity")
+    if isinstance(x, dict):
+        return {k: json_safe(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [json_safe(v) for v in x]
+    return x
+
+
 def fill_of(row):
     if row.get("fill") is None:
         return None
@@ -170,7 +182,7 @@ def main():
     for r in coords:
         v = coord_values(r).astype(np.dtype(r["dtype"]).newbyteorder("="))
         z = root.create_array(r["array"], shape=v.shape, chunks=v.shape, dtype=v.dtype,
-                              dimension_names=r["dims"], attributes=r.get("attrs") or {},
+                              dimension_names=r["dims"], attributes=json_safe(r.get("attrs") or {}),
                               fill_value=None)
         z[:] = v
     nref, pending, ncommit = 0, 0, 0
@@ -181,8 +193,12 @@ def main():
         attrs = dict(r.get("attrs") or {})
         attrs.pop("_FillValue", None)
         fill = fill_of(r)
-        if fill is not None:
-            attrs["_FillValue"] = fill  # xarray masks on this attribute for Zarr v3
+        # xarray masks on this attribute for Zarr v3. A NaN fill is left out:
+        # zarr writes attributes with bare NaN tokens, which is not JSON and
+        # which Icechunk rejects ("bad metadata"), and NaN needs no mask.
+        if fill is not None and np.isfinite(fill):
+            attrs["_FillValue"] = fill
+        attrs = json_safe(attrs)
         root.create_array(r["array"], shape=r["shape"], chunks=r["chunks"],
                           dtype=np.dtype(r["dtype"]).newbyteorder("="),
                           serializer=ser, compressors=comp, filters=pre or None,
