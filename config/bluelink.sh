@@ -20,6 +20,8 @@ case "${BLUELINK_FREQ:-daily}" in
   *) echo "BLUELINK_FREQ must be daily or month" >&2; exit 1 ;;
 esac
 DATASET=bluelink-${BLUELINK_FREQ:-daily}-${BRAN_VAR:-temp}
+# product group (products/bluelink/): the scratch prefix on source.coop
+PRODUCT_GROUP=bluelink
 ARRAYS="${BRAN_VAR:-temp}"
 THREDDS="https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN"
 case "${BRAN_ROOT:-thredds}" in

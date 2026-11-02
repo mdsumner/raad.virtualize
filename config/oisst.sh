@@ -1,6 +1,8 @@
 # OISST v2.1, September 1981 (30 days, 4 arrays, one chunk per file):
 # the dry run. Sources over HTTPS from the public NOAA bucket.
 DATASET=noaa-oisst-avhrr-v2.1-198109
+# product group (products/oisst/): the scratch prefix on source.coop
+PRODUCT_GROUP=oisst
 ARRAYS="sst anom err ice"
 BASE="/vsicurl/https://noaa-cdr-sea-surface-temp-optimum-interpolation-pds.s3.amazonaws.com/data/v2.1/avhrr"
 sources() {

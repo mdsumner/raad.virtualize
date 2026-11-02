@@ -1,7 +1,8 @@
-"""catalog.py -- root STAC catalog of a product: one child per dataset.
+"""catalog.py -- STAC catalog of a product group (one child per dataset) or
+of the product root (one child per group).
 
   python py/catalog.py PRODUCT_DIR OUT_DIR [--published PREFIX] [--check]
-                       [--base URL]
+                       [--base URL] [--parent HREF]
 
 PRODUCT_DIR holds product.json (id, title, description, license) and
 datasets.tsv (dataset, config, env, title; # lines skipped). OUT_DIR gets
@@ -17,6 +18,16 @@ the catalog sits beside the dataset directories that run.sh publishes.
   missing collection is reported and the row is kept.
 --check: fail when any row has no published collection.
 --base URL: public URL of the publish prefix, for the catalog's self link.
+--parent HREF: the catalog one level up (e.g. ../catalog.json), given to a
+  group that sits under a root catalog; its root and parent links point
+  there. Without it the group catalog is its own root.
+
+Root mode: when PRODUCT_DIR holds groups.tsv (group, title) instead of
+datasets.tsv, the catalog has one child per group at
+./<group>/catalog.json, --published reads those, and the status file is
+groups.json (with the group's dataset count where published). A group is
+the directory PRODUCT_DIR/<group>/ with its own product.json and
+datasets.tsv; a group with no rows yet is an empty, valid catalog.
 
 Reads through GDAL's virtual file system, so the same credentials and
 endpoint settings as publish apply (AWS_S3_ENDPOINT and the keys).
@@ -31,17 +42,17 @@ import sys
 STAC_VERSION = "1.1.0"
 
 
-def read_rows(path):
+def read_rows(path, key="dataset", need=("dataset", "config", "env", "title")):
     with open(path, newline="") as f:
         lines = [ln for ln in f if ln.strip() and not ln.startswith("#")]
-    rows = list(csv.DictReader(lines, delimiter="\t"))
-    need = {"dataset", "config", "env", "title"}
-    if not rows or not need <= set(rows[0]):
+    rd = csv.DictReader(lines, delimiter="\t")
+    rows = list(rd)
+    if not rd.fieldnames or not set(need) <= set(rd.fieldnames):
         sys.exit(f"catalog: {path} needs columns {sorted(need)}")
-    names = [r["dataset"] for r in rows]
+    names = [r[key] for r in rows]
     dup = sorted({n for n in names if names.count(n) > 1})
     if dup:
-        sys.exit(f"catalog: duplicate datasets in {path}: {', '.join(dup)}")
+        sys.exit(f"catalog: duplicate {key}s in {path}: {', '.join(dup)}")
     return rows
 
 
@@ -99,37 +110,55 @@ def main():
     ap.add_argument("--published")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--base")
+    ap.add_argument("--parent")
     a = ap.parse_args()
     if a.check and not a.published:
         sys.exit("catalog: --check needs --published")
 
     with open(os.path.join(a.product_dir, "product.json")) as f:
         prod = json.load(f)
-    rows = read_rows(os.path.join(a.product_dir, "datasets.tsv"))
+    root_mode = os.path.exists(os.path.join(a.product_dir, "groups.tsv"))
+    if root_mode:
+        key, cols, listing, status_file = "group", ("group", "title"), "groups.tsv", "groups.json"
+    else:
+        key, cols, listing, status_file = ("dataset", ("dataset", "config", "env", "title"),
+                                           "datasets.tsv", "datasets.json")
+    rows = read_rows(os.path.join(a.product_dir, listing), key, cols)
+    if root_mode:
+        for r in rows:
+            if not os.path.exists(os.path.join(a.product_dir, r["group"], "product.json")):
+                sys.exit(f"catalog: group {r['group']} has no {a.product_dir}/{r['group']}/product.json")
 
-    links = [{"rel": "root", "href": "./catalog.json", "type": "application/json"}]
+    up = a.parent if a.parent and not root_mode else "./catalog.json"
+    links = [{"rel": "root", "href": up, "type": "application/json"}]
+    if up != "./catalog.json":
+        links.append({"rel": "parent", "href": up, "type": "application/json"})
     if a.base:
         links.append({"rel": "self", "href": a.base.rstrip("/") + "/catalog.json",
                       "type": "application/json"})
     status, missing = [], []
     for r in rows:
-        rel = f"{r['dataset']}/stac/collection.json"
+        rel = f"{r['group']}/catalog.json" if root_mode else f"{r['dataset']}/stac/collection.json"
         link = {"rel": "child", "href": "./" + rel, "type": "application/json",
                 "title": r["title"]}
-        st = {k: r[k] for k in ("dataset", "config", "env", "title")}
+        st = {k: r[k] for k in cols}
         if a.published:
-            coll = read_json(vsi_path(a.published, rel))
-            if coll is None:
-                missing.append(r["dataset"])
+            doc = read_json(vsi_path(a.published, rel))
+            if doc is None:
+                missing.append(r[key])
                 st["published"] = False
             else:
                 st["published"] = True
-                st.update(summary(coll))
+                if root_mode:
+                    st["datasets"] = sum(1 for ln in doc.get("links", []) if ln.get("rel") == "child")
+                else:
+                    st.update(summary(doc))
         links.append(link)
         status.append(st)
 
     if missing:
-        msg = f"catalog: no published collection for {len(missing)} of {len(rows)}: {', '.join(missing)}"
+        what = "group catalog" if root_mode else "collection"
+        msg = f"catalog: no published {what} for {len(missing)} of {len(rows)}: {', '.join(missing)}"
         if a.check:
             sys.exit(msg)
         print(msg, file=sys.stderr)
@@ -143,15 +172,15 @@ def main():
     with open(os.path.join(a.out_dir, "catalog.json"), "w") as f:
         json.dump(cat, f, indent=2)
         f.write("\n")
-    with open(os.path.join(a.out_dir, "datasets.json"), "w") as f:
+    with open(os.path.join(a.out_dir, status_file), "w") as f:
         json.dump(status, f, indent=2)
         f.write("\n")
-    for name in ("product.json", "datasets.tsv", "README.md"):
+    for name in ("product.json", listing, "README.md"):
         src = os.path.join(a.product_dir, name)
         if os.path.exists(src):
             shutil.copyfile(src, os.path.join(a.out_dir, name))
     n_pub = sum(1 for s in status if s.get("published"))
-    print(f"catalog: {len(rows)} datasets" + (f", {n_pub} published" if a.published else "")
+    print(f"catalog: {len(rows)} {key}s" + (f", {n_pub} published" if a.published else "")
           + f" -> {a.out_dir}/catalog.json")
 
 

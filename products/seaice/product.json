@@ -1,0 +1,6 @@
+{
+  "id": "seaice",
+  "title": "Sea ice concentration virtual stores",
+  "description": "Byte-reference indexes of passive microwave sea ice concentration products, read from the original files. No data is copied. Drafts.",
+  "license": "other"
+}

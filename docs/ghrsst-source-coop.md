@@ -42,8 +42,11 @@ ausantarctic/ghrsst-mur-v2/
       store.sqlite                  mdim-refs/0.2 store
 
 ausantarctic/ausantarctic-scratch/
-  virtual/
+  catalog.json                      root catalog, one child per group
+  ghrsst/
+    catalog.json                    group catalog, one child per dataset
     <DATASET>/                      drafts, same layout as above
+  bluelink/, oisst/, seaice/        the other groups
 ```
 
 Notes on the layout:
@@ -105,11 +108,15 @@ product needs no change to `ausantarctic/ghrsst-mur-v2`, its credentials
 cannot write to the production data, and it can be emptied without
 coordination. The forms reference the COGs in `ausantarctic/ghrsst-mur-v2`
 by absolute URL, so they work from any product. The same product holds
-bluelink and other drafts, one `virtual/<DATASET>/` directory each.
+bluelink and other drafts, one group prefix per product family
+(`ghrsst/<DATASET>/`, `bluelink/<DATASET>/`, ...; the dataset config's
+`PRODUCT_GROUP`, matching `products/<group>/`), under one root
+`catalog.json`.
 
-Inside the scratch product the layout is the production one from the
-`virtual/` level down (`virtual/<DATASET>/...`), so promotion is the
-copy plus `stac/` re-render described above. Another product (a personal
+Below the group prefix the layout is the production one below `virtual/`
+(`ghrsst/<DATASET>/...` in scratch, `virtual/<DATASET>/...` in
+`ausantarctic/ghrsst-mur-v2`), so promotion is the copy of the dataset
+directory plus `stac/` re-render described above. Another product (a personal
 one, for example) is a `SOURCECOOP_REPO` setting away; product ID rules: 3
 to 39 characters, letters, digits and single hyphens, not starting or
 ending with a hyphen.
@@ -166,7 +173,8 @@ python py/sourcecoop_check.py ausantarctic/ausantarctic-scratch
 `config/source-coop.sh` is the publish target. `SOURCECOOP_REPO` names the
 product (default `ausantarctic/ausantarctic-scratch`; any other
 `ausantarctic/` product is refused unless `SOURCECOOP_PRODUCTION=1`),
-`SOURCECOOP_PREFIX` defaults to `virtual`, and `STAC_BASE` is set to the
+`SOURCECOOP_PREFIX` defaults to the config's `PRODUCT_GROUP` (`ghrsst`)
+in the scratch product and to `virtual` elsewhere, and `STAC_BASE` is set to the
 public URL of the dataset directory.
 
 ```sh

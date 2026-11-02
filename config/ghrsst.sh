@@ -14,6 +14,8 @@
 #                  do not, so they are left out)
 : "${GHRSST_ROOT:?set GHRSST_ROOT to the directory of MUR v4.1 netCDF files}"
 DATASET=ghrsst-mur-v4.1${GHRSST_YEARS:+-$(echo $GHRSST_YEARS | tr ' ' '-')}
+# product group (products/ghrsst/): the scratch prefix on source.coop
+PRODUCT_GROUP=ghrsst
 ARRAYS="${GHRSST_ARRAYS:-analysed_sst analysis_error mask sea_ice_fraction}"
 sources() {
   local pat='*-JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v4.1.nc'

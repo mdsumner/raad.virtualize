@@ -20,6 +20,8 @@
 GHRSST_VAR=${GHRSST_VAR:-analysed_sst}
 GHRSST_COG_ROOT=${GHRSST_COG_ROOT:-/vsis3/ausantarctic/ghrsst-mur-v2}
 DATASET=ghrsst-mur-cog-$GHRSST_VAR${GHRSST_YEARS:+-$(echo $GHRSST_YEARS | tr ' ' '-')}
+# product group (products/ghrsst/): the scratch prefix on source.coop
+PRODUCT_GROUP=ghrsst
 ARRAYS=$GHRSST_VAR
 GHRSST_PATTERN="^([0-9]{8})090000-JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02\.0-fv04\.1_${GHRSST_VAR}\.tif\$"
 sources() (

@@ -21,7 +21,7 @@ Both forms point at the same BRAN netCDF files on
 The store:
 
 ```
-s3://us-west-2.opendata.source.coop/ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-salt/icechunk/
+s3://us-west-2.opendata.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-salt/icechunk/
 ```
 
 Repository metadata, manifests and coordinates are read anonymously from
@@ -69,7 +69,7 @@ wanted, open with chunks matching the store and compute under
 ## GDAL mdim VRT
 
 ```
-/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-salt/mdim.vrt
+/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-salt/mdim.vrt
 ```
 
 The VRT is about 140 KB with 403 sources, one per monthly netCDF file, each
@@ -100,7 +100,7 @@ chunks are HDF5 shuffle + zlib, and GDAL's Zarr v3 codec list has no
 `numcodecs.shuffle` (GDAL master, 2026-11-01; its shuffle filter exists
 for Zarr v2 only). GDAL readers of these bytes use the mdim VRT or the
 kerchunk Parquet form (Zarr v2):
-`ZARR:"/vsikerchunk_parquet_ref/{/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-salt/kerchunk}"`.
+`ZARR:"/vsikerchunk_parquet_ref/{/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-salt/kerchunk}"`.
 
 ## Other bluelink datasets
 
