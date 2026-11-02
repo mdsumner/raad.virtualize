@@ -183,10 +183,11 @@ syncs `out/`, `plan.vrt` and `store.sqlite` to `<prefix>/<DATASET>/`.
 bucket and checks them against GDAL on the sources.
 
 `config/source-coop.sh` targets a source.coop product (`SOURCECOOP_REPO`,
-default `ausantarctic/ghrsst-mur-v2`) through the data proxy S3 API, with
-the product's temporary credentials in the same variables plus
-`AWS_SESSION_TOKEN`. It requires `SOURCECOOP_PREFIX`, and in the production
-product refuses any prefix outside `dev/` unless `SOURCECOOP_PRODUCTION=1`.
+default `ausantarctic/ausantarctic-scratch`, the drafting product for all
+index families) through the data proxy S3 API, with the product's temporary
+credentials in the same variables plus `AWS_SESSION_TOKEN`.
+`SOURCECOOP_PREFIX` defaults to `virtual`. Any other `ausantarctic/`
+product is refused unless `SOURCECOOP_PRODUCTION=1`.
 `py/sourcecoop_check.py ACCOUNT/PRODUCT` checks that a product takes the
 writes publish and Icechunk need. `verify-published` with `AWS_NO_SIGN_REQUEST=YES`
 reads the forms back anonymously. Layout and promotion:

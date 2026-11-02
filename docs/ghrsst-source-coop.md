@@ -2,11 +2,14 @@
 
 Layout of the byte-reference indexes (flat refs, kerchunk Parquet, Icechunk,
 MDIM VRT, STAC) for the GHRSST MUR COGs in the source.coop repository
-`ausantarctic/ghrsst-mur-v2`, the trial procedure in this repository, and the
-changes to `AustralianAntarcticDivision/ghrsst-cogger` that would take the
+`ausantarctic/ghrsst-mur-v2`, the drafting procedure in this repository, and
+the changes to `AustralianAntarcticDivision/ghrsst-cogger` that would take the
 procedure over.
 
-Status: draft. Nothing has been written to source.coop yet. Credential and
+Status: draft. Drafts of every index family (GHRSST, bluelink, others) go
+to the scratch product `ausantarctic/ausantarctic-scratch`, so that drafting
+does not touch the production pipeline (decision 2026-11-02). Nothing has
+been written to source.coop yet. Credential and
 product details are from the source.coop documentation (docs.source.coop,
 read 2026-10-29) and are untested here.
 
@@ -37,25 +40,27 @@ ausantarctic/ghrsst-mur-v2/
         items.parquet               stac-geoparquet (where rustac is installed)
       plan.vrt                      plan, verbatim source URIs
       store.sqlite                  mdim-refs/0.2 store
-  dev/
-    virtual/<DATASET>/              trial, same layout as virtual/
+
+ausantarctic/ausantarctic-scratch/
+  virtual/
+    <DATASET>/                      drafts, same layout as above
 ```
 
 Notes on the layout:
 
 - Every form references the COGs by absolute URL
   (`https://data.source.coop/ausantarctic/ghrsst-mur-v2/YYYY/...`), so a
-  dataset directory can be copied between prefixes unchanged. Only the STAC
-  collection holds its own location (`STAC_BASE`): promotion from `dev/` to
-  `virtual/` is a copy of the directory followed by a re-render of `stac/`
+  dataset directory can be copied between products unchanged. Only the STAC
+  collection holds its own location (`STAC_BASE`): promotion from the
+  scratch product to `ausantarctic/ghrsst-mur-v2/virtual/` is a copy of the directory followed by a re-render of `stac/`
   with the new base.
 - The source listing in `config/ghrsst-cog.sh` takes only four-digit
-  top-level names, so `virtual/` and `dev/` are not mistaken for data. Any
+  top-level names, so `virtual/` is not mistaken for data. Any
   listing in ghrsst-cogger that walks the repository root needs the same
   check (not confirmed; the cogger code was not reviewed for this draft).
-- `dev/` is public and visible in the source.coop browser. It carries a
-  `README.md` stating that its contents are transient and may be removed
-  without notice.
+- The scratch product carries a `README.md` stating that its contents are
+  transient and may be removed without notice. verify-published reads
+  anonymously, so the product must be publicly readable (not checked).
 - The Icechunk repository registers one virtual chunk container,
   `https://data.source.coop/`. Readers authorize it with
   `icechunk.credentials.HttpAccess` (anonymous).
@@ -92,27 +97,22 @@ arrays are smaller (mask is Byte).
 
 ## Trial procedure
 
-### Test product
+### Scratch product
 
-The first trial goes to a separate, unlisted source.coop product rather
-than to `dev/` in the production product. A separate product needs no
-change to `ausantarctic/ghrsst-mur-v2`, its credentials cannot write to the
-production data, and it can be emptied or abandoned without coordination.
-The forms reference the COGs in `ausantarctic/ghrsst-mur-v2` by absolute
-URL, so they work from any product.
+Drafts go to `ausantarctic/ausantarctic-scratch`, the default target of
+`config/source-coop.sh`, rather than to the production product. The scratch
+product needs no change to `ausantarctic/ghrsst-mur-v2`, its credentials
+cannot write to the production data, and it can be emptied without
+coordination. The forms reference the COGs in `ausantarctic/ghrsst-mur-v2`
+by absolute URL, so they work from any product. The same product holds
+bluelink and other drafts, one `virtual/<DATASET>/` directory each.
 
-- Create the product under a personal account or an organization the
-  person is owner or maintainer of (top-right menu, after beta access is
-  granted), for example `mdsumner/ghrsst-mur-virtual-test`. New products
-  are unlisted: readable by URL, absent from search.
-- Product ID rules: 3 to 39 characters, letters, digits and single hyphens,
-  not starting or ending with a hyphen.
-- The source.coop documentation does not describe deleting a product;
-  plan on emptying it instead.
-
-Inside the test product the layout is the production one from the
-`virtual/` level down (`virtual/<DATASET>/...`), so promotion is the same
-copy plus `stac/` re-render described above.
+Inside the scratch product the layout is the production one from the
+`virtual/` level down (`virtual/<DATASET>/...`), so promotion is the
+copy plus `stac/` re-render described above. Another product (a personal
+one, for example) is a `SOURCECOOP_REPO` setting away; product ID rules: 3
+to 39 characters, letters, digits and single hyphens, not starting or
+ending with a hyphen.
 
 ### Credentials
 
@@ -158,18 +158,19 @@ in-place commits), a GDAL PUT (informational), and deletes.
 
 ```sh
 # needs the product's AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN exported
-python py/sourcecoop_check.py mdsumner/ghrsst-mur-virtual-test
+python py/sourcecoop_check.py ausantarctic/ausantarctic-scratch
 ```
 
 ### Build, publish, read back
 
 `config/source-coop.sh` is the publish target. `SOURCECOOP_REPO` names the
-product (default `ausantarctic/ghrsst-mur-v2`, where any prefix outside
-`dev/` is refused unless `SOURCECOOP_PRODUCTION=1`), and `STAC_BASE` is set
-to the public URL of the dataset directory.
+product (default `ausantarctic/ausantarctic-scratch`; any other
+`ausantarctic/` product is refused unless `SOURCECOOP_PRODUCTION=1`),
+`SOURCECOOP_PREFIX` defaults to `virtual`, and `STAC_BASE` is set to the
+public URL of the dataset directory.
 
 ```sh
-export SOURCECOOP_REPO=mdsumner/ghrsst-mur-virtual-test SOURCECOOP_PREFIX=virtual GHRSST_YEARS=2024
+export GHRSST_YEARS=2024
 # build and verify locally
 bash run.sh config/ghrsst-cog.sh config/source-coop.sh
 # publish (product credentials exported)
@@ -184,7 +185,7 @@ collection carries the public base. Because the forms are rendered before
 `publish`, a local build of the same dataset can be published to the AADC
 transfer bucket and to source.coop without a rebuild, apart from `stac/`.
 
-## Checks before anything goes outside dev/
+## Checks before promotion to production
 
 1. Completeness: the harvested source count equals the listed COG count,
    and every source has its full tile grid (an earlier full run lost 19
