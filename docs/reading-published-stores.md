@@ -110,6 +110,40 @@ The explicit form
 `ZARR:"/vsikerchunk_parquet_ref/{/vsicurl/https://.../kerchunk}"` is
 equivalent.
 
+### kerchunk through fsspec with the pyarrow engine
+
+fsspec reads kerchunk Parquet refs through `LazyReferenceMapper`, whose
+default is `engine="fastparquet"`, and `fsspec.filesystem("reference",
+fo=<url>)` has no way to change it. fastparquet 2026.5.0+ under pandas 3
+returns a null `path` for every row after arrow's dictionary-to-plain
+fallback in a `refs.<n>.parq` file, zarr takes that as "no such chunk", and
+xarray returns fill values with no error. On `oisst-v2.1-daily` (published
+before the fix) `sst` reads all-NaN from time index 8192 (2004-02-05)
+onwards. Build the mapper with `engine="pyarrow"`:
+
+```python
+import fsspec
+import xarray as xr
+import zarr
+from fsspec.implementations.reference import LazyReferenceMapper
+
+url = ("https://data.source.coop/ausantarctic/ausantarctic-scratch/"
+       "oisst/oisst-v2.1-daily/kerchunk")
+refs = LazyReferenceMapper(url, fs=fsspec.filesystem("https"), engine="pyarrow")
+# zarr-python 3 wants the reference filesystem and its target both async
+fs = fsspec.filesystem("reference", fo=refs, remote_protocol="https",
+                       remote_options={"asynchronous": True}, asynchronous=True)
+ds = xr.open_dataset(zarr.storage.FsspecStore(fs, read_only=True, path=""),
+                     engine="zarr", consolidated=False, zarr_format=2)
+```
+
+Stores written after the fix (`use_dictionary = FALSE` in the kerchunk
+writer) read the same with either engine; `py/check_kerchunk_parquet.py
+<kerchunk dir or URL>` reports whether a store is affected. GDAL's
+`/vsikerchunk_parquet_ref/` reads the Parquet with Arrow C++ and should not
+be affected: verify reads the last time step through it, and the OISST
+verify-published run passed.
+
 ### One index, three readers
 
 `temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5)`

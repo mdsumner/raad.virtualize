@@ -13,6 +13,12 @@ Readers, all raw (no scale/offset applied):
             driver cannot decode; local OUT_DIR only
   icechunk  zarr-python on the Icechunk repository (virtual refs)
 
+Also, on the local OUT_DIR/kerchunk (the published copy is the same bytes):
+  kerchunk-refs  every refs.<n>.parq read with pyarrow and, when installed,
+            with fastparquet, fsspec's default engine; the `path` columns must
+            agree (see check_kerchunk_parquet.py: fastparquet drops paths
+            after arrow's dictionary-to-plain fallback)
+
 Usage:
   python verify.py --plan plan.vrt --out OUT_DIR [--window ARRAY:START:COUNT ...]
                    [--published /vsis3/BUCKET/PREFIX]
@@ -401,6 +407,14 @@ def main():
                 ok = sf == want[0] and same_fill(nd, want[1])
                 bad += not ok
                 print(f"    {k:11s} scale {sf!r} fill {nd!r} {'ok' if ok else 'MISMATCH'}")
+    if "kerchunk-refs" not in a.skip and os.path.isdir(os.path.join(a.out, "kerchunk")):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import check_kerchunk_parquet as ckp
+        print("\nkerchunk refs: pyarrow vs",
+              f"fastparquet {ckp.fastparquet.__version__}" if ckp.fastparquet else
+              "dictionary-fallback check (fastparquet not installed)")
+        _, kbad = ckp.check(os.path.join(a.out, "kerchunk"))
+        bad += kbad
     if errors:
         print("\nread errors (full text)")
         for e in errors:

@@ -121,6 +121,21 @@ Editor's note: *here 1. "gdal getrawblockinfo is wrong" the llm was using 3.13 a
     stale the same way, so an index of a live collection needs the recheck
     on every update, and a reader cannot tell without a validator (an etag
     or size check before trusting the refs).
+17. **fastparquet drops kerchunk paths after a dictionary fallback.** arrow
+    writes the `path` column of `refs.<n>.parq` dictionary-encoded and falls
+    back to plain encoding once the dictionary passes 1 MiB (about 8,000
+    distinct URLs). fastparquet 2026.5.0+ under pandas 3, fsspec's default
+    engine for kerchunk Parquet, returns null for every path after the
+    fallback, and xarray reads fill values with no error: OISST `sst` is
+    all NaN from time index 8192, sea ice G02202 from index 11264. Stores
+    with many chunks per source file (bluelink, GHRSST, ASI) stay under
+    the limit. fastparquet 2026.3.0 reads these files correctly; the
+    regression is its pandas 3 arrow string path. Reported by Michael Sumner from raadtools. The kerchunk
+    writer now sets `use_dictionary = FALSE`; verify compares fastparquet
+    with pyarrow on every refs file (`py/check_kerchunk_parquet.py`).
+    Readers of older stores pass `engine="pyarrow"` to
+    `LazyReferenceMapper` ([Reading published
+    stores](reading-published-stores.md)).
 
 ## Legs
 
