@@ -1,5 +1,5 @@
 -- chunk_index.sql: a chunk index over the leading two dimensions of one
--- array in a flat refs store (mdim-refs/0.2: arrays.json, refs_<array>.parquet).
+-- array in a flat refs store (byterefs/0.1: arrays.json, refs_<array>.parquet).
 --
 -- Set two variables first, then read this file, e.g. with the duckdb CLI
 -- from the repository root:

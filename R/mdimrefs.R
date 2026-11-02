@@ -1,4 +1,5 @@
-## mdimrefs.R -- reference implementation of the mdim-refs/0.2 store (SPEC.md).
+## mdimrefs.R -- reference implementation of the byterefs/0.1 store
+## (https://github.com/byterefs/spec, spec/byterefs-0.1.md).
 ## ----------------------------------------------------------------------------
 ## Merges raad.virtualize R/store.R (per-source rows keyed on source + within-
 ## source chunk coord; source recorded verbatim) with aad-filelist
@@ -11,7 +12,8 @@
 ## ----------------------------------------------------------------------------
 library(DBI)
 
-MR_FORMAT   <- "mdim-refs/0.2"
+MR_FORMAT   <- "byterefs/0.1"
+## readers also accept "mdim-refs/0.2" (same layout) until byterefs/0.2 (byterefs decision 0003)
 MR_RESERVED <- c("meta", "sources", "arrays", "placements", "remap")
 ## meta keys that hold JSON for the renders, not dataset attributes
 MR_META_JSON <- c("coord_attrs", "dimensions")

@@ -109,7 +109,7 @@ same catalog step.
 
 | Part | Where it lives |
 |---|---|
-| Store contract | the dataset directory layout above; mdim-refs/0.2 store, flat refs, plan VRT |
+| Store contract | the dataset directory layout above; byterefs/0.1 store, flat refs, plan VRT |
 | Validator | `verify` and `verify-published` per dataset; `catalog.sh check` across the product |
 | Trigger and cadence | the dataset config plus the job loop; a release is a full rebuild |
 | Product template | `products/<product>/` (this document) |

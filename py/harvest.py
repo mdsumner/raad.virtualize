@@ -4,7 +4,7 @@ Step 2 of the end-to-end example (README.md). Reads the `gdal mdim mosaic`
 VRT (the plan), and for every distinct source of the requested arrays lists
 the byte range of every chunk of the source's own chunk grid. One row per
 chunk, keyed on the chunk's position WITHIN the source (the physical layer
-of mdim-refs/0.2): source, dim_0..dim_{n-1}, present, offset, size, info,
+of byterefs/0.1): source, dim_0..dim_{n-1}, present, offset, size, info,
 data.
 
 Engines (--engine):
