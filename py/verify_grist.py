@@ -98,9 +98,11 @@ def cf_days(values, units):
     return np.floor(secs / 86400).astype("i8").astype("datetime64[D]")
 
 
-def resolve(arr, index):
+def resolve(arr, index, drop_missing=False):
     """Positions of `index` (dim -> value text) on a GDAL MDArray: a start and
-    count per dimension, the dimensions not in `index` read whole."""
+    count per dimension, the dimensions not in `index` read whole.
+    drop_missing: index names the array lacks are ignored (a source file of
+    one time step with no time dimension, stacked by py/plan_lift.py)."""
     start, count, used = [], [], set()
     for dim in arr.GetDimensions():
         name = dim.GetName()
@@ -128,7 +130,7 @@ def resolve(arr, index):
         count.append(1)
         used.add(name)
     miss = set(index) - used
-    if miss:
+    if miss and not drop_missing:
         raise ValueError(f"index names dimensions the array lacks: {sorted(miss)}")
     if len(start) - len(used) != 2:
         raise ValueError(f"{len(start) - len(used)} dimensions left after the index, not 2")
@@ -149,15 +151,26 @@ def place(shape, n, k):
     return off, size
 
 
-def read_mdim(ds_path, array, index, cache, win=None):
+def open_mdim(ds_path):
+    try:
+        return gdal.OpenEx(ds_path, gdal.OF_MULTIDIM_RASTER)
+    except RuntimeError as e:
+        # the netCDF driver opens /vsi files only with Linux userfaultfd,
+        # which containers often lack; netCDF4 files are HDF5
+        if "userfaultfd" not in str(e):
+            raise
+        return gdal.OpenEx(ds_path, gdal.OF_MULTIDIM_RASTER, allowed_drivers=["HDF5"])
+
+
+def read_mdim(ds_path, array, index, cache, win=None, drop_missing=False):
     if ds_path not in cache:
         if len(cache) > 4:  # sources change along the catalog: keep a few open
             cache.clear()
-        cache[ds_path] = gdal.OpenEx(ds_path, gdal.OF_MULTIDIM_RASTER)
+        cache[ds_path] = open_mdim(ds_path)
     arr = cache[ds_path].GetRootGroup().OpenMDArray(array)
     if arr is None:
         raise ValueError(f"no array {array} in {ds_path}")
-    start, count, axes = resolve(arr, index)
+    start, count, axes = resolve(arr, index, drop_missing)
     if win:
         n, k = win
         free = [i for i in range(len(start)) if i not in axes]
@@ -170,7 +183,7 @@ def read_mdim(ds_path, array, index, cache, win=None):
 
 def read_source(src, array, index, cache, win=None):
     try:
-        return read_mdim(src, array, index, cache, win)
+        return read_mdim(src, array, index, cache, win, drop_missing=True)
     except Exception as e:
         ds = gdal.Open(src)  # a classic raster (COG): band 1, no index
         if ds is None:
