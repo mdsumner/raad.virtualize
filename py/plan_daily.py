@@ -90,12 +90,11 @@ def file_time_unit(path, tname):
     gdal.UseExceptions()
     ds = gdal.OpenEx(path, gdal.OF_MULTIDIM_RASTER)
     arr = ds.GetRootGroup().OpenMDArray(tname)
-    u = arr.GetUnit()
-    if not u:
-        at = arr.GetAttribute("units")
-        u = at.Read() if at is not None else ""
-    cal = arr.GetAttribute("calendar")
-    return u, (cal.Read() if cal is not None else None)
+    # with exceptions on, GetAttribute raises for a missing attribute
+    attrs = {a.GetName(): a for a in (arr.GetAttributes() or [])}
+    u = arr.GetUnit() or (attrs["units"].Read() if "units" in attrs else "")
+    cal = attrs["calendar"].Read() if "calendar" in attrs else None
+    return u, cal
 
 
 def check_files(files, idx, values, arrays, shapes, tname):
