@@ -183,7 +183,7 @@ syncs `out/`, `plan.vrt` and `store.sqlite` to `<prefix>/<DATASET>/`.
 bucket and checks them against GDAL on the sources.
 
 `config/source-coop.sh` targets a source.coop product (`SOURCECOOP_REPO`,
-default `ausantarctic/ausantarctic-scratch`, the drafting product for all
+default `ausantarctic/ausancarctic-scratch01`, the drafting product for all
 index families) through the data proxy S3 API, with the product's temporary
 credentials in the same variables plus `AWS_SESSION_TOKEN`.
 `SOURCECOOP_PREFIX` defaults to `virtual`. Any other `ausantarctic/`

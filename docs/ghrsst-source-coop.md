@@ -7,7 +7,7 @@ the changes to `AustralianAntarcticDivision/ghrsst-cogger` that would take the
 procedure over.
 
 Status: draft. Drafts of every index family (GHRSST, bluelink, others) go
-to the scratch product `ausantarctic/ausantarctic-scratch`, so that drafting
+to the scratch product `ausantarctic/ausancarctic-scratch01`, so that drafting
 does not touch the production pipeline (decision 2026-11-02). Nothing has
 been written to source.coop yet. Credential and
 product details are from the source.coop documentation (docs.source.coop,
@@ -41,7 +41,7 @@ ausantarctic/ghrsst-mur-v2/
       plan.vrt                      plan, verbatim source URIs
       store.sqlite                  mdim-refs/0.2 store
 
-ausantarctic/ausantarctic-scratch/
+ausantarctic/ausancarctic-scratch01/
   virtual/
     <DATASET>/                      drafts, same layout as above
 ```
@@ -99,7 +99,7 @@ arrays are smaller (mask is Byte).
 
 ### Scratch product
 
-Drafts go to `ausantarctic/ausantarctic-scratch`, the default target of
+Drafts go to `ausantarctic/ausancarctic-scratch01`, the default target of
 `config/source-coop.sh`, rather than to the production product. The scratch
 product needs no change to `ausantarctic/ghrsst-mur-v2`, its credentials
 cannot write to the production data, and it can be emptied without
@@ -158,13 +158,13 @@ in-place commits), a GDAL PUT (informational), and deletes.
 
 ```sh
 # needs the product's AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN exported
-python py/sourcecoop_check.py ausantarctic/ausantarctic-scratch
+python py/sourcecoop_check.py ausantarctic/ausancarctic-scratch01
 ```
 
 ### Build, publish, read back
 
 `config/source-coop.sh` is the publish target. `SOURCECOOP_REPO` names the
-product (default `ausantarctic/ausantarctic-scratch`; any other
+product (default `ausantarctic/ausancarctic-scratch01`; any other
 `ausantarctic/` product is refused unless `SOURCECOOP_PRODUCTION=1`),
 `SOURCECOOP_PREFIX` defaults to `virtual`, and `STAC_BASE` is set to the
 public URL of the dataset directory.

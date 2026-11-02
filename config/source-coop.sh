@@ -8,11 +8,13 @@
 # Layout, test product and promotion: docs/ghrsst-source-coop.md. Check that
 # a product takes writes first with py/sourcecoop_check.py.
 #
-#   SOURCECOOP_REPO    account/product, default ausantarctic/ausantarctic-scratch,
+#   SOURCECOOP_REPO    account/product, default ausantarctic/ausancarctic-scratch01,
 #                      the drafting product for every index family (GHRSST,
 #                      bluelink, others). Any other ausantarctic/ product is
 #                      a production product and is refused unless
 #                      SOURCECOOP_PRODUCTION=1
+#                      (product ID as created, spelling included; override
+#                      with SOURCECOOP_SCRATCH if it is renamed)
 #   SOURCECOOP_PREFIX  default virtual
 #   SOURCECOOP_ENDPOINT  default data.source.coop
 #
@@ -26,7 +28,7 @@
 # one hour; a publish that runs longer fails with ExpiredToken.
 # verify-published needs no keys: with AWS_NO_SIGN_REQUEST=YES it reads the
 # forms back anonymously, as a public reader would.
-SOURCECOOP_SCRATCH=ausantarctic/ausantarctic-scratch
+SOURCECOOP_SCRATCH=${SOURCECOOP_SCRATCH:-ausantarctic/ausancarctic-scratch01}
 SOURCECOOP_REPO=${SOURCECOOP_REPO:-$SOURCECOOP_SCRATCH}
 SOURCECOOP_REPO=${SOURCECOOP_REPO%/}
 SOURCECOOP_PREFIX=${SOURCECOOP_PREFIX:-virtual}

@@ -14,7 +14,7 @@
 ##     -v BRAN_VAR=temp,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY \
 ##     hpc/nci/bran-publish.pbs
 ## PUBLISH_CONFIG: config/aadc-transfer.sh (default, AADC transfer bucket) or
-## config/source-coop.sh (source.coop, drafts in ausantarctic/ausantarctic-scratch;
+## config/source-coop.sh (source.coop, drafts in ausantarctic/ausancarctic-scratch01;
 ## SOURCECOOP_* there). source.coop keys are temporary (one hour, with
 ## AWS_SESSION_TOKEN, which also goes in -v): the token can expire while a held
 ## job waits for its build, so submit the source.coop publish after the build
