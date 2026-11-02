@@ -9,5 +9,3 @@ dataset, each in its own directory with the forms common to every group
   Record of Passive Microwave Sea Ice Concentration, G02202 Version 6, 25 km
   polar stereographic grids, daily from 1978-10-25. Sources are the netCDF
   files at https://noaadata.apps.nsidc.org/NOAA/G02202_V6/.
-
-How they are built and read: mdsumner/raad.virtualize.

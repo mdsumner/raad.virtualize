@@ -17,5 +17,3 @@ reads the original netCDF files in the public NOAA bucket
 ```sh
 gdal mdim info /vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/oisst/oisst-v2.1-daily/mdim.vrt
 ```
-
-Worked examples and how the stores are built: https://mdsumner.github.io/raad.virtualize/

@@ -8,7 +8,9 @@ PRODUCT_DIR holds product.json (id, title, description, license) and
 datasets.tsv (dataset, config, env, title; # lines skipped). OUT_DIR gets
 catalog.json, with one child link per dataset to
 ./<dataset>/stac/collection.json, and copies of product.json, datasets.tsv
-and README.md (when present), plus any images beside them (README banner).
+and README.md (when present, with a generated Links section: repository,
+site, and each row's anchor on the site's Published page), plus any images
+beside them (README banner).
 OUT_DIR is synced to the publish prefix, so
 the catalog sits beside the dataset directories that run.sh publishes.
 
@@ -43,6 +45,24 @@ import sys
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".svg", ".webp")
 
 STAC_VERSION = "1.1.0"
+REPO_URL = "https://github.com/mdsumner/raad.virtualize"
+SITE_URL = "https://mdsumner.github.io/raad.virtualize/"
+
+
+def readme_links(rows, root_mode):
+    """Links section appended to the published README.md, generated from the
+    listing so it never goes stale: the repository, the site, and one link per
+    group (root) or dataset (group) to its anchor on the site's Published page."""
+    key = "group" if root_mode else "dataset"
+    what = "Each group" if root_mode else "Each dataset"
+    out = ["", "## Links", "",
+           f"- Code: [mdsumner/raad.virtualize]({REPO_URL})",
+           f"- Site (how the stores are built and read, worked examples): {SITE_URL}",
+           f"- {what} on the site's Published page, with the URL of every form:"]
+    for r in rows:
+        name = r[key] + ("/" if root_mode else "")
+        out.append(f"  - [`{name}`]({SITE_URL}published.html#{r[key]}): {r['title']}")
+    return "\n".join(out) + "\n"
 
 
 def read_rows(path, key="dataset", need=("dataset", "config", "env", "title")):
@@ -184,6 +204,12 @@ def main():
         src = os.path.join(a.product_dir, name)
         if os.path.exists(src):
             shutil.copyfile(src, os.path.join(a.out_dir, name))
+    readme = os.path.join(a.out_dir, "README.md")
+    if os.path.exists(readme):
+        with open(readme) as f:
+            text = f.read().rstrip("\n") + "\n"
+        with open(readme, "w") as f:
+            f.write(text + readme_links(rows, root_mode))
     n_pub = sum(1 for s in status if s.get("published"))
     print(f"catalog: {len(rows)} {key}s" + (f", {n_pub} published" if a.published else "")
           + f" -> {a.out_dir}/catalog.json")
