@@ -7,8 +7,10 @@ cloud-native forms (kerchunk, Icechunk, VRT) are derived as projections.
 This repo is a working stage and will change shape and name. This README
 documents the model and the pipeline that implements it.
 
-Project page (datasets, reader coverage, ongoing work):
-<https://mdsumner.github.io/raad.virtualize/>, built from `docs/`.
+Project site (worked examples, published datasets, reader coverage):
+<https://mdsumner.github.io/raad.virtualize/>, a Quarto website in `docs/`
+rendered by `.github/workflows/pages.yml` (`quarto render docs`; new
+examples go in `docs/examples/<slug>/index.qmd`, from `_template/`).
 
 
 ## Design

@@ -1,4 +1,6 @@
-# Indexes-only products
+---
+title: "Indexes-only products"
+---
 
 An indexes-only product publishes byte-reference indexes of data that stays
 with its provider, with no copy of the data itself. It is the form for

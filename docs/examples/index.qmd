@@ -1,0 +1,36 @@
+---
+title: "Examples"
+subtitle: "Worked reads of published datasets"
+listing:
+  contents: "*/index.qmd"
+  type: table
+  sort: "date desc"
+  fields: [date, title, description, categories]
+  field-display-names:
+    date: "Last run"
+  categories: true
+  filter-ui: true
+  sort-ui: true
+page-layout: full
+toc: false
+---
+
+Each example is one query against one published dataset. Every reader that
+answers it has its own tab, and the page records who ran each reader,
+where, when, and what came back, so equal answers across readers are on
+record.
+
+## Adding an example
+
+Copy `docs/examples/_template/` to `docs/examples/<slug>/` and fill in:
+
+- front matter: `title`, `description`, `date` (last run), `categories`
+  (dataset family, forms, languages);
+- the **Query** block: dataset, selection, and the expected result
+  (shape, first and last values);
+- one tab per reader: code that runs as pasted, plus a status line
+  `[ok]`, `[no]` or `[not run]` with who, where and when;
+- the **Runs** table.
+
+Code on these pages is not executed when the site is built (no data access
+in CI); the values shown are pasted from real runs.

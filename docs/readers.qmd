@@ -1,0 +1,38 @@
+---
+title: "Readers and forms"
+subtitle: "Which reader opens which published form, by codec"
+---
+
+Every form of a dataset holds the same byte references. Whether a reader
+can use a form depends on the codecs the source chunks need, so the matrix
+is per source family:
+
+- **Bluelink (BRAN netCDF):** int16 chunks, HDF5 shuffle + zlib. In Zarr v3
+  (Icechunk) the shuffle is `numcodecs.shuffle`; in Zarr v2 (kerchunk) it
+  is the `shuffle` filter.
+- **GHRSST MUR COG:** int16 tiles, ZSTD with TIFF horizontal predictor
+  (`PREDICTOR=2`), written as the `imagecodecs_delta` filter.
+
+[ok]{.status .status-ok} read and checked against GDAL on the sources;
+[partial]{.status .status-partial} read with a caveat;
+[no]{.status .status-no} the reader rejects the form;
+[not run]{.status .status-todo} no run recorded yet.
+
+| Reader | Form | Bluelink | GHRSST COG |
+|---|---|---|---|
+| xarray + icechunk (zarr-python) | Icechunk | [ok]{.status .status-ok} at zarr `async.concurrency` 4 (THREDDS resets at 10) | [ok]{.status .status-ok} with imagecodecs registered |
+| xarray + fsspec (zarr-python) | kerchunk | [ok]{.status .status-ok} | [ok]{.status .status-ok} with imagecodecs registered |
+| GDAL multidim (osgeo.gdal, gdalxarray, `gdal mdim`) | mdim VRT | [ok]{.status .status-ok} | [ok]{.status .status-ok} one HEAD + 2 GET per source; parallel by process |
+| GDAL Zarr driver (`ZARR:"/vsicurl/.../kerchunk/"`) | kerchunk | [ok]{.status .status-ok} same values as the VRT | [no]{.status .status-no} no `imagecodecs_delta` |
+| GDAL `/vsiicechunk/{...}` | Icechunk | [no]{.status .status-no} no `numcodecs.shuffle` in Zarr v3 | [no]{.status .status-no} no `imagecodecs_delta` |
+| terra (`rast(vrt, md = TRUE)`) | mdim VRT | [partial]{.status .status-partial} BRAN-shaped synthetic VRT only; CRS guessed | [ok]{.status .status-ok} with `CPL_VSIL_CURL_CACHE_SIZE` raised |
+| wxy-refs | flat refs | [partial]{.status .status-partial} synthetic BRAN only | [no]{.status .status-no} predictor decode pending |
+| gdalraster multidim | mdim VRT | [not run]{.status .status-todo} | [not run]{.status .status-todo} |
+
+xarray decodes the packed int16 to float64 from the Zarr forms because the
+JSON attributes do not keep the float32 type of `scale_factor`.
+
+Sources for each cell: [Results](results.md), [Reading published
+stores](reading-published-stores.md) and the [Examples](examples/index.qmd).
+A new run that changes a cell updates this table and adds or updates an
+example page.

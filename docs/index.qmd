@@ -1,8 +1,8 @@
 ---
-title: Overview
+title: "Byte-reference virtualization of array collections"
+subtitle: "One table of byte references per collection; every published form rendered from it"
+toc: false
 ---
-
-# Byte-reference virtualization of array collections
 
 This repository builds virtual, cloud-readable views of archival array
 collections (netCDF, HDF5, GeoTIFF/COG) without copying the data. Each
@@ -11,11 +11,29 @@ every published form is rendered from that store. The repository is a
 working stage: its name and layout will change as the parts move to their
 long-term homes.
 
-- Code and runbook: [README](https://github.com/mdsumner/raad.virtualize#readme)
-- Run log and findings: [results](results.md)
-- Reading published stores (Icechunk, mdim VRT): [reading-published-stores](reading-published-stores.md)
+::: {.grid}
+
+::: {.g-col-12 .g-col-md-4}
+### [Examples](examples/index.qmd)
+Worked reads of published datasets, one query per page, every reader in
+its own tab, with who ran it, when, and what came back.
+:::
+
+::: {.g-col-12 .g-col-md-4}
+### [Published](published.md)
+Every published dataset with the URL of each form (mdim VRT, kerchunk,
+Icechunk, flat refs, STAC).
+:::
+
+::: {.g-col-12 .g-col-md-4}
+### [Readers](readers.qmd)
+Which reader opens which form today, and the codec gaps that decide it.
+:::
+
+:::
 
 ## Model
+
 
 A virtual store is a table plus a plan. The table holds one row per chunk
 of every source file (source, chunk coordinate within the source, present,
@@ -35,15 +53,22 @@ rewritten only at render time, so one harvest serves several endpoints.
 
 ## Pipeline
 
-```
-sources -> plan (gdal mdim mosaic, or py/plan_cog.py for GeoTIFF)
-        -> harvest (chunk index per source)  -> collate (store.sqlite)
-        -> render (flat, VRT, kerchunk)      -> Icechunk
-        -> verify (every form against GDAL on the sources)
-        -> publish, verify-published (object storage)
+```{mermaid}
+flowchart LR
+  S[sources] --> P[plan<br/>gdal mdim mosaic / plan_cog.py]
+  P --> H[harvest<br/>chunk index per source]
+  H --> C[collate<br/>store.sqlite]
+  C --> R1[flat refs]
+  C --> R2[mdim VRT]
+  C --> R3[kerchunk]
+  C --> R4[Icechunk]
+  C --> R5[STAC]
+  R1 & R2 & R3 & R4 --> V[verify<br/>against GDAL on the sources]
+  V --> U[publish<br/>verify-published]
 ```
 
-## Datasets
+## Early runs
+
 
 | Dataset | Source | Refs | State |
 |---|---|---|---|
@@ -53,26 +78,11 @@ sources -> plan (gdal mdim mosaic, or py/plan_cog.py for GeoTIFF)
 | GHRSST MUR `analysed_sst` 2024 | source.coop (COG) | 935,496 | VRT and Icechunk verified from the bucket |
 | GHRSST MUR `analysed_sst` 2002-2026 | source.coop (COG) | 22,771,404 | harvest 17 min, collate 6 min (1.2 GB store), render 5 min, Icechunk 105 s (568 MB, 23 commits); verify in progress |
 
-The AADC transfer bucket is private staging. Public publication (Pawsey,
-source.coop) is a later step.
-
-## Reader coverage
-
-The GHRSST COGs use ZSTD with TIFF horizontal predictor (`PREDICTOR=2`),
-written to the Zarr forms as the `imagecodecs_delta` filter. Coverage then
-differs by reader:
-
-| Form | Python with imagecodecs | GDAL, R |
-|---|---|---|
-| MDIM VRT | yes | yes; a full-width row of one day took 166 s |
-| Icechunk | yes; the same row took 6 s | no filter for `imagecodecs_delta` |
-| kerchunk Parquet | yes | no filter for `imagecodecs_delta` |
-| flat refs store | own decode | wxy-refs, once it decodes the predictor |
-
-Each reader stack has at least one working form today; the gaps below
-widen that for R and GDAL users.
+The AADC transfer bucket is private staging. Current public datasets are
+on the [Published](published.md) page.
 
 ## Ongoing work
+
 
 - Full GHRSST MUR series through render, Icechunk and verify (the
   Icechunk scale test).
@@ -90,6 +100,7 @@ widen that for R and GDAL users.
   publishing to the public endpoints.
 
 ## Related work
+
 
 - [wxylib/design](https://github.com/wxylib/design): mdim-refs/0.2
   specification and the wxy-refs reader

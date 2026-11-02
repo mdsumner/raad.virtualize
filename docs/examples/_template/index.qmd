@@ -1,0 +1,39 @@
+---
+title: "<Dataset>: <query in a few words>"
+description: "<one line: what the page shows, e.g. which readers agree>"
+date: YYYY-MM-DD
+categories: [<family>, <forms>, <languages>]
+---
+
+## Query
+
+| | |
+|---|---|
+| Dataset | `<dataset>` ([forms](../../published.md)) |
+| Selection | `<xarray isel/sel expression>` |
+| Coordinates | <what the selection lands on> |
+| Result | <shape, dtype, first and last values> |
+
+## Readers
+
+::: {.panel-tabset}
+
+## <reader, form>
+
+[ok]{.status .status-ok} <who>, <where>, <YYYY-MM-DD>
+
+```python
+# code that runs as pasted
+```
+
+## <next reader>
+
+[not run]{.status .status-todo}
+
+:::
+
+## Runs
+
+| Reader | Result | Who, where | When |
+|---|---|---|---|
+| | | | |

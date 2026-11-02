@@ -1,4 +1,6 @@
-# Pipeline results and findings
+---
+title: "Pipeline results and findings"
+---
 
 Runs of `run.sh` between 2026-10-20 and 2026-10-23. "Identical" means the
 raw (unscaled) values of every checked window hash the same as GDAL reading

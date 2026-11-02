@@ -1,0 +1,50 @@
+project:
+  type: website
+  output-dir: _site
+  pre-render: python3 ../py/site_published.py
+  render:
+    - "*.qmd"
+    - "*.md"
+    - "examples/**/*.qmd"
+
+website:
+  title: "raad.virtualize"
+  description: "One store of byte references per array collection; kerchunk, Icechunk and GDAL multidim VRT rendered from it"
+  site-url: https://mdsumner.github.io/raad.virtualize/
+  repo-url: https://github.com/mdsumner/raad.virtualize
+  repo-subdir: docs
+  repo-actions: [source, issue]
+  page-navigation: true
+  navbar:
+    left:
+      - href: index.qmd
+        text: Overview
+      - href: examples/index.qmd
+        text: Examples
+      - href: published.md
+        text: Published
+      - href: readers.qmd
+        text: Readers
+      - href: results.md
+        text: Results
+      - text: Guides
+        menu:
+          - href: reading-published-stores.md
+          - href: indexes-only-product.md
+          - href: ghrsst-source-coop.md
+    right:
+      - icon: github
+        href: https://github.com/mdsumner/raad.virtualize
+  page-footer:
+    left: "Working stage: names and layout will change."
+    right: "Built with [Quarto](https://quarto.org)"
+
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    toc: true
+    code-copy: true
+    code-overflow: wrap
+    css: styles.css
