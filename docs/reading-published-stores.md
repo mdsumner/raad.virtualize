@@ -1,8 +1,6 @@
 ---
-title: Reading published stores
+title: "Reading published stores"
 ---
-
-# Reading published stores
 
 Draft workflow illustration over one dataset, `bluelink-daily-salt` in the
 source.coop scratch product, read two ways with the same selections (a

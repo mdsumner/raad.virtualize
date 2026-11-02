@@ -1,0 +1,11 @@
+/* status badges used on example pages and the readers matrix */
+.status { display: inline-block; padding: 0 .45em; border-radius: .3em;
+          font-size: .85em; font-weight: 600; white-space: nowrap; }
+.status-ok      { background: #d1f0d8; color: #14532d; }
+.status-partial { background: #fdf0c4; color: #713f12; }
+.status-no      { background: #f8d4d4; color: #7f1d1d; }
+.status-todo    { background: #e5e7eb; color: #374151; }
+[data-bs-theme="dark"] .status-ok      { background: #14532d; color: #d1f0d8; }
+[data-bs-theme="dark"] .status-partial { background: #713f12; color: #fdf0c4; }
+[data-bs-theme="dark"] .status-no      { background: #7f1d1d; color: #f8d4d4; }
+[data-bs-theme="dark"] .status-todo    { background: #374151; color: #e5e7eb; }

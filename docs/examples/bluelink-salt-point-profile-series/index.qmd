@@ -1,0 +1,82 @@
+---
+title: "Bluelink salinity: point, profile, 30-day series"
+description: "Icechunk with request concurrency capped, and the mdim VRT through gdalxarray, south of Tasmania."
+date: 2026-11-02
+categories: [bluelink, icechunk, mdim-vrt, python]
+---
+
+## Query
+
+| | |
+|---|---|
+| Dataset | `bluelink-daily-salt` ([forms](../../published.md)) |
+| Location | nearest to 147 E, 44 S; depth level nearest 5 m |
+| Selections | one value on the last day; the 51-level profile on the last day; the last 30 days at that depth |
+| Requests | 1, 51 and 30 source chunks (`salt` chunks are 1 x 1 x 300 x 300) |
+| Result | not yet recorded |
+
+Full scripts:
+[`examples/read_bluelink_icechunk.py`](https://github.com/mdsumner/raad.virtualize/blob/main/examples/read_bluelink_icechunk.py),
+[`examples/read_bluelink_mdimvrt.py`](https://github.com/mdsumner/raad.virtualize/blob/main/examples/read_bluelink_mdimvrt.py).
+Background: [Reading published stores](../../reading-published-stores.md).
+
+## Readers
+
+::: {.panel-tabset}
+
+## icechunk + xarray
+
+[partial]{.status .status-partial} cloud session, 2026-11-02 (icechunk
+2.3.1, zarr 3.4.2, xarray 2026.9.0): storage, config, authorization, open
+and coordinates in about 3 s; data reads not run there (THREDDS
+unreachable from that environment).
+
+```python
+import icechunk as ic, xarray as xr, zarr
+
+storage = ic.s3_storage(
+    bucket="us-west-2.opendata.source.coop",
+    prefix="ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-salt/icechunk",
+    region="us-west-2", anonymous=True)
+config = ic.Repository.fetch_config(storage)    # the repo's own config
+config.max_concurrent_requests = 4
+auth = {c.url_prefix: ic.credentials.HttpAccess  # https://thredds.nci.org.au/
+        for c in config.virtual_chunk_containers.values()}
+repo = ic.Repository.open(storage, config=config, authorize_virtual_chunk_access=auth)
+zarr.config.set({"async.concurrency": 4})       # THREDDS resets at the default 10
+
+ds = xr.open_zarr(repo.readonly_session("main").store, consolidated=False, chunks=None)
+salt = ds.salt
+point   = salt.sel(xt_ocean=147, yt_ocean=-44, st_ocean=5, method="nearest").isel(Time=-1).load()
+profile = salt.sel(xt_ocean=147, yt_ocean=-44, method="nearest").isel(Time=-1).load()
+series  = salt.sel(xt_ocean=147, yt_ocean=-44, st_ocean=5, method="nearest").isel(Time=slice(-30, None)).load()
+```
+
+## gdalxarray, mdim VRT
+
+[not run]{.status .status-todo} for salt; the same call on temp is
+[ok]{.status .status-ok} in [the temperature example](../bluelink-temp-latitude-line/index.qmd).
+
+```python
+import xarray as xr
+ds = xr.open_dataset(
+    "/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/"
+    "virtual/bluelink-daily-salt/mdim.vrt",
+    engine="gdalxarray", chunks=None,
+    config_options={"GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
+                    "GDAL_HTTP_MAX_RETRY": "3", "GDAL_HTTP_RETRY_DELAY": "2"})
+salt = ds.salt
+profile = salt.sel(xt_ocean=147, yt_ocean=-44, method="nearest").isel(Time=-1).load()
+```
+
+## R
+
+[not run]{.status .status-todo}
+
+:::
+
+## Runs
+
+| Reader | Result | Who, where | When |
+|---|---|---|---|
+| icechunk + xarray | open and coordinates only | cloud session | 2026-11-02 |

@@ -1,4 +1,6 @@
-# GHRSST virtual indexes on source.coop
+---
+title: "GHRSST virtual indexes on source.coop"
+---
 
 Layout of the byte-reference indexes (flat refs, kerchunk Parquet, Icechunk,
 MDIM VRT, STAC) for the GHRSST MUR COGs in the source.coop repository

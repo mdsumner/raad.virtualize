@@ -1,0 +1,122 @@
+---
+title: "Bluelink temperature: one latitude line, last day"
+description: "Same 50 values from the mdim VRT and the kerchunk store through gdalxarray; GDAL rejects the Icechunk form."
+date: 2026-11-02
+categories: [bluelink, mdim-vrt, kerchunk, icechunk, python, gdal]
+---
+
+## Query
+
+| | |
+|---|---|
+| Dataset | `bluelink-daily-temp` ([forms](../../published.md)) |
+| Selection | `temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5)` |
+| Coordinates | 2026-07-31T12:00, 120.05 E, 44.95 S to 40.05 S, 28.17 m |
+| Result | 50 values, float64; first `8.91857684`, last `11.86025596` |
+
+One source chunk: rows 300-349 and column 1200 all fall in the 300 x 300
+chunk starting at (300, 1200) of one day and one depth.
+
+## Readers
+
+::: {.panel-tabset}
+
+## gdalxarray, mdim VRT
+
+[ok]{.status .status-ok} Michael, 2026-11-02
+
+```python
+import xarray
+ds = xarray.open_dataset(
+    "/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/"
+    "virtual/bluelink-daily-temp/mdim.vrt",
+    engine="gdalxarray")
+ds.temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5).values
+```
+
+## gdalxarray, kerchunk
+
+[ok]{.status .status-ok} Michael, 2026-11-02;
+values identical to the VRT tab
+
+```python
+import xarray
+ds = xarray.open_dataset(
+    'ZARR:"/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/'
+    'virtual/bluelink-daily-temp/kerchunk/"',
+    engine="gdalxarray")
+ds.temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5).values
+```
+
+## gdalxarray, Icechunk
+
+[no]{.status .status-no} Michael, Pawsey (gdal-r-python_dev SIF, older build), 2026-11-02
+
+```python
+import xarray
+ds = xarray.open_dataset(
+    "/vsiicechunk/{/vsicurl/https://data.source.coop/ausantarctic/"
+    "ausantarctic-scratch/virtual/bluelink-daily-temp/icechunk}",
+    engine="gdalxarray")
+# Skipping array 'temp': //temp: Unsupported codec: numcodecs.shuffle
+```
+
+Coordinates open; `temp` is skipped. GDAL's Zarr v3 reader has no
+`numcodecs.shuffle` (GDAL master, 2026-11-01). See [Readers](../../readers.qmd).
+
+## icechunk + xarray
+
+[not run]{.status .status-todo} for this selection; the open is checked in
+[the salinity example](../bluelink-salt-point-profile-series/index.qmd).
+
+```python
+import icechunk as ic, xarray as xr, zarr
+storage = ic.s3_storage(bucket="us-west-2.opendata.source.coop",
+                        prefix="ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-temp/icechunk",
+                        region="us-west-2", anonymous=True)
+repo = ic.Repository.open(storage, authorize_virtual_chunk_access={
+    "https://thredds.nci.org.au/": ic.credentials.HttpAccess})
+zarr.config.set({"async.concurrency": 4})
+ds = xr.open_zarr(repo.readonly_session("main").store, consolidated=False, chunks=None)
+ds.temp.isel(Time=-1, xt_ocean=1200, yt_ocean=slice(300, 350), st_ocean=5).values
+```
+
+## R
+
+[not run]{.status .status-todo}
+
+```r
+library(terra)
+u <- "/vsicurl/https://data.source.coop/ausantarctic/ausantarctic-scratch/virtual/bluelink-daily-temp/mdim.vrt"
+r <- rast(u, "temp", md = TRUE)
+```
+
+terra exposes Time x depth as layers (12,265 x 51); the layer and cell
+indexing for this selection is still to be written and run.
+
+:::
+
+## Runs
+
+| Reader | Result | Who, where | When |
+|---|---|---|---|
+| gdalxarray, mdim VRT | 50 values, as above | Michael | 2026-11-02 |
+| gdalxarray, kerchunk | identical to the VRT | Michael | 2026-11-02 |
+| gdalxarray, Icechunk | `temp` skipped: `numcodecs.shuffle` | Michael, Pawsey SIF | 2026-11-02 |
+
+<details><summary>All 50 values</summary>
+
+```
+ 8.91857684  8.94970572  9.05087458  9.13647899  9.19873675
+ 9.19873675  9.24543007  9.46333223  9.64232329  9.66566995
+ 9.65788773  9.65788773  9.69679883  9.75127437  9.77462103
+ 9.76683881  9.74349215  9.71236327  9.69679883  9.70458105
+ 9.78240325  9.83687879  9.88357211 10.00808762 10.18707868
+10.22598978 10.18707868 10.34272308 10.70848742 10.77074517
+10.75518074 10.78630961 10.90304291 11.06646953 11.25324281
+11.29215391 11.27658947 11.29215391 11.29215391 11.28437169
+11.29993613 11.31550057 11.33884723 11.42445165 11.48670941
+11.41666943 11.14429173 11.10538063 11.44779831 11.86025596
+```
+
+</details>
