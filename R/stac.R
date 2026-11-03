@@ -253,6 +253,8 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     warning("stac: no geographic x/y found and no STAC_BBOX; spatial extent written as the globe")
   }
   ttime <- if (!is.na(dt)) dims[[dt]]$time
+  ## STAC_INTERVAL=start,end: temporal coverage of a dataset with no time axis
+  interval <- if (nzchar(Sys.getenv("STAC_INTERVAL"))) strsplit(Sys.getenv("STAC_INTERVAL"), ",")[[1]]
 
   ## datacube
   cube_dims <- lapply(dims, function(d) {
@@ -302,7 +304,10 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
       if (tt[1] == tt[2]) props$datetime <- .iso(tt[1])
       else props[c("datetime", "start_datetime", "end_datetime")] <- list(NULL, .iso(tt[1]), .iso(tt[2]))
     } else {
-      props$datetime <- meta$created %||% .iso(Sys.time())
+      ## a static dataset states its coverage (STAC_INTERVAL); the build
+      ## time is not a data time
+      if (length(interval)) props[c("datetime", "start_datetime", "end_datetime")] <- list(NULL, interval[1], interval[2])
+      else props$datetime <- meta$created %||% .iso(Sys.time())
     }
     if (is.null(props$datetime)) props["datetime"] <- list(NULL)
     if (!is.na(epsg) && !is.na(dx) && !is.na(dy) && !is.null(arrays[[dx]]$affine) &&
@@ -329,17 +334,18 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
 
   ## collection
   forms <- .form_assets(out, base, .containers(unique(P$path)))
-  textent <- if (!is.null(ttime)) I(list(I(.iso(range(ttime))))) else I(list(I(c(NA, NA))))
+  textent <- if (!is.null(ttime)) I(list(I(.iso(range(ttime))))) else
+    if (length(interval)) I(list(I(interval))) else I(list(I(c(NA, NA))))
   coll <- list(
     type = "Collection", stac_version = STAC_VERSION,
     stac_extensions = I(unname(STAC_EXT[c("datacube", "xarray")])),
     id = meta$dataset,
-    title = meta$dataset,
+    title = if (nzchar(Sys.getenv("STAC_TITLE"))) Sys.getenv("STAC_TITLE") else meta$dataset,
     description = sprintf(paste(
       "Virtualized collection of %d source files (%s), rendered from an mdim-refs/0.2 store",
       "of byte references. Collection assets are the virtual forms of the whole cube;",
       "items are the source granules."), length(items), paste(names(data), collapse = ", ")),
-    license = "other",
+    license = if (nzchar(Sys.getenv("STAC_LICENSE"))) Sys.getenv("STAC_LICENSE") else "other",
     extent = list(spatial = list(bbox = I(list(I(cbbox)))), temporal = list(interval = textent)),
     `cube:dimensions` = cube_dims, `cube:variables` = cube_vars,
     item_assets = list(data = list(type = .media_type(P$source[1]), roles = list("data"))),

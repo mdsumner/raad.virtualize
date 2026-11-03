@@ -1,0 +1,5 @@
+# Datasets of the group. One row per dataset: dataset name, dataset config,
+# its settings (comma separated, as qsub -v takes them), title. Lines starting
+# with # are skipped.
+dataset	config	env	title
+bedmap3	config/bedmap3.sh		Bedmap3 ice thickness, bed and surface elevation for Antarctica

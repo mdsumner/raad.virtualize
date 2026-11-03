@@ -81,8 +81,9 @@ def source_extent(src, shape):
     when the count is not written in the source element."""
     off = [int(x) for x in src.find("DestSlab").get("offset").split(",")]
     if src.find("SourceBand") is not None:
-        # a raster band given a leading length-1 axis (SourceTranspose -1,0,1)
-        return off, [1] + list(shape[1:])
+        # a raster band given a leading length-1 axis (SourceTranspose -1,0,1),
+        # or the whole of a 2D array (py/plan_static.py)
+        return off, list(shape) if len(shape) == 2 else [1] + list(shape[1:])
     ss = src.find("SourceSlab")
     if ss is None or not ss.get("count"):
         return None
@@ -276,7 +277,15 @@ def touches_absent(absent, chunks, start, count):
 
 
 def source_scale(plan, name):
-    """scale_factor of NAME in the first source listed beside the plan."""
+    """scale_factor of NAME in the first source listed beside the plan, or for
+    a raster band source (GeoTIFF) in the first source the plan gives NAME."""
+    arr = next(x for x in ET.parse(plan).getroot().find("Group").findall("Array")
+               if x.get("name") == name)
+    src = arr.find("Source")
+    if src is not None and src.find("SourceBand") is not None:
+        ds = gdal.Open(src.find("SourceFilename").text)
+        sc = ds.GetRasterBand(int(src.find("SourceBand").text)).GetScale()
+        return 1.0 if sc is None else sc
     lst = os.path.join(os.path.dirname(os.path.abspath(plan)), "sources.txt")
     src = open(lst).readline().strip()
     m = gdal.OpenEx(src, gdal.OF_MULTIDIM_RASTER).GetRootGroup().OpenMDArray(name)

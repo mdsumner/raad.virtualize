@@ -9,7 +9,8 @@
 #
 # Every leading *.sh argument is sourced, in order (dataset, then a publish
 # target). Steps: deps plan harvest collate render icechunk grist stac verify, and
-# publish verify-published (not run by default).
+# prepare publish verify-published (not run by default). prepare runs the
+# config's prepare function, for a dataset that writes its sources first.
 # Env: E2E_WORK (default ./work/<DATASET>), PYTHON, RSCRIPT, GDAL, WORKERS,
 #      HARVEST_LIMIT (scan only the first N sources; for a smoke test),
 #      HARVEST_ENGINE (auto | gdal | h5py; see py/harvest.py),
@@ -24,10 +25,12 @@
 #      STAC asset hrefs and GDAL open strings),
 #      GRIST_LEVELS, GRIST_ARRAYS, GRIST_TARGET (default VRT_TARGET),
 #      GRIST_BASE (default STAC_BASE), GRIST_VERIFY_BOUNDARIES,
-#      GRIST_VERIFY_WINDOW (see R/grist.R and py/verify_grist.py).
+#      GRIST_VERIFY_WINDOW (see R/grist.R and py/verify_grist.py),
+#      DEFAULT_STEPS (steps when none are named; set by a config with no time
+#      axis, which leaves out grist).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ $# -ge 1 ] || { sed -n '2,22p' "$0"; exit 1; }
+[ $# -ge 1 ] || { sed -n '2,26p' "$0"; exit 1; }
 CONFIGS=()
 while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$1")"); shift; done
 # Provenance stamped into the store meta (and so into every rendered form).
@@ -35,7 +38,7 @@ while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$
 REV=$(git -c safe.directory="$HERE" -C "$HERE" describe --always --dirty 2>/dev/null || echo unversioned)
 REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#")
 export E2E_GENERATOR="${E2E_REPO:-${REPO:-local}} $REV" E2E_CONFIG="${CONFIGS[*]}"
-STEPS=${*:-plan harvest collate render icechunk grist stac verify}
+STEPS=${*:-${DEFAULT_STEPS:-plan harvest collate render icechunk grist stac verify}}
 PYTHON=${PYTHON:-python}; RSCRIPT=${RSCRIPT:-Rscript}; GDAL=${GDAL:-gdal}
 WORK=${E2E_WORK:-$HERE/work/$DATASET}
 mkdir -p "$WORK"
@@ -61,6 +64,9 @@ for s in $STEPS; do
   case $s in
     deps)
       step deps "$RSCRIPT" "$HERE/R/install-deps.R" "$R_LIB" ;;
+    prepare)
+      declare -F prepare > /dev/null || { echo "prepare: the config defines no prepare"; exit 1; }
+      step prepare prepare ;;
     plan)
       # sources go to the mosaic as a response file (@file): a full GHRSST
       # or multi-year BRAN listing is longer than the argument limit

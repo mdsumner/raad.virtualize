@@ -20,7 +20,8 @@ Engines (--engine):
 
 A source that GDAL cannot open as multidimensional (a GeoTIFF or COG placed
 by a <SourceBand> plan, as vrtstack writes) is scanned from its TIFF tile
-index instead (walk_tiff): IFD 0 only, chunk coordinates (0, row, col)
+index instead (walk_tiff): IFD 0 only, chunk coordinates (0, row, col), or
+(row, col) for a 2D array (py/plan_static.py)
 within the source, dims named after the plan array. A netCDF/HDF5 source
 that the plan gives a new axis (<SourceArray> with <SourceTranspose>-1,0,1,
 the plan_lift.py form) gets a 0 coordinate on that axis in the same way.
@@ -158,6 +159,9 @@ def lift_meta(m, t, dims):
     return m
 
 
+CF_TAGS = ("long_name", "standard_name", "description", "flag_meanings")
+
+
 def tiff_info(ds):
     """Codec of a GeoTIFF in block-info KEY=VALUE form."""
     st = ds.GetMetadata("IMAGE_STRUCTURE") or {}
@@ -167,26 +171,27 @@ def tiff_info(ds):
     return info
 
 
-def walk_tiff(ds, band):
+def walk_tiff(ds, band, rank=3):
     """Rows for one band of a GeoTIFF/COG from its tile index (IFD 0): GDAL's
     TIFF metadata domain gives BLOCK_OFFSET_x_y and BLOCK_SIZE_x_y; an offset
-    of 0 is a tile never written. Coordinates carry a leading 0 for the axis
-    the plan adds (SourceTranspose -1,...)."""
+    of 0 is a tile never written. Coordinates carry a leading 0 for each axis
+    the plan adds (SourceTranspose -1,...); rank 2 has none."""
     b = ds.GetRasterBand(band)
     if ds.RasterCount > 1 and (ds.GetMetadata("IMAGE_STRUCTURE") or {}).get("INTERLEAVE") == "PIXEL":
         sys.exit("pixel-interleaved multiband TIFF: one band is not one chunk grid")
     bx, by = b.GetBlockSize()
     nx, ny = math.ceil(ds.RasterXSize / bx), math.ceil(ds.RasterYSize / by)
     info = tiff_info(ds)
+    lead = (0,) * (rank - 2)
     rows = []
     for iy in range(ny):
         for ix in range(nx):
             off = int(b.GetMetadataItem(f"BLOCK_OFFSET_{ix}_{iy}", "TIFF") or 0)
             size = int(b.GetMetadataItem(f"BLOCK_SIZE_{ix}_{iy}", "TIFF") or 0)
             if off and size:
-                rows.append(((0, iy, ix), 1, off, size, info, None))
+                rows.append((lead + (iy, ix), 1, off, size, info, None))
             else:
-                rows.append(((0, iy, ix), 0, None, None, None, None))
+                rows.append((lead + (iy, ix), 0, None, None, None, None))
     return rows
 
 
@@ -194,11 +199,14 @@ def describe_tiff(ds, band, dims):
     b = ds.GetRasterBand(band)
     bx, by = b.GetBlockSize()
     code = NUMPY[b.DataType]
+    lead = [1] * (len(dims) - 2)
+    tags = ds.GetMetadata()
     return {
-        "dims": dims, "shape": [1, ds.RasterYSize, ds.RasterXSize], "chunks": [1, by, bx],
+        "dims": dims, "shape": lead + [ds.RasterYSize, ds.RasterXSize], "chunks": lead + [by, bx],
         "dtype": ("|" if code.endswith("1") else "<") + code,  # GDAL TIFFs are little-endian
         "nodata": b.GetNoDataValue(), "scale": b.GetScale(), "offset": b.GetOffset(),
-        "unit": b.GetUnitType() or None, "attrs": {}, "info": tiff_info(ds),
+        "unit": b.GetUnitType() or None, "info": tiff_info(ds),
+        "attrs": {k: tags[k] for k in CF_TAGS if k in tags},
     }
 
 
@@ -420,7 +428,8 @@ def scan_tiff_once(source, arrays, out, want_meta, tiff):
             continue
         b = ds.GetRasterBand(band)
         packing[nm] = {"scale": b.GetScale(), "offset": b.GetOffset(), "nodata": b.GetNoDataValue()}
-        nrow, _ = write_rows(walk_tiff(ds, band), source, 3, nm, k, out)
+        rank = len(tiff["dims"][nm])
+        nrow, _ = write_rows(walk_tiff(ds, band, rank), source, rank, nm, k, out)
         n += nrow
         if want_meta:
             meta[nm] = describe_tiff(ds, band, tiff["dims"][nm])
@@ -526,12 +535,25 @@ def main():
     print(f"{len(srcs)} sources in plan, {len(srcs) - len(todo)} already scanned, "
           f"{len(todo)} to scan with {a.workers} workers", file=sys.stderr)
     if not have_meta:
-        # arrays.json from the first source, scanned in this process
-        first = todo.pop(0) if todo else srcs[0]
-        _, n, dt, meta = scan_source(first, a.array, a.out, True, a.engine, tiff=tiff, lifts=lifts)
+        # arrays.json from the first source, scanned in this process, and
+        # from the first source of any array that one does not hold (one
+        # array per file: py/plan_static.py)
+        meta = {}
+        while True:
+            want = [nm for nm in a.array if nm not in meta]
+            if meta and not want:
+                break
+            first = next((s for s in (todo or srcs) if not meta or
+                          any((nm, s) in (bands or {}) for nm in want)), None)
+            if first is None:
+                break
+            if first in todo:
+                todo.remove(first)
+            _, n, dt, m = scan_source(first, a.array, a.out, True, a.engine, tiff=tiff, lifts=lifts)
+            meta.update(m)
+            print(f"  {first}: {n} chunks in {dt:.1f} s", file=sys.stderr)
         with open(os.path.join(a.out, "arrays.json"), "w") as f:
             json.dump(strict(meta), f, indent=1, default=str, allow_nan=False)
-        print(f"  {first}: {n} chunks in {dt:.1f} s (arrays.json written)", file=sys.stderr)
 
     t0, total = time.time(), 0
     with ProcessPoolExecutor(a.workers) as ex:
