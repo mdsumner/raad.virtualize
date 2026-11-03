@@ -12,13 +12,15 @@ opens every source in order on each read to learn its shape (about 1 s per
 
 Every file is assumed to share the grid, type and tiling of the first one
 (only the first is opened). Dates come from the first capture group of
---pattern applied to the file name, as YYYYMMDD (--cadence day, the default)
-or YYYYMM (--cadence month).
+--pattern applied to the file name, as YYYYMMDD (--cadence day, the default),
+YYYYMMDD (--cadence 5day), or YYYYMM (--cadence month).
 
 --cadence month: one time step per calendar month, the time value the first
 day of the month in days since 1970-01-01, written as InlineValues (months
 are not evenly spaced in days). The time index of a file is its month minus
-the first month.
+the first month. --cadence 5day: one step per 5-day period, by either of the
+calendars axis() recognises from the file dates. Steps evenly spaced in days
+are written as RegularlySpacedValues, others as InlineValues.
 
 Steps (days or months) between the first and last date with no file are
 listed on stderr. --max-missing N stops (exit 1, no plan written) when more
@@ -51,17 +53,45 @@ def month_index(d, t0):
     return (d.year - t0.year) * 12 + d.month - t0.month
 
 
-def step_dates(t0, n, cadence):
-    """The first date of each of n steps from t0."""
+PENTAD_DAYS = (1, 6, 11, 16, 21, 26)
+
+
+def axis(dates, cadence):
+    """(index of a date, first date of every step) for the sorted file dates.
+
+    day    one step per day
+    month  one step per calendar month (dates are the first of the month)
+    5day   one step per 5-day period. Two calendars are recognised from the
+           dates themselves: periods starting on days 1, 6, 11, 16, 21, 26
+           of each month (the last one runs to the month end), or a
+           continuous 5-day sequence from the first date. Dates fitting
+           neither stop the plan."""
+    t0, t1 = dates[0], dates[-1]
     if cadence == "day":
-        return [t0 + dt.timedelta(i) for i in range(n)]
-    return [dt.date(t0.year + (t0.month - 1 + i) // 12, (t0.month - 1 + i) % 12 + 1, 1)
-            for i in range(n)]
+        steps = [t0 + dt.timedelta(i) for i in range((t1 - t0).days + 1)]
+    elif cadence == "month":
+        n = month_index(t1, t0) + 1
+        steps = [dt.date(t0.year + (t0.month - 1 + i) // 12, (t0.month - 1 + i) % 12 + 1, 1)
+                 for i in range(n)]
+    elif all(d.day in PENTAD_DAYS for d in dates):
+        steps, y, m = [], t0.year, t0.month
+        while (y, m) <= (t1.year, t1.month):
+            steps += [dt.date(y, m, k) for k in PENTAD_DAYS]
+            y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+        steps = [d for d in steps if t0 <= d <= t1]
+    elif all((d - t0).days % 5 == 0 for d in dates):
+        steps = [t0 + dt.timedelta(5 * i) for i in range((t1 - t0).days // 5 + 1)]
+    else:
+        bad = ", ".join(str(d) for d in dates[:12])
+        sys.exit(f"plan_cog: 5day dates fit neither days {PENTAD_DAYS} of each month "
+                 f"nor a continuous 5-day sequence (first dates: {bad})")
+    pos = {d: i for i, d in enumerate(steps)}
+    return pos.__getitem__, steps
 
 
 def dated(sources, pattern, cadence="day"):
     rx = re.compile(pattern)
-    fmt = "%Y%m%d" if cadence == "day" else "%Y%m"
+    fmt = "%Y%m" if cadence == "month" else "%Y%m%d"
     out = []
     for s in sources:
         m = rx.search(os.path.basename(s))
@@ -85,16 +115,15 @@ def plan(sources, array, pattern, cadence="day"):
     bx, by = b.GetBlockSize()
     x0, dx, _, y0, _, dy = ds.GetGeoTransform()
     t0 = files[0][0]
-    if cadence == "day":
-        index = lambda d: (d - t0).days
-        tvals = f'      <RegularlySpacedValues start="{(t0 - EPOCH).days}" increment="1"/>'
+    index, steps = axis([d for d, _ in files], cadence)
+    nt = len(steps)
+    days = [(d - EPOCH).days for d in steps]
+    inc = days[1] - days[0] if nt > 1 else 1
+    if all(b - a == inc for a, b in zip(days, days[1:])):
+        tvals = f'      <RegularlySpacedValues start="{days[0]}" increment="{inc}"/>'
     else:
-        index = lambda d: month_index(d, t0)
-    nt = index(files[-1][0]) + 1
-    steps = step_dates(t0, nt, cadence)
-    if cadence == "month":
         tvals = (f'      <InlineValues offset="0" count="{nt}">'
-                 + " ".join(str((d - EPOCH).days) for d in steps) + "</InlineValues>")
+                 + " ".join(str(v) for v in days) + "</InlineValues>")
     srs = ds.GetSpatialRef()
     lines = [
         "<VRTDataset>",
@@ -156,7 +185,7 @@ def main():
     ap.add_argument("--array", required=True)
     ap.add_argument("--pattern", required=True,
                     help="regex on the file name; group 1 is YYYYMMDD (day) or YYYYMM (month)")
-    ap.add_argument("--cadence", choices=("day", "month"), default="day")
+    ap.add_argument("--cadence", choices=("day", "5day", "month"), default="day")
     ap.add_argument("--max-missing", type=int, default=-1,
                     help="fail when more steps than this have no file (-1: no limit)")
     ap.add_argument("vrt")
@@ -164,7 +193,7 @@ def main():
     with open(a.sources) as f:
         sources = [s.strip() for s in f if s.strip()]
     text, nfiles, nt, missing = plan(sources, a.array, a.pattern, a.cadence)
-    unit = "days" if a.cadence == "day" else "months"
+    unit = {"day": "days", "5day": "5-day periods", "month": "months"}[a.cadence]
     if missing:
         shown = ", ".join(str(d) for d in missing[:20]) + (" ..." if len(missing) > 20 else "")
         print(f"plan_cog: {len(missing)} of {nt} {unit} have no file: {shown}", file=sys.stderr)

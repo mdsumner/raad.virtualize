@@ -6,3 +6,6 @@ dataset	config	env	title
 esacci-oc-v6.0-monthly-chlor_a	config/esacci-oc.sh	ESACCI_VAR=chlor_a	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a, merged sensors, 4 km, from 1997-09
 esacci-oc-v6.0-monthly-chlor_a_log10_bias	config/esacci-oc.sh	ESACCI_VAR=chlor_a_log10_bias	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a log10 bias, merged sensors, 4 km, from 1997-09
 esacci-oc-v6.0-monthly-chlor_a_log10_rmsd	config/esacci-oc.sh	ESACCI_VAR=chlor_a_log10_rmsd	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a log10 RMSD, merged sensors, 4 km, from 1997-09
+esacci-oc-v6.0-5day-chlor_a	config/esacci-oc.sh	ESACCI_CADENCE=5day,ESACCI_VAR=chlor_a	ESA Ocean Colour CCI v6.0 5-day chlorophyll-a, merged sensors, 4 km, from 1997-09
+esacci-oc-v6.0-5day-chlor_a_log10_bias	config/esacci-oc.sh	ESACCI_CADENCE=5day,ESACCI_VAR=chlor_a_log10_bias	ESA Ocean Colour CCI v6.0 5-day chlorophyll-a log10 bias, merged sensors, 4 km, from 1997-09
+esacci-oc-v6.0-5day-chlor_a_log10_rmsd	config/esacci-oc.sh	ESACCI_CADENCE=5day,ESACCI_VAR=chlor_a_log10_rmsd	ESA Ocean Colour CCI v6.0 5-day chlorophyll-a log10 RMSD, merged sensors, 4 km, from 1997-09

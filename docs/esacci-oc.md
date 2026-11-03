@@ -37,12 +37,21 @@ folder (`chlor_a`) replaced by the variable:
 v6.0-release/geographic/monthly/chlor_a/1997/ESACCI-OC-L3S-CHLOR_A-MERGED-1M_MONTHLY_4km_GEO_PML_OCx-199709-fv6.0_chlor_a.tif
 ```
 
-## Monthly time axis
+## Time axis
 
-`py/plan_cog.py --cadence month` gives one time step per calendar month, the
-first day of the month as days since 1970-01-01 (`InlineValues`). A month
-with no file is a hole; `ESACCI_MAX_MISSING` (default 0) stops the plan when
-a listing is short.
+`ESACCI_CADENCE` (monthly, 5day, daily) selects the THREDDS folder and the
+`py/plan_cog.py --cadence`:
+
+- `month`: one step per calendar month, the first day of the month as days
+  since 1970-01-01 (`InlineValues`)
+- `5day`: one step per 5-day period. The calendar is taken from the file
+  dates: periods starting on days 1, 6, 11, 16, 21 and 26 of each month, or a
+  continuous 5-day sequence. Dates fitting neither stop the plan.
+- `day`: one step per day
+
+A step with no file is a hole; `ESACCI_MAX_MISSING` (default 0) stops the
+plan when a listing is short. The 5-day and daily datasets publish STAC items
+as ndjson and stac-geoparquet only (`STAC_ITEM_FILES=0`).
 
 ## Procedure on Setonix
 
@@ -54,6 +63,8 @@ the `pawsey1197` remote; no keys are set in the job):
 sbatch --export=ALL,ESACCI_YEARS=2025,ESACCI_LIMIT=2 hpc/pawsey/esacci-cog.slurm
 # the full monthly series; resubmit as is after a timeout
 sbatch hpc/pawsey/esacci-cog.slurm
+# the 5-day series (index with ESACCI_CADENCE=5day as well)
+sbatch --export=ALL,ESACCI_CADENCE=5day hpc/pawsey/esacci-cog.slurm
 ```
 
 Index over the local COGs, remapped to the public Acacia URL, then publish to
@@ -74,6 +85,7 @@ the COGs are uploaded before the index is built.
   `chlor_a_log10_rmsd` from each download (`ESACCI_VARS`); the per-sensor
   observation counts in the same files are not converted. Each variable is
   its own dataset (`ESACCI_VAR`).
-- Daily, 5-day and annual cadences: the conversion takes any CCI THREDDS
-  catalog; the plan needs a cadence for 5-day and 8-day steps.
+- Annual and 8-day cadences are not planned.
+- Re-runs skip COGs already written; a file changed upstream under the same
+  name is not detected (v6.0 is a fixed release, extended by new files).
 - Coverage is global.
