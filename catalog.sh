@@ -52,7 +52,8 @@ if [ $ROOT_MODE = 1 ]; then
   fi
   BASE=${CATALOG_BASE:-${PUBLISH_ROOT_BASE:-}}
   BASE=${BASE%/}
-elif [ -n "${PUBLISH_ROOT:-}" ] && [ "${PUBLISH%/}" != "${PUBLISH_ROOT%/}" ]; then
+elif [ -n "${PUBLISH_ROOT:-}" ] && [ "${PUBLISH%/}" != "${PUBLISH_ROOT%/}" ] &&
+     [ "${SOURCECOOP_REPO:-}" = "${SOURCECOOP_SCRATCH:-}" ]; then
   # one ../ per path level between the group and the product root
   rel=${PUBLISH#"${PUBLISH_ROOT%/}"/}
   PARENT=$(echo "${rel%/}" | awk -F/ '{for (i = 1; i <= NF; i++) printf "../"}')catalog.json

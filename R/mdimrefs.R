@@ -324,7 +324,8 @@ mr_plan_vrt <- function(vrt) {
                                               nm, tr[lift][tr[lift] != want][1], want))
       sa[lift] <- paste0("lift:", sa[lift])
     }
-    band_count <- .jl(c(1L, unname(dim_size[refs])[-1L]))
+    ## a band fills the array (rank 2) or one step of a leading new axis
+    band_count <- .jl(if (rank == 2L) unname(dim_size[refs]) else c(1L, unname(dim_size[refs])[-1L]))
     out$arrays[[nm]] <- list(
       dims = refs, shape = unname(dim_size[refs]), dtype = dt,
       sources = data.frame(

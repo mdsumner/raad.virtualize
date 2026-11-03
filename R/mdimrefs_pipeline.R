@@ -40,8 +40,10 @@ mr_ingest_scan_dir <- function(con, dir, verbose = TRUE, batch = 2000L,
   ## one virtual array, so stop here (sidecars from harvest.py >= 2026-10-21)
   pk <- lapply(sj, function(f) jsonlite::fromJSON(f, simplifyVector = FALSE)$packing)
   pk <- Filter(Negate(is.null), pk)
-  if (length(pk)) for (nm in names(pk[[1]])) {
-    u <- unique(vapply(pk, function(p) .j(p[[nm]]), ""))
+  ## each source reports its own arrays: with one array per file only those
+  ## that hold an array are compared
+  for (nm in unique(unlist(lapply(pk, names)))) {
+    u <- unique(vapply(Filter(function(p) !is.null(p[[nm]]), pk), function(p) .j(p[[nm]]), ""))
     if (length(u) > 1L) stop(sprintf("array '%s': scale/offset/nodata differ between sources: %s",
                                      nm, paste(u, collapse = " | ")))
   }
@@ -256,8 +258,9 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
         cn <- .fj(P$count[i])
         if (startsWith(P$source_array[i], "band:")) {
           ## a raster band, given a leading length-1 axis (the vrtstack form)
+          ## unless the array is 2D (py/plan_static.py)
           xml2::xml_add_child(s, "SourceBand", sub("^band:", "", P$source_array[i]))
-          xml2::xml_add_child(s, "SourceTranspose",
+          if (length(cn) > 2L) xml2::xml_add_child(s, "SourceTranspose",
                               paste(c(-1L, seq_len(length(cn) - 1L) - 1L), collapse = ","))
           ## the extent, so GDAL opens only the sources a read touches
           ## (without it every source is opened to learn its shape)
