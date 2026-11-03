@@ -12,6 +12,9 @@ forms common to every group (`mdim.vrt`, `kerchunk/`, `icechunk/`, `flat/`,
   monthly from 1997-09. COGs written from the netCDF files at
   https://www.oceancolour.org/thredds/catalog/cci/v6.0-release/geographic/monthly/chlor_a/catalog.html
   with values unchanged and the netCDF fill as NaN.
+- `esacci-oc-v6.0-monthly-chlor_a_log10_bias`,
+  `esacci-oc-v6.0-monthly-chlor_a_log10_rmsd`: the per-pixel log10 bias and
+  root mean square difference of `chlor_a`, from the same files.
 
 Citation: Ocean Colour Climate Change Initiative dataset, Version 6.0,
 European Space Agency, available online at

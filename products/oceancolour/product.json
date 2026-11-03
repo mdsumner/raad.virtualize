@@ -1,7 +1,7 @@
 {
   "id": "oceancolour",
   "title": "Ocean colour virtual stores",
-  "description": "Byte-reference indexes of ocean colour products over Cloud Optimized GeoTIFF copies of the original netCDF files: ESA Ocean Colour CCI v6.0 merged-sensor chlorophyll-a, geographic 4 km. Each dataset is published as a GDAL multidimensional VRT, kerchunk Parquet, an Icechunk repository with virtual references, a flat Parquet refs store and a STAC collection. Drafts.",
+  "description": "Byte-reference indexes of ocean colour products over Cloud Optimized GeoTIFF copies of the original netCDF files: ESA Ocean Colour CCI v6.0 merged-sensor chlorophyll-a and its log10 bias and RMSD, geographic 4 km. Each dataset is published as a GDAL multidimensional VRT, kerchunk Parquet, an Icechunk repository with virtual references, a flat Parquet refs store and a STAC collection. Drafts.",
   "license": "other",
   "public_base": "https://data.source.coop/ausantarctic/ausantarctic-scratch/oceancolour"
 }

@@ -7,7 +7,7 @@ Build of the ESA Ocean Colour CCI v6.0 indexes in the `oceancolour/` group of
 www.oceancolour.org is distant and slow for range reads, so the selected
 variables are copied once as COGs to Pawsey Acacia and the virtual forms
 reference the COGs (the GHRSST pattern), not the netCDF files. Monthly
-`chlor_a` is the first dataset.
+`chlor_a`, with its log10 bias and RMSD, are the first datasets.
 
 ## COG settings
 
@@ -70,9 +70,10 @@ the COGs are uploaded before the index is built.
 
 ## Open points
 
-- Variables beyond `chlor_a`: the monthly `chlor_a` files also hold
-  `chlor_a_log10_bias`, `chlor_a_log10_rmsd` and the per-sensor observation
-  counts; `ESACCI_VARS` converts them in the same download.
+- Variables: the job converts `chlor_a`, `chlor_a_log10_bias` and
+  `chlor_a_log10_rmsd` from each download (`ESACCI_VARS`); the per-sensor
+  observation counts in the same files are not converted. Each variable is
+  its own dataset (`ESACCI_VAR`).
 - Daily, 5-day and annual cadences: the conversion takes any CCI THREDDS
   catalog; the plan needs a cadence for 5-day and 8-day steps.
-- Southern Ocean subset or global: the COGs are global.
+- Coverage is global.

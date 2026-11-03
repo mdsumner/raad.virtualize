@@ -16,7 +16,8 @@
 #
 #   ESACCI_CATALOG  THREDDS catalog.xml (default the v6.0 geographic monthly
 #                   chlor_a catalog)
-#   ESACCI_VARS     netCDF variables, space separated (default chlor_a)
+#   ESACCI_VARS     netCDF variables, space separated (default chlor_a
+#                   chlor_a_log10_bias chlor_a_log10_rmsd)
 #   ESACCI_YEARS    years, space separated (default every year)
 #   ESACCI_LIMIT    convert at most N netCDF files (smoke test)
 #   ESACCI_OUT      local COG root (default $MYSCRATCH/esacci-oc/cog)
@@ -36,7 +37,7 @@ module load singularity/4.1.0-slurm
 command -v rclone > /dev/null || module load rclone
 
 CATALOG=${ESACCI_CATALOG:-https://www.oceancolour.org/thredds/catalog/cci/v6.0-release/geographic/monthly/chlor_a/catalog.xml}
-VARS=${ESACCI_VARS:-chlor_a}
+VARS=${ESACCI_VARS:-chlor_a chlor_a_log10_bias chlor_a_log10_rmsd}
 OUT=${ESACCI_OUT:-$MYSCRATCH/esacci-oc/cog}
 TMP=$(dirname "$OUT")/download
 REMOTE=${ESACCI_REMOTE-pawsey1197:aad-derived/esacci-oc}
