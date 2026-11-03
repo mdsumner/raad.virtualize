@@ -8,8 +8,10 @@
 #   bash hpc/pawsey/singularity-run.sh run.sh config/esacci-oc.sh config/source-coop.sh publish verify-published
 #
 # The Python packages the image lacks (obstore for source.coop publish,
-# imagecodecs, fastparquet, rustac) are installed once with pip --user into
-# RV_PYUSER. The environment passes into the container as is.
+# imagecodecs, fastparquet, rustac) are installed once with pip --target into
+# RV_PYUSER/site, which goes on PYTHONPATH (the image's Python is a
+# virtualenv, which refuses pip --user). The environment passes into the
+# container as is.
 #
 #   SIF        default $MYSOFTWARE/sif_lib/gdal-r-python-extras_2026-10-25.sif
 #   RV_PYUSER  default $MYSOFTWARE/rv-pyuser
@@ -21,11 +23,16 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 command -v singularity > /dev/null || module load "${SINGULARITY_MODULE:-singularity/4.3.5-slurm}"
 command -v singularity > /dev/null || { echo "singularity-run.sh: no singularity (set SINGULARITY_MODULE)" >&2; exit 1; }
 SIF=${SIF:-$MYSOFTWARE/sif_lib/gdal-r-python-extras_2026-10-25.sif}
-export PYTHONUSERBASE=${RV_PYUSER:-$MYSOFTWARE/rv-pyuser}
+PYSITE=${RV_PYUSER:-$MYSOFTWARE/rv-pyuser}/site
+export PYTHONPATH=$PYSITE${PYTHONPATH:+:$PYTHONPATH}
 PKGS="obstore imagecodecs fastparquet rustac"
 cd "$HERE"
 exec singularity exec -B "$MYSOFTWARE" "$SIF" bash -c '
-  python -c "import obstore, imagecodecs, fastparquet, rustac" 2>/dev/null ||
-    python -m pip install -q --user '"$PKGS"' 2>/dev/null ||
-    python -m pip install -q --user --break-system-packages '"$PKGS"'
+  for p in '"$PKGS"'; do
+    python -c "import $p" 2>/dev/null && continue
+    # only what is missing, and without dependencies for the self-contained
+    # wheels, so nothing on PYTHONPATH shadows the image numpy or GDAL
+    case $p in obstore|rustac) nd=--no-deps ;; *) nd= ;; esac
+    python -m pip install -q --target "'"$PYSITE"'" $nd $p
+  done
   exec bash "$@"' bash "$@"
