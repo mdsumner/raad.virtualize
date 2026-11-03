@@ -249,10 +249,24 @@ def walk_tiff(ds, band, rank=3):
     return rows
 
 
+def band_packing(b, base=None):
+    """scale, offset, nodata and unit of a band. GDAL keeps scale, offset and
+    unit in the GDAL_METADATA tag of the full-resolution IFD only, so an
+    overview directory opened as GTIFF_DIR:<k>: reports none: take them from
+    `base`, the same band of the file (nodata is per IFD and kept)."""
+    src = base or b
+    nodata = b.GetNoDataValue()
+    return {"scale": src.GetScale(), "offset": src.GetOffset(),
+            "nodata": nodata if nodata is not None else src.GetNoDataValue(),
+            "unit": src.GetUnitType() or None}
+
+
 def describe_tiff(ds, band, dims, tags_ds=None, extra=None):
-    """arrays.json entry for one band; tags_ds holds the CF tags (the file,
-    when ds is one of its overview directories), extra the plan attributes."""
+    """arrays.json entry for one band; tags_ds is the file when ds is one of
+    its overview directories (CF tags, scale, offset and unit come from it),
+    extra the plan attributes."""
     b = ds.GetRasterBand(band)
+    pk = band_packing(b, tags_ds.GetRasterBand(band) if tags_ds is not None else None)
     bx, by = b.GetBlockSize()
     code = NUMPY[b.DataType]
     lead = [1] * (len(dims) - 2)
@@ -262,8 +276,8 @@ def describe_tiff(ds, band, dims, tags_ds=None, extra=None):
     return {
         "dims": dims, "shape": lead + [ds.RasterYSize, ds.RasterXSize], "chunks": lead + [by, bx],
         "dtype": ("|" if code.endswith("1") else "<") + code,  # GDAL TIFFs are little-endian
-        "nodata": b.GetNoDataValue(), "scale": b.GetScale(), "offset": b.GetOffset(),
-        "unit": b.GetUnitType() or None, "info": tiff_info(ds),
+        "nodata": pk["nodata"], "scale": pk["scale"], "offset": pk["offset"],
+        "unit": pk["unit"], "info": tiff_info(ds),
         "attrs": attrs,
     }
 
@@ -490,7 +504,8 @@ def scan_tiff_once(source, arrays, out, want_meta, tiff):
             dirs[d] = gdal.Open(f"GTIFF_DIR:{d}:{source}")
         dd = dirs[d]
         b = dd.GetRasterBand(band)
-        packing[nm] = {"scale": b.GetScale(), "offset": b.GetOffset(), "nodata": b.GetNoDataValue()}
+        pk = band_packing(b, ds.GetRasterBand(band) if d is not None else None)
+        packing[nm] = {k: pk[k] for k in ("scale", "offset", "nodata")}
         rank = len(tiff["dims"][nm])
         nrow, _ = write_rows(walk_tiff(dd, band, rank), source, rank, nm, k, out)
         n += nrow
