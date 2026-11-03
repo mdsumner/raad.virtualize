@@ -29,6 +29,8 @@
 #                   in $MYSOFTWARE/sif_lib)
 #   SINGULARITY_MODULE  module providing singularity when it is not already
 #                   on PATH (default singularity/4.3.5-slurm)
+#   RCLONE_MODULE   the same for rclone (default rclone/1.68.1; Setonix
+#                   modules need an explicit version)
 #
 # COGs already under ESACCI_OUT, or listed under ESACCI_REMOTE, are skipped,
 # so a job that runs out of time is resubmitted as is. rclone runs on the
@@ -37,7 +39,7 @@ set -uo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
 command -v singularity > /dev/null || module load "${SINGULARITY_MODULE:-singularity/4.3.5-slurm}"
 command -v singularity > /dev/null || { echo "esacci-cog: no singularity (set SINGULARITY_MODULE)" >&2; exit 1; }
-command -v rclone > /dev/null || module load rclone
+command -v rclone > /dev/null || module load "${RCLONE_MODULE:-rclone/1.68.1}"
 command -v rclone > /dev/null || { echo "esacci-cog: no rclone" >&2; exit 1; }
 
 CATALOG=${ESACCI_CATALOG:-https://www.oceancolour.org/thredds/catalog/cci/v6.0-release/geographic/monthly/chlor_a/catalog.xml}
