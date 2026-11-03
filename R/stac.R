@@ -193,8 +193,8 @@ STAC_EXT <- c(
                           "dsn is the mdim VRT, index the coordinate values of the non-spatial dimensions."),
       `rv:form` = "grist-catalog")
   a$store <- list(href = rel("store.sqlite"), type = "application/vnd.sqlite3",
-    title = "mdim-refs/0.2 store", roles = list("metadata", "references"),
-    `rv:form` = "mdim-refs")
+    title = "byterefs/0.1 SQLite store", roles = list("metadata", "references"),
+    `rv:form` = "byterefs-sqlite")
   a$plan <- list(href = rel("plan.vrt"), type = "application/xml",
     title = "Plan (gdal mdim mosaic VRT, verbatim sources)", roles = list("metadata"),
     `rv:form` = "plan")
@@ -342,7 +342,7 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     id = meta$dataset,
     title = if (nzchar(Sys.getenv("STAC_TITLE"))) Sys.getenv("STAC_TITLE") else meta$dataset,
     description = sprintf(paste(
-      "Virtualized collection of %d source files (%s), rendered from an mdim-refs/0.2 store",
+      "Virtualized collection of %d source files (%s), rendered from a byterefs/0.1 store",
       "of byte references. Collection assets are the virtual forms of the whole cube;",
       "items are the source granules."), length(items), paste(names(data), collapse = ", ")),
     license = if (nzchar(Sys.getenv("STAC_LICENSE"))) Sys.getenv("STAC_LICENSE") else "other",

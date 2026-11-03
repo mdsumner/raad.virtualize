@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end write: sources -> plan (mdim mosaic VRT) -> byte-ref harvest ->
-# mdim-refs/0.2 store -> flat refs store -> MDIM VRT, kerchunk Parquet,
+# byterefs/0.1 store -> flat refs store -> MDIM VRT, kerchunk Parquet,
 # Icechunk -> verify. See README.md.
 #
 #   ./run.sh config/oisst.sh                 all steps

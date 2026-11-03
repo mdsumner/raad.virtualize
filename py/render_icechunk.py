@@ -48,6 +48,9 @@ import zarr
 from zarr.codecs import numcodecs as nc3
 from zarr.codecs import BytesCodec
 
+# byterefs decision 0003: mdim-refs/0.2 is the same layout, read until byterefs/0.2
+FORMATS_READ = ("byterefs/0.1", "mdim-refs/0.2")
+
 
 def remap_rules(doc, target):
     if not target:
@@ -149,8 +152,8 @@ def main():
     a = p.parse_args()
 
     doc = json.load(open(os.path.join(a.flat, "arrays.json")))
-    if not doc["format_version"].startswith("mdim-refs/"):
-        sys.exit("not an mdim-refs flat store")
+    if doc.get("format_version") not in FORMATS_READ:
+        sys.exit(f"not a byterefs flat store: format_version {doc.get('format_version')!r}")
     rules = remap_rules(doc, a.target)
     rows = doc["arrays"]
 
@@ -219,14 +222,14 @@ def main():
             nref += len(specs)
             pending += len(specs)
             if pending >= a.commit_every:
-                snap = session.commit(f"mdim-refs flat store refs to {nref}")
+                snap = session.commit(f"byterefs flat store refs to {nref}")
                 session = repo.writable_session("main")
                 store = session.store
                 root = zarr.open_group(store, mode="r+")
                 pending, ncommit = 0, ncommit + 1
         print(f"  {r['array']}: shape {r['shape']} chunks {r['chunks']}", file=sys.stderr)
     if pending or not ncommit:  # a batch commit may already hold every ref
-        snap = session.commit(f"mdim-refs flat store {os.path.abspath(a.flat)}, target {a.target}")
+        snap = session.commit(f"byterefs flat store {os.path.abspath(a.flat)}, target {a.target}")
         ncommit += 1
     size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(a.repo) for f in fs)
     print(f"icechunk: {nref} virtual refs, {len(coords)} coords, containers {sorted(containers)}, "

@@ -1,4 +1,4 @@
-## collate.R -- step 3: harvest + plan -> mdim-refs/0.2 SQLite store.
+## collate.R -- step 3: harvest + plan -> byterefs/0.1 SQLite store.
 ##
 ## Rscript collate.R SCAN_DIR PLAN_VRT STORE DATASET [REMAP ...]
 ##   REMAP is "target|prefix|replacement", repeatable, applied only at publish.

@@ -29,8 +29,9 @@ runs once per granule.
 
 ## The store
 
-The store is a SQLite database in the mdim-refs/0.2 layout (specification:
-wxylib/design, `specs/mdim-refs-0.2.md`). It has three layers:
+The store is a SQLite database in the byterefs/0.1 layout (specification:
+[byterefs/spec](https://github.com/byterefs/spec), `spec/byterefs-0.1.md`;
+stores built before 2026-11 say `mdim-refs/0.2`, the same layout). It has three layers:
 
 - **physical**: `sources` (one row per granule, the URI as harvested, size,
   mtime) and one chunk table per array, keyed on (source, within-source
@@ -116,7 +117,7 @@ the collection).
 ```
 sources --(plan: gdal mdim mosaic)------> plan.vrt
         --(harvest: py/harvest.py)------> scan/   one Parquet fragment per source
-        --(collate: R/collate.R)--------> store.sqlite   mdim-refs/0.2
+        --(collate: R/collate.R)--------> store.sqlite   byterefs/0.1
         --(render: R/render.R)----------> out/flat/  out/mdim.vrt  out/kerchunk/
         --(icechunk: py/render_icechunk.py, from out/flat)--> out/icechunk/
         --(grist: R/grist.R, from the store)----------------> out/grist/catalog.parquet
@@ -314,7 +315,7 @@ float32 type of `scale_factor`. Results and findings are in
   source. `R/stac.R`: the STAC render. `py/render_icechunk.py`, `py/verify.py`: Icechunk render and
   verification. `py/make_bran_synth.py`: BRAN-shaped synthetic files with
   unwritten chunks.
-- `R/mdimrefs.R`: the mdim-refs/0.2 reference implementation, copied with a
+- `R/mdimrefs.R`: the byterefs/0.1 reference implementation, copied with a
   JSON precision fix. `R/mdimrefs_pipeline.R`: directory ingest, flat store,
   VRT renderer and the kerchunk writer from blocklist (vendored with the
   same fix). `R/collate.R`, `R/render.R`: steps 3 and 4.

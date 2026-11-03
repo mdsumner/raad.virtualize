@@ -47,8 +47,9 @@ are projections of the two:
 | kerchunk Parquet | fsspec / xarray; GDAL `/vsikerchunk_parquet_ref/` |
 | Icechunk (virtual references) | zarr-python / xarray |
 
-The store layout is mdim-refs/0.2 (specification in wxylib/design,
-`specs/mdim-refs-0.2.md`). Source URIs are recorded as harvested and
+The store layout is byterefs/0.1 (specification:
+[byterefs/spec](https://github.com/byterefs/spec), `spec/byterefs-0.1.md`;
+stores built before 2026-11 say `mdim-refs/0.2`, the same layout). Source URIs are recorded as harvested and
 rewritten only at render time, so one harvest serves several endpoints.
 
 ## Pipeline
@@ -102,8 +103,10 @@ on the [Published](published.md) page.
 ## Related work
 
 
-- [wxylib/design](https://github.com/wxylib/design): mdim-refs/0.2
-  specification and the wxy-refs reader
+- [byterefs/spec](https://github.com/byterefs/spec): the byte-reference
+  table specification this store follows
+- [wxylib/design](https://github.com/wxylib/design): design notes and the
+  wxy-refs reader
 - [hypertidy/vrtstack](https://github.com/hypertidy/vrtstack): COG
   collections as multidim VRT, the form `py/plan_cog.py` writes
 - [hypertidy/blocklist](https://github.com/hypertidy/blocklist): the

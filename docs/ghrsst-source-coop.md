@@ -42,7 +42,7 @@ ausantarctic/ghrsst-mur-v2/
         items.ndjson                one item per COG
         items.parquet               stac-geoparquet (where rustac is installed)
       plan.vrt                      plan, verbatim source URIs
-      store.sqlite                  mdim-refs/0.2 store
+      store.sqlite                  byterefs/0.1 store
 
 ausantarctic/ausantarctic-scratch/
   catalog.json                      root catalog, one child per group
