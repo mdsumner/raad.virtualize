@@ -32,6 +32,7 @@ website:
           - href: reading-published-stores.md
           - href: indexes-only-product.md
           - href: ghrsst-source-coop.md
+          - href: esacci-oc.md
     right:
       - icon: github
         href: https://github.com/mdsumner/raad.virtualize
