@@ -24,7 +24,7 @@ SIF=${SIF:-$MYSOFTWARE/sif_lib/gdal-r-python-extras_2026-10-25.sif}
 export PYTHONUSERBASE=${RV_PYUSER:-$MYSOFTWARE/rv-pyuser}
 PKGS="obstore imagecodecs fastparquet"
 cd "$HERE"
-exec singularity exec -B /scratch -B "$MYSOFTWARE" "$SIF" bash -c '
+exec singularity exec "$SIF" bash -c '
   python -c "import obstore, imagecodecs, fastparquet" 2>/dev/null ||
     python -m pip install -q --user '"$PKGS"' 2>/dev/null ||
     python -m pip install -q --user --break-system-packages '"$PKGS"'

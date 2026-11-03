@@ -58,7 +58,7 @@ if [ -n "$REMOTE" ]; then
 fi
 
 var_flags=(); for v in $VARS; do var_flags+=(--var "$v"); done
-singularity exec -B /scratch "$SIF" python "$PWD/py/esacci_cog.py" \
+singularity exec "$SIF" python "$PWD/py/esacci_cog.py" \
   --catalog "$CATALOG" "${var_flags[@]}" --out "$OUT" --tmp "$TMP" --done "$DONE" \
   --workers "$WORKERS" --threads 2 ${ESACCI_YEARS:+--years $ESACCI_YEARS} \
   ${ESACCI_LIMIT:+--limit "$ESACCI_LIMIT"}
