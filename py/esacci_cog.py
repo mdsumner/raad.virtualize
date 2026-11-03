@@ -157,6 +157,9 @@ def convert(task):
     Returns (manifest rows, error text or None)."""
     url, path, todo, a = task
     t0 = time.time()
+    # GDAL's default block cache is 5% of the node's RAM per process, far
+    # more than a job's share when several workers run on one node
+    gdal.SetCacheMax(a.cache_mb * 1024 * 1024)
     nc = os.path.join(a.tmp, os.path.basename(path))
     rows = []
     try:
@@ -175,8 +178,11 @@ def convert(task):
                 raise ValueError(f"{var}: scale/offset {b.GetScale()}/{b.GetOffset()} not handled")
             v = b.ReadAsArray()
             fill = b.GetNoDataValue()
-            src = v.copy()
             floating = np.issubdtype(v.dtype, np.floating)
+            # the fill pixels of the netCDF, kept as a mask (not a copy of v)
+            missing = np.isnan(v) if floating else None
+            if floating and fill is not None:
+                missing |= v == np.asarray(fill, v.dtype)
             if floating and a.fill == "nan":
                 if fill is not None:
                     v[v == np.asarray(fill, v.dtype)] = np.nan
@@ -231,7 +237,7 @@ def convert(task):
                                  f"nodata {gnd}, geotransform {ggt}")
             if floating and a.fill == "nan" and fill is not None:
                 # the NaN pixels are exactly the netCDF fill pixels
-                if int((np.isnan(w) != ((src == np.asarray(fill, src.dtype)) | np.isnan(src))).sum()):
+                if int((np.isnan(w) != missing).sum()):
                     got = None
                     os.remove(tmp)
                     raise ValueError(f"{var}: NaN pixels do not match the netCDF fill")
@@ -263,6 +269,7 @@ def main():
     p.add_argument("--workers", type=int, default=4, help="files converted at once")
     p.add_argument("--threads", type=int, default=2, help="COG compression threads per worker")
     p.add_argument("--level", type=int, default=17, help="ZSTD level")
+    p.add_argument("--cache-mb", type=int, default=256, help="GDAL block cache per worker, MB")
     p.add_argument("--fill", choices=("nan", "source"), default="nan",
                    help="floating point fill: NaN (default) or the netCDF _FillValue")
     p.add_argument("--limit", type=int, help="convert at most N files (smoke test)")
