@@ -58,6 +58,8 @@ mr_grist_catalog <- function(con, out, target = NULL, base = NULL, plan_file = N
   if (!length(plan$dim_type)) plan$dim_type <- unlist(lapply(mr_dimensions(con), `[[`, "type"))
   arrays <- mr_array_list(con); names(arrays) <- vapply(arrays, `[[`, "", "array")
   data <- Filter(function(a) a$storage == "referenced", arrays)
+  ## overview levels (attribute overview_of) only when asked for by name
+  if (!length(arrays_sel)) data <- Filter(function(a) is.null(a$attrs$overview_of), data)
   if (length(arrays_sel)) {
     miss <- setdiff(arrays_sel, names(data))
     if (length(miss)) stop("grist: no referenced array ", paste(miss, collapse = ", "))

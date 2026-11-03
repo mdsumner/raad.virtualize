@@ -20,9 +20,13 @@ Engines (--engine):
 
 A source that GDAL cannot open as multidimensional (a GeoTIFF or COG placed
 by a <SourceBand> plan, as vrtstack writes) is scanned from its TIFF tile
-index instead (walk_tiff): IFD 0 only, chunk coordinates (0, row, col), or
+index instead (walk_tiff): chunk coordinates (0, row, col), or
 (row, col) for a 2D array (py/plan_static.py)
-within the source, dims named after the plan array. A netCDF/HDF5 source
+within the source, dims named after the plan array. The tile index is that
+of IFD 0, or of TIFF directory k for a source placed as GTIFF_DIR:<k>:<file>
+(an overview level, py/plan_cog.py --overviews). The source recorded is the
+file in both cases, so all levels of a file share one source record, and
+the plan's overview levels of a requested array are harvested with it. A netCDF/HDF5 source
 that the plan gives a new axis (<SourceArray> with <SourceTranspose>-1,0,1,
 the plan_lift.py form) gets a 0 coordinate on that axis in the same way.
   HARVEST_BLOCK_SIZE (env, default 65536): fsspec read block for remote h5py.
@@ -57,6 +61,7 @@ import itertools
 import json
 import math
 import os
+import re
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -79,8 +84,27 @@ def key_of(source):
     return hashlib.sha1(source.encode()).hexdigest()
 
 
+GTIFF_DIR = re.compile(r"^GTIFF_DIR:(\d+):(.*)$")
+
+
+def split_dir(f):
+    """(TIFF directory or None, file) of a plan SourceFilename: an overview
+    level is placed as GTIFF_DIR:<k>:<file> (py/plan_cog.py --overviews).
+    The file, not the GTIFF_DIR string, is the source: every level of a file
+    shares its source record, so a changed file invalidates all of them."""
+    m = GTIFF_DIR.match(f)
+    return (int(m.group(1)), m.group(2)) if m else (None, f)
+
+
+def source_file(f, base):
+    k, f = split_dir(f)
+    if not (f.startswith("/") or "://" in f):
+        f = os.path.join(base, f)
+    return k, f
+
+
 def plan_sources(vrt, arrays):
-    """Distinct sources of `arrays` in plan order, as GDAL opens them."""
+    """Distinct source files of `arrays` in plan order, as GDAL opens them."""
     root = ET.parse(vrt).getroot()
     base = os.path.dirname(os.path.abspath(vrt))
     out = []
@@ -88,11 +112,42 @@ def plan_sources(vrt, arrays):
         if arr.get("name") not in arrays:
             continue
         for s in arr.findall("Source/SourceFilename"):
-            f = s.text
-            if not (f.startswith("/") or "://" in f):
-                f = os.path.join(base, f)
+            _, f = source_file(s.text, base)
             if f not in out:
                 out.append(f)
+    return out
+
+
+def plan_attrs(vrt, arrays):
+    """<Attribute>s of each requested array in the plan (overview_of,
+    overview_factor, overview_resampling from plan_cog.py --overviews):
+    {array: {name: value}}, a String as text, numbers as a list."""
+    root = ET.parse(vrt).getroot()
+    out = {}
+    for arr in root.findall("Group/Array"):
+        if arr.get("name") not in arrays:
+            continue
+        at = {}
+        for a in arr.findall("Attribute"):
+            vals = [v.text for v in a.findall("Value")]
+            if (a.findtext("DataType") or "String") == "String":
+                at[a.get("name")] = vals[0] if len(vals) == 1 else vals
+            else:
+                at[a.get("name")] = [float(v) for v in vals]
+        if at:
+            out[arr.get("name")] = at
+    return out
+
+
+def plan_overviews(vrt, arrays):
+    """Plan arrays declared as overview levels of any of `arrays`, in plan
+    order: harvested with them, so a plan with levels needs no list."""
+    root = ET.parse(vrt).getroot()
+    out = []
+    for arr in root.findall("Group/Array"):
+        of = [a.findtext("Value") for a in arr.findall("Attribute") if a.get("name") == "overview_of"]
+        if of and of[0] in arrays and arr.get("name") not in arrays:
+            out.append(arr.get("name"))
     return out
 
 
@@ -104,7 +159,8 @@ def plan_dims(vrt, arrays):
 
 
 def plan_bands(vrt, arrays):
-    """Band index per (array, source) for <SourceBand> sources."""
+    """(band, TIFF directory or None) per (array, source file) for
+    <SourceBand> sources."""
     root = ET.parse(vrt).getroot()
     base = os.path.dirname(os.path.abspath(vrt))
     out = {}
@@ -115,10 +171,8 @@ def plan_bands(vrt, arrays):
             b = src.find("SourceBand")
             if b is None:
                 continue
-            f = src.find("SourceFilename").text
-            if not (f.startswith("/") or "://" in f):
-                f = os.path.join(base, f)
-            out[(arr.get("name"), f)] = int(b.text)
+            k, f = source_file(src.find("SourceFilename").text, base)
+            out[(arr.get("name"), f)] = (int(b.text), k)
     return out
 
 
@@ -195,18 +249,22 @@ def walk_tiff(ds, band, rank=3):
     return rows
 
 
-def describe_tiff(ds, band, dims):
+def describe_tiff(ds, band, dims, tags_ds=None, extra=None):
+    """arrays.json entry for one band; tags_ds holds the CF tags (the file,
+    when ds is one of its overview directories), extra the plan attributes."""
     b = ds.GetRasterBand(band)
     bx, by = b.GetBlockSize()
     code = NUMPY[b.DataType]
     lead = [1] * (len(dims) - 2)
-    tags = ds.GetMetadata()
+    tags = (tags_ds or ds).GetMetadata()
+    attrs = {k: tags[k] for k in CF_TAGS if k in tags}
+    attrs.update(extra or {})
     return {
         "dims": dims, "shape": lead + [ds.RasterYSize, ds.RasterXSize], "chunks": lead + [by, bx],
         "dtype": ("|" if code.endswith("1") else "<") + code,  # GDAL TIFFs are little-endian
         "nodata": b.GetNoDataValue(), "scale": b.GetScale(), "offset": b.GetOffset(),
         "unit": b.GetUnitType() or None, "info": tiff_info(ds),
-        "attrs": {k: tags[k] for k in CF_TAGS if k in tags},
+        "attrs": attrs,
     }
 
 
@@ -421,18 +479,23 @@ def scan_tiff_once(source, arrays, out, want_meta, tiff):
     t0 = time.time()
     k = key_of(source)
     ds = gdal.Open(source)
+    dirs = {None: ds}  # an overview level is its own TIFF directory
     meta, n, packing = {}, 0, {}
     for nm in arrays:
-        band = tiff["bands"].get((nm, source))
-        if band is None:
+        bk = tiff["bands"].get((nm, source))
+        if bk is None:
             continue
-        b = ds.GetRasterBand(band)
+        band, d = bk
+        if d not in dirs:
+            dirs[d] = gdal.Open(f"GTIFF_DIR:{d}:{source}")
+        dd = dirs[d]
+        b = dd.GetRasterBand(band)
         packing[nm] = {"scale": b.GetScale(), "offset": b.GetOffset(), "nodata": b.GetNoDataValue()}
         rank = len(tiff["dims"][nm])
-        nrow, _ = write_rows(walk_tiff(ds, band, rank), source, rank, nm, k, out)
+        nrow, _ = write_rows(walk_tiff(dd, band, rank), source, rank, nm, k, out)
         n += nrow
         if want_meta:
-            meta[nm] = describe_tiff(ds, band, tiff["dims"][nm])
+            meta[nm] = describe_tiff(dd, band, tiff["dims"][nm], ds, tiff["attrs"].get(nm))
             meta[nm]["scanned"] = True
     write_source(source, out, k, ds.GetDriver().ShortName, packing)
     return source, n, time.time() - t0, meta if want_meta else None
@@ -506,6 +569,12 @@ def main():
                    help="stat the last N sources again and rescan those changed since "
                         "their scan (0 none, -1 all)")
     a = p.parse_args()
+    # overview levels the plan declares (plan_cog.py --overviews) go with
+    # their array
+    levels = plan_overviews(a.plan, a.array)
+    if levels:
+        print(f"harvest: overview levels {' '.join(levels)}", file=sys.stderr)
+        a.array += levels
 
     for d in ["sources"] + [f"chunks_{nm}" for nm in a.array]:
         os.makedirs(os.path.join(a.out, d), exist_ok=True)
@@ -514,7 +583,8 @@ def main():
         srcs = srcs[:a.limit]
     have_meta = os.path.exists(os.path.join(a.out, "arrays.json"))
     bands = plan_bands(a.plan, a.array)
-    tiff = {"dims": plan_dims(a.plan, a.array), "bands": bands} if bands else None
+    tiff = ({"dims": plan_dims(a.plan, a.array), "bands": bands,
+             "attrs": plan_attrs(a.plan, a.array)} if bands else None)
     lifts = plan_lifts(a.plan, a.array) or None
 
     def done(s):

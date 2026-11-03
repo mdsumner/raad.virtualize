@@ -24,7 +24,8 @@ Chosen: level 17, no predictor, `SPARSE_OK=FALSE`, 512 x 512 tiles. A
 predictor is written as `imagecodecs_delta`, which GDAL's Zarr driver does not
 read; without one GDAL reads the Kerchunk form. Overviews use AVERAGE, or
 NEAREST for `mask` and `thickness_survey_count`, and add 40% to
-`bed_topography` by 43%. They are not indexed.
+`bed_topography` by 43%. Each level is indexed as an array `<name>_x<f>`
+(`BEDMAP3_OVERVIEWS`, default 1; py/plan_static.py --overviews).
 
 ## Findings for other static products
 

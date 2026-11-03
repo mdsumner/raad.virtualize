@@ -9,6 +9,11 @@
 #                    anonymously from data.source.coop; sources are recorded
 #                    as /vsicurl/https://data.source.coop/...). A local
 #                    directory of the same YYYY/MM/DD layout also works.
+#   GHRSST_OVERVIEWS 1: every overview level of the cogger COGs is an array
+#                    of its own (py/plan_cog.py --overviews; resampling
+#                    recorded as unknown, it is cogger's). Default 0: the
+#                    stores index IFD 0 only (docs/ghrsst-source-coop.md);
+#                    the levels add about a third more refs (30.5M rows)
 #   GHRSST_MAX_MISSING  days between the first and last file allowed to have
 #                    no file (default 0): the plan step stops on more, so a
 #                    listing cut short by server errors is not published
@@ -42,7 +47,8 @@ sources() (
 )
 make_plan() {
   "$PYTHON" "$HERE/py/plan_cog.py" --sources "$WORK/sources.txt" --array "$GHRSST_VAR" \
-    --pattern "$GHRSST_PATTERN" --max-missing "${GHRSST_MAX_MISSING:-0}" "$WORK/plan.vrt"
+    --pattern "$GHRSST_PATTERN" --max-missing "${GHRSST_MAX_MISSING:-0}" \
+    $([ "${GHRSST_OVERVIEWS:-0}" = 1 ] && echo --overviews) "$WORK/plan.vrt"
 }
 # target|prefix|replacement, applied at publish only (sources stay verbatim)
 REMAPS=("public|/vsicurl/https://|https://")

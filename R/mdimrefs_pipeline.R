@@ -254,12 +254,15 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
       P$path <- mr_remap(con, P$source, target)
       for (i in seq_len(nrow(P))) {
         s <- xml2::xml_add_child(node, "Source")
-        xml2::xml_add_child(s, "SourceFilename", P$path[i])
         cn <- .fj(P$count[i])
+        ## band:<n>/dir:<k>, an overview level: TIFF directory k of the file
+        gdir <- if (grepl("/dir:[0-9]+$", P$source_array[i])) sub("^.*/dir:", "", P$source_array[i])
+        xml2::xml_add_child(s, "SourceFilename",
+                            if (is.null(gdir)) P$path[i] else paste0("GTIFF_DIR:", gdir, ":", P$path[i]))
         if (startsWith(P$source_array[i], "band:")) {
           ## a raster band, given a leading length-1 axis (the vrtstack form)
           ## unless the array is 2D (py/plan_static.py)
-          xml2::xml_add_child(s, "SourceBand", sub("^band:", "", P$source_array[i]))
+          xml2::xml_add_child(s, "SourceBand", sub("/dir:[0-9]+$", "", sub("^band:", "", P$source_array[i])))
           if (length(cn) > 2L) xml2::xml_add_child(s, "SourceTranspose",
                               paste(c(-1L, seq_len(length(cn) - 1L) - 1L), collapse = ","))
           ## the extent, so GDAL opens only the sources a read touches

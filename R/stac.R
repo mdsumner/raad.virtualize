@@ -229,7 +229,9 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
   if (!length(plan$dim_type))  # no plan file beside the store: the store keeps the types
     plan$dim_type <- unlist(lapply(mr_dimensions(con), `[[`, "type"))
   arrays <- mr_array_list(con); names(arrays) <- vapply(arrays, `[[`, "", "array")
-  data <- Filter(function(a) a$storage == "referenced", arrays)
+  ## overview levels (attribute overview_of, py/plan_cog.py --overviews) are
+  ## other resolutions of a variable, not variables: left out of the cube
+  data <- Filter(function(a) a$storage == "referenced" && is.null(a$attrs$overview_of), arrays)
   if (!length(data)) stop("stac: no referenced arrays in the store")
 
   ## dimensions of the data arrays, with values, role and decoded time

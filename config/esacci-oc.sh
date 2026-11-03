@@ -20,6 +20,10 @@
 #                    -<years> suffix, so a subset never overwrites the series
 #   ESACCI_MAX_MISSING  time steps between the first and last file allowed
 #                    to have no file (default 0)
+#   ESACCI_OVERVIEWS 1 (default): every overview level of the COGs (x2 to
+#                    x32, AVERAGE, py/esacci_cog.py) is an array of its own,
+#                    <var>_x<factor>, beside <var> (py/plan_cog.py --overviews);
+#                    0: full resolution only
 #
 #   bash run.sh config/esacci-oc.sh
 #   bash run.sh config/esacci-oc.sh config/source-coop.sh publish verify-published
@@ -58,7 +62,8 @@ sources() (
 make_plan() {
   "$PYTHON" "$HERE/py/plan_cog.py" --sources "$WORK/sources.txt" --array "$ESACCI_VAR" \
     --cadence "$ESACCI_STEP" --pattern "$ESACCI_PATTERN" \
-    --max-missing "${ESACCI_MAX_MISSING:-0}" "$WORK/plan.vrt"
+    --max-missing "${ESACCI_MAX_MISSING:-0}" \
+    $([ "${ESACCI_OVERVIEWS:-1}" = 1 ] && echo --overviews --resampling AVERAGE) "$WORK/plan.vrt"
 }
 # target|prefix|replacement, applied at publish only (sources stay verbatim)
 REMAPS=("public|$ESACCI_COG_ROOT|$ESACCI_COG_URL" "gdal|$ESACCI_COG_ROOT|/vsicurl/$ESACCI_COG_URL")
