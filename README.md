@@ -86,13 +86,19 @@ Six renderings, all from the store and none derived from another:
    (`ZARR:"/vsikerchunk_parquet_ref/{DIR}"`).
 4. **Icechunk**: virtual references, one virtual chunk container per source
    host.
-5. **STAC**: a static catalog (`stac/collection.json`, `stac/items/`,
-   `stac/items.ndjson`, and `stac/items.parquet` in stac-geoparquet form
-   where `rustac` is installed). The collection describes the whole cube
+5. **STAC**: one collection per dataset (`stac/collection.json`) with
+   the items in one stac-geoparquet file (`stac/items.parquet`, written
+   with the `rustac` Python package, collection asset `geoparquet-items`)
+   and as `stac/items.ndjson`. The collection describes the whole cube
    with the datacube extension and carries one asset per form above (VRT,
-   kerchunk, Icechunk, flat refs, store, plan); each item is one source
-   granule, with its time range from the plan placement, its bbox, and the
-   projection fields where the grid is affine and the SRS known. The forms
+   kerchunk, Icechunk, flat refs, store, plan) and a `thumbnail` PNG of one
+   field (`py/thumbnail.py`). An item is one source granule, or the sources
+   that share a time and footprint, with one asset per source: a static
+   grid of one file per array (Bedmap3, IBCSO) is one item with an asset
+   per array. Items carry the time range from the plan placement, the
+   bbox, and the projection fields where the grid is affine and the SRS
+   known. Per-item JSON files (`stac/items/`) are written only for a
+   collection of one item. The forms
    in 1 to 4 serve readers of the cube; STAC serves search, discovery and
    the granule-level readers (GDAL STACIT and GTI, gdalcubes, odc-stac,
    stackstac).
@@ -159,7 +165,9 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `VERIFY_WINDOWS` | explicit `--window ARRAY:START:COUNT` checks |
 | `STAC_TARGET` | remap target for STAC item hrefs (default `KERCHUNK_TARGET`) |
 | `STAC_BASE` | URL of the published dataset prefix; collection asset hrefs become absolute and carry a GDAL open string (`rv:gdal`). Without it the hrefs are relative to the published layout. |
-| `STAC_ITEM_FILES` | `0` skips `stac/items/` (one file per granule) for long series; the ndjson and stac-geoparquet forms remain |
+| `STAC_ITEM_FILES` | `auto` (default) writes `stac/items/<id>.json` only for a collection of one item; `1` always, `0` never. The ndjson and stac-geoparquet forms are always written |
+| `STAC_GEOPARQUET` | `0` skips `stac/items.parquet`; otherwise written where the `rustac` Python package (or command) is installed, and listed as the collection asset `geoparquet-items` |
+| `STAC_THUMBNAIL`, `STAC_THUMB_ARRAY`, `STAC_THUMB_PALETTE`, `STAC_THUMB_LOG10`, `STAC_THUMB_WIDTH` | the collection's `thumbnail.png` (`py/thumbnail.py`): `0` skips; the array (default the first of `ARRAYS`), palette (`viridis`, `topo`, `ice`), log10 stretch, width in pixels (512) |
 | `GRIST_LEVELS` | values of the vertical dimension in the grist catalog, comma separated, or `all` (default the first value) |
 | `GRIST_ARRAYS` | arrays in the grist catalog (default every referenced array) |
 | `GRIST_TARGET` | remap target for the grist `source` column (default `VRT_TARGET`) |

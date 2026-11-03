@@ -12,7 +12,8 @@
 # (E2E_WORK, WORKERS, HARVEST_*, VERIFY_WINDOWS, GRIST_*, STAC_*,
 # ICECHUNK_ARGS, S3_SYNC_ARGS) and the publish target (SOURCECOOP_*,
 # AADC_PREFIX). The Python packages the image lacks (obstore for source.coop
-# publish, imagecodecs and fastparquet for TIFF predictor sources) are
+# publish, imagecodecs and fastparquet for TIFF predictor sources, rustac
+# for stac-geoparquet) are
 # installed into the container on each start (the container is removed
 # after the run). The container runs as root, so work/ is root-owned.
 #
@@ -33,9 +34,9 @@ for v in $(compgen -e); do
 done
 mounts=()
 for m in ${RV_MOUNTS-$([ -d /rdsi ] && echo /rdsi)}; do mounts+=(-v "$m:$m:ro"); done
-PKGS="obstore imagecodecs fastparquet"
+PKGS="obstore imagecodecs fastparquet rustac"
 exec docker run --rm -i -v "$HERE:$HERE" -w "$HERE" ${mounts[@]+"${mounts[@]}"} ${envs[@]+"${envs[@]}"} "$IMAGE" bash -c '
-  python -c "import obstore, imagecodecs, fastparquet" 2>/dev/null ||
+  python -c "import obstore, imagecodecs, fastparquet, rustac" 2>/dev/null ||
     python -m pip install -q '"$PKGS"' 2>/dev/null ||
     python -m pip install -q --break-system-packages '"$PKGS"'
   exec bash "$@"' bash "$@"

@@ -1,17 +1,22 @@
-## stac.R -- STAC render: store -> collection + one item per source.
+## stac.R -- STAC render: store -> collection + items.
 ##
 ## Rscript stac.R STORE OUT_DIR [TARGET] [BASE]
 ##   OUT_DIR/stac/collection.json  datacube collection, assets for every form
 ##                                 found in OUT_DIR (flat, mdim.vrt, kerchunk,
-##                                 icechunk) and for the store and plan
-##   OUT_DIR/stac/items/<id>.json  one item per source granule (static catalog)
-##   OUT_DIR/stac/items.ndjson     the same items, one per line (for bulk
-##                                 loading, stac-geoparquet, DuckDB, rstac)
+##                                 icechunk, grist, thumbnail.png), the store,
+##                                 the plan and the stac-geoparquet items
+##   OUT_DIR/stac/items.ndjson     the items, one per line; run.sh translates
+##                                 it to stac/items.parquet (stac-geoparquet)
+##   OUT_DIR/stac/items/<id>.json  one file per item, only for a collection of
+##                                 one item unless STAC_ITEM_FILES=1
+## An item is one source granule, or the sources that share its time and
+## footprint, with one asset per source: a static grid of one file per array
+## is one item with an asset per array.
 ## TARGET: remap target for item hrefs ("" = verbatim sources).
 ## BASE: URL of the published dataset prefix (the directory that holds
-##   mdim.vrt, kerchunk/, icechunk/, store.sqlite). STAC_ITEM_FILES=0 in the
-##   environment skips items/ (for a long series, where items.ndjson and its
-##   stac-geoparquet translation serve better). With BASE the hrefs of
+##   mdim.vrt, kerchunk/, icechunk/, store.sqlite). STAC_ITEM_FILES: auto
+##   (default; item files for a single-item collection), 1 (always) or 0
+##   (never). With BASE the hrefs of
 ##   the collection assets are absolute and each asset carries a GDAL open
 ##   string (rv:gdal); without it they are relative to the published layout
 ##   (OUT_DIR synced to the prefix, store.sqlite and plan.vrt beside it).
@@ -192,6 +197,19 @@ STAC_EXT <- c(
       description = paste("One row per 2D field (date, dsn, array, index, source) for hypertidy/grist:",
                           "dsn is the mdim VRT, index the coordinate values of the non-spatial dimensions."),
       `rv:form` = "grist-catalog")
+  ## items as stac-geoparquet: run.sh writes stac/items.parquet from
+  ## items.ndjson after this render and sets STAC_GEOPARQUET=1 when it can
+  ## (rustac); the "geoparquet-items" key and "stac-items" role follow the
+  ## Planetary Computer convention, and GDAL GTI opens the file directly
+  if (Sys.getenv("STAC_GEOPARQUET") == "1")
+    a$`geoparquet-items` <- list(href = rel("stac/items.parquet"),
+      type = "application/vnd.apache.parquet", title = "Items (stac-geoparquet)",
+      roles = list("stac-items"),
+      description = "Every item of the collection as one row, for DuckDB, rustac, pystac and GDAL GTI.")
+  if (file.exists(file.path(out, "thumbnail.png")))
+    a$thumbnail <- list(href = rel("thumbnail.png"), type = "image/png",
+      title = "Overview image", roles = list("thumbnail", "overview"),
+      description = Sys.getenv("STAC_THUMB_DESCRIPTION", "One field of the cube (py/thumbnail.py)."))
   a$store <- list(href = rel("store.sqlite"), type = "application/vnd.sqlite3",
     title = "byterefs/0.1 SQLite store", roles = list("metadata", "references"),
     `rv:form` = "byterefs-sqlite")
@@ -280,20 +298,24 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     description = a$attrs$long_name, unit = a$attrs$units,
     `rv:dtype` = a$dtype, `rv:chunks` = I(a$chunks))))
 
-  ## items: one per source, from its placements
+  js <- function(x, pretty = FALSE) jsonlite::toJSON(x, auto_unbox = TRUE, digits = I(15),
+                                                     null = "null", na = "null", pretty = pretty)
+  ## items: one per source granule, from its placements; sources that share
+  ## a time and footprint are one item with an asset per source (a static
+  ## grid of one file per array is one item, as a single-scene raster is)
   P <- dbGetQuery(con, "SELECT p.array, p.source_id, p.count, p.dest, s.source, s.size
                         FROM placements p JOIN sources s USING (source_id)
                         ORDER BY p.source_id")
   P <- P[P$array %in% names(data), , drop = FALSE]
   P$path <- mr_remap(con, P$source, target)
-  ## item id: the file name without extension, with the source_id appended
-  ## where two sources share a name
+  ## source name: the file name without extension, with the source_id
+  ## appended where two sources share a name
   S <- unique(P[c("source_id", "source")])
   S$id <- sub("[.][^.]*$", "", basename(sub("[?#].*$", "", S$source)))
   dup <- S$id %in% S$id[duplicated(S$id)]
   S$id[dup] <- paste0(S$id[dup], "-", S$source_id[dup])
   P$id <- S$id[match(P$source_id, S$source_id)]
-  items <- lapply(split(P, P$source_id), function(p) {
+  parts <- lapply(split(P, P$source_id), function(p) {
     a1 <- data[[p$array[1]]]
     de <- .fj(p$dest[1]); cn <- .fj(p$count[1])
     rng <- function(d) { k <- match(d, a1$dims); if (is.na(k)) NULL else seq.int(de[k] + 1L, length.out = cn[k]) }
@@ -319,18 +341,48 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
       props[["proj:transform"]] <- I(c(ax$step, 0, ax$start + ax$step * (ix[1] - 1.5),
                                        0, ay$step, ay$start + ay$step * (iy[1] - 1.5)))
     }
-    props[["rv:placement"]] <- lapply(stats::setNames(seq_len(nrow(p)), p$array), function(i)
+    ## where each array of this source lands in the cube
+    placement <- lapply(stats::setNames(seq_len(nrow(p)), p$array), function(i)
       list(dest = I(.fj(p$dest[i])), count = I(.fj(p$count[i]))))
     asset <- Filter(Negate(is.null), list(href = p$path[1], type = .media_type(p$source[1]),
       roles = list("data"), `file:size` = if (!is.na(p$size[1])) as.numeric(p$size[1]),
-      `rv:source` = if (p$path[1] != p$source[1]) p$source[1]))
+      `rv:source` = if (p$path[1] != p$source[1]) p$source[1], `rv:placement` = placement))
+    list(id = p$id[1], arrays = p$array, bb = bb, props = props, asset = asset)
+  })
+  key <- vapply(parts, function(x) as.character(js(list(x$bb, x$props))), "")
+  groups <- unname(split(parts, factor(key, levels = unique(key))))
+  items <- lapply(groups, function(g) {
+    if (length(g) == 1L) {
+      id <- g[[1]]$id; assets <- list(data = g[[1]]$asset)
+    } else {
+      ## asset key: the array, where each source holds one array and no two
+      ## the same; else the source name
+      arr <- lapply(g, `[[`, "arrays")
+      by_array <- all(lengths(arr) == 1L) && !anyDuplicated(unlist(arr))
+      assets <- stats::setNames(lapply(g, `[[`, "asset"),
+                                if (by_array) unlist(arr) else vapply(g, `[[`, "", "id"))
+      dt0 <- g[[1]]$props$start_datetime %||% g[[1]]$props$datetime
+      id <- if (length(groups) == 1L) meta$dataset
+            else paste0(meta$dataset, "-", gsub("[^0-9]", "", dt0 %||% g[[1]]$id))
+    }
+    props <- g[[1]]$props; bb <- g[[1]]$bb
     list(type = "Feature", stac_version = STAC_VERSION,
          stac_extensions = I(unname(STAC_EXT[c("file", if (!is.null(props[["proj:code"]])) "projection")])),
-         id = p$id[1], geometry = .bbox_geom(bb), bbox = I(bb), properties = props,
-         links = list(), assets = list(data = asset), collection = meta$dataset)
+         id = id, geometry = .bbox_geom(bb), bbox = I(bb), properties = props,
+         links = list(), assets = assets, collection = meta$dataset)
   })
   items <- items[order(vapply(items, function(x) x$properties$start_datetime %||%
                                 x$properties$datetime %||% "", ""))]
+  ## item asset keys and types, for the collection's item_assets
+  akeys <- unique(unlist(lapply(items, function(x) names(x$assets))))
+  item_assets <- lapply(stats::setNames(akeys, akeys), function(k) {
+    a <- NULL; for (x in items) if (!is.null(x$assets[[k]])) { a <- x$assets[[k]]; break }
+    list(type = a$type, roles = list("data"))
+  })
+  ## per-item JSON files: auto (default) writes them for a collection of one
+  ## item; a long series is served by items.ndjson and stac-geoparquet
+  if (identical(items_dir, "auto")) items_dir <- length(items) == 1L
+  items_dir <- isTRUE(as.logical(items_dir))
 
   ## collection
   forms <- .form_assets(out, base, .containers(unique(P$path)))
@@ -344,11 +396,13 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     description = sprintf(paste(
       "Virtualized collection of %d source files (%s), rendered from a byterefs/0.1 store",
       "of byte references. Collection assets are the virtual forms of the whole cube;",
-      "items are the source granules."), length(items), paste(names(data), collapse = ", ")),
+      "items (%d) are the source granules, one per time step and footprint, listed in",
+      "stac/items.ndjson and, where present, the geoparquet-items asset."),
+      nrow(S), paste(names(data), collapse = ", "), length(items)),
     license = if (nzchar(Sys.getenv("STAC_LICENSE"))) Sys.getenv("STAC_LICENSE") else "other",
     extent = list(spatial = list(bbox = I(list(I(cbbox)))), temporal = list(interval = textent)),
     `cube:dimensions` = cube_dims, `cube:variables` = cube_vars,
-    item_assets = list(data = list(type = .media_type(P$source[1]), roles = list("data"))),
+    item_assets = item_assets,
     assets = forms,
     links = unname(c(
       list(list(rel = "root", href = "./collection.json", type = "application/json")),
@@ -356,10 +410,9 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
                                     href = paste0(sub("/$", "", base), "/stac/collection.json"))),
       if (items_dir) lapply(items, function(x)
         list(rel = "item", href = sprintf("./items/%s.json", x$id), type = "application/geo+json")))),
+    `rv:items` = length(items),
     `rv:meta` = meta[setdiff(names(meta), MR_META_JSON)])
 
-  js <- function(x, pretty = FALSE) jsonlite::toJSON(x, auto_unbox = TRUE, digits = I(15),
-                                                     null = "null", na = "null", pretty = pretty)
   writeLines(js(coll, TRUE), file.path(dir, "collection.json"))
   ## each item is serialized once: the ndjson row has no links (its relative
   ## links would resolve against stac/, not stac/items/), the item file gets
@@ -387,7 +440,7 @@ if (sys.nframe() == 0L) {
   pf <- if (length(pf) && !is.na(pf)) file.path(dirname(db), pf)
   t0 <- Sys.time()
   mr_write_stac(con, out, target = target, base = base, plan_file = pf,
-                items_dir = Sys.getenv("STAC_ITEM_FILES", "1") != "0")
+                items_dir = Sys.getenv("STAC_ITEM_FILES", "auto"))
   DBI::dbDisconnect(con)
   message(sprintf("STAC: %.1f s", as.numeric(Sys.time() - t0, units = "secs")))
 }

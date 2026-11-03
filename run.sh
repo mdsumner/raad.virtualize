@@ -9,7 +9,8 @@
 #
 # Every leading *.sh argument is sourced, in order (dataset, then a publish
 # target). Steps: deps plan harvest collate render icechunk grist stac verify, and
-# prepare publish verify-published (not run by default). prepare runs the
+# prepare publish publish-stac verify-published (not run by default).
+# publish-stac republishes only stac/ and thumbnail.png. prepare runs the
 # config's prepare function, for a dataset that writes its sources first.
 # Env: E2E_WORK (default ./work/<DATASET>), PYTHON, RSCRIPT, GDAL, WORKERS,
 #      HARVEST_LIMIT (scan only the first N sources; for a smoke test),
@@ -22,7 +23,9 @@
 #      resume a publish cut off by an expired token),
 #      STAC_TARGET (remap target for STAC item hrefs; default KERCHUNK_TARGET),
 #      STAC_BASE (public URL of the published dataset prefix, for absolute
-#      STAC asset hrefs and GDAL open strings),
+#      STAC asset hrefs and GDAL open strings), STAC_ITEM_FILES (see
+#      R/stac.R), STAC_GEOPARQUET, STAC_THUMBNAIL and STAC_THUMB_* (see the
+#      stac step),
 #      GRIST_LEVELS, GRIST_ARRAYS, GRIST_TARGET (default VRT_TARGET),
 #      GRIST_BASE (default STAC_BASE), GRIST_VERIFY_BOUNDARIES,
 #      GRIST_VERIFY_WINDOW (see R/grist.R and py/verify_grist.py),
@@ -103,11 +106,41 @@ for s in $STEPS; do
         [ -z "$STAC_BBOX" ] || echo "stac: bbox $STAC_BBOX (py/plan_bbox.py)" | tee -a "$LOG"
       fi
       export STAC_BBOX
+      # collection title: the dataset's row in its group's datasets.tsv
+      # where the config sets none
+      if [ -z "${STAC_TITLE:-}" ] && [ -n "${PRODUCT_GROUP:-}" ] && [ -f "$HERE/products/$PRODUCT_GROUP/datasets.tsv" ]; then
+        STAC_TITLE=$(awk -F'\t' -v d="$DATASET" '!/^#/ && $1 == d {print $4; exit}' "$HERE/products/$PRODUCT_GROUP/datasets.tsv")
+        export STAC_TITLE
+      fi
+      # overview image of one field (py/thumbnail.py), a collection asset;
+      # a failure leaves the collection without one. STAC_THUMBNAIL=0 skips,
+      # STAC_THUMB_ARRAY (default the first of ARRAYS), STAC_THUMB_PALETTE,
+      # STAC_THUMB_LOG10=1 and STAC_THUMB_WIDTH choose what is drawn
+      rm -f "$WORK/out/thumbnail.png"
+      if [ "${STAC_THUMBNAIL:-1}" = 1 ]; then
+        if desc=$("$PYTHON" "$HERE/py/thumbnail.py" "$WORK/store.sqlite" "$WORK/out/thumbnail.png" \
+              --array "${STAC_THUMB_ARRAY:-${ARRAYS%% *}}" --palette "${STAC_THUMB_PALETTE:-viridis}" \
+              --width "${STAC_THUMB_WIDTH:-512}" $([ "${STAC_THUMB_LOG10:-0}" = 1 ] && echo --log10) \
+              2>> "$LOG"); then
+          export STAC_THUMB_DESCRIPTION="Overview of $desc (py/thumbnail.py)."
+          echo "stac: thumbnail $desc" | tee -a "$LOG"
+        else
+          rm -f "$WORK/out/thumbnail.png"; echo "stac: no thumbnail (py/thumbnail.py failed, see $LOG)" | tee -a "$LOG"
+        fi
+      fi
+      # items as stac-geoparquet (rustac); the collection lists it only when
+      # it is written. STAC_GEOPARQUET=0 skips
+      want=${STAC_GEOPARQUET:-1}; STAC_GEOPARQUET=0
+      if [ "$want" = 1 ] && "$PYTHON" "$HERE/py/stac_geoparquet.py" --check; then
+        STAC_GEOPARQUET=1
+      else
+        echo "stac: no stac-geoparquet (pip install rustac)" | tee -a "$LOG"
+      fi
+      export STAC_GEOPARQUET
       step stac "$RSCRIPT" "$HERE/R/stac.R" "$WORK/store.sqlite" "$WORK/out" \
         "${STAC_TARGET-$KERCHUNK_TARGET}" "${STAC_BASE:-}"
-      # stac-geoparquet from the ndjson items, where rustac is installed
-      if command -v rustac > /dev/null; then
-        step stac rustac translate "$WORK/out/stac/items.ndjson" "$WORK/out/stac/items.parquet"
+      if [ "$STAC_GEOPARQUET" = 1 ]; then
+        step stac "$PYTHON" "$HERE/py/stac_geoparquet.py" "$WORK/out/stac/items.ndjson" "$WORK/out/stac/items.parquet"
       fi ;;
     verify)
       step verify "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
@@ -128,6 +161,20 @@ for s in $STEPS; do
       else
         step publish "$GDAL" vsi sync -r -j 8 "$WORK/out/" "$PUB/"
         for f in plan.vrt store.sqlite; do step publish "$GDAL" vsi copy "$WORK/$f" "$PUB/$f"; done
+      fi ;;
+    publish-stac)
+      # the STAC render and thumbnail only, after a stac step on a dataset
+      # whose other forms are already published
+      [ -n "$PUB" ] || { echo "publish-stac: set PUBLISH or source a publish config"; exit 1; }
+      [ -f "$WORK/out/stac/collection.json" ] || { echo "publish-stac: no $WORK/out/stac; run the stac step"; exit 1; }
+      if [ "${PUBLISH_WITH:-gdal}" = obstore ]; then
+        step publish-stac "$PYTHON" "$HERE/py/s3_sync.py" ${S3_SYNC_ARGS:-} "$WORK/out/stac" "$PUB/stac"
+        [ ! -f "$WORK/out/thumbnail.png" ] ||
+          step publish-stac "$PYTHON" "$HERE/py/s3_sync.py" "$WORK/out/thumbnail.png" "$PUB/thumbnail.png"
+      else
+        step publish-stac "$GDAL" vsi sync -r "$WORK/out/stac/" "$PUB/stac/"
+        [ ! -f "$WORK/out/thumbnail.png" ] ||
+          step publish-stac "$GDAL" vsi copy "$WORK/out/thumbnail.png" "$PUB/thumbnail.png"
       fi ;;
     verify-published)
       [ -n "$PUB" ] || { echo "verify-published: set PUBLISH or source a publish config"; exit 1; }

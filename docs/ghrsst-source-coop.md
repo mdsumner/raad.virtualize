@@ -37,10 +37,12 @@ ausantarctic/ghrsst-mur-v2/
         arrays.json
         sources.parquet
         refs_<var>.parquet
+      thumbnail.png                 overview of one field (collection asset)
       stac/
-        collection.json             one asset per form above
+        collection.json             one asset per form above, thumbnail,
+                                    items.parquet (geoparquet-items)
         items.ndjson                one item per COG
-        items.parquet               stac-geoparquet (where rustac is installed)
+        items.parquet               stac-geoparquet (rustac)
       plan.vrt                      plan, verbatim source URIs
       store.sqlite                  byterefs/0.1 store
 
