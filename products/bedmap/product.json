@@ -1,7 +1,7 @@
 {
   "id": "bedmap",
   "title": "Bedmap: Antarctic ice thickness, bed and surface elevation",
-  "description": "Cloud-optimised copies of the Bedmap gridded products for Antarctica, with virtual multidimensional indexes (GDAL VRT, Kerchunk, Icechunk, STAC). Currently holds Bedmap3: 500 m grids in EPSG:3031 of ice thickness, bed and surface elevation, uncertainty, survey counts and a surface type mask. Repackaged from the UK Polar Data Centre release (doi:10.5285/2d0e4791-8e20-46a3-80e4-f5f6716025d2), CC BY 4.0.",
+  "description": "Cloud-optimized copies of the Bedmap gridded products for Antarctica, with virtual multidimensional indexes (GDAL VRT, Kerchunk, Icechunk, STAC). Currently holds Bedmap3: 500 m grids in EPSG:3031 of ice thickness, bed and surface elevation, uncertainty, survey counts and a surface type mask. Repackaged from the UK Polar Data Centre release (doi:10.5285/2d0e4791-8e20-46a3-80e4-f5f6716025d2), CC BY 4.0.",
   "license": "CC-BY-4.0",
   "public_base": "https://data.source.coop/ausantarctic/bedmap/virtual"
 }

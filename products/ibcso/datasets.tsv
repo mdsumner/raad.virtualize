@@ -1,0 +1,7 @@
+# Datasets of the group. One row per dataset: dataset name, dataset config,
+# its settings (comma separated, as qsub -v takes them), title. Lines starting
+# with # are skipped.
+dataset	config	env	title
+ibcso-v2	config/ibcso.sh	IBCSO_RELEASE=v2	IBCSO Version 2
+ibcso-annual-2024	config/ibcso.sh	IBCSO_RELEASE=2024	IBCSO 2024 annual release
+ibcso-annual-2025	config/ibcso.sh	IBCSO_RELEASE=2025	IBCSO 2025 annual release
