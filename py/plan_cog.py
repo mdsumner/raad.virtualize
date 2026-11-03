@@ -28,9 +28,22 @@ than N steps are missing: a listing that dropped directories (HTTP 503 from
 the server, for example) then fails instead of planning a shorter series.
 Default -1, no limit.
 
+--overviews: each overview level of the first file becomes one more array,
+<array>_x<f> (f the size ratio to full resolution, rounded), on its own
+dims y_x<f> and x_x<f> and the same time axis, with one source per file:
+GTIFF_DIR:<k>:<file>, the overview's own IFD, which GDAL opens as an
+ordinary GeoTIFF, so the plan reads every level and the harvest lists that
+IFD's tiles. Sizes come from the IFD (GDAL rounds overview sizes up); the
+cell size is the full-resolution one times the exact size ratio, so a level
+covers the same extent. Each level carries attributes overview_of,
+overview_factor ([y, x] size ratios) and overview_resampling (--resampling,
+default unknown: GDAL does not record it in the file). Mask IFDs are not
+levels. Every file must have the same levels (the harvest stops otherwise).
+
 Usage:
   python plan_cog.py --sources sources.txt --array analysed_sst \
     --pattern '^(\\d{8})090000-.*\\.tif$' plan.vrt
+  python plan_cog.py ... --overviews --resampling AVERAGE plan.vrt
 """
 import argparse
 import datetime as dt
@@ -105,7 +118,43 @@ def dated(sources, pattern, cadence="day"):
     return out
 
 
-def plan(sources, array, pattern, cadence="day"):
+def overview_dirs(path):
+    """[(k, xsize, ysize)] for the overview levels of band 1 of a GeoTIFF, in
+    GDAL's overview order, with k the TIFF directory (GTIFF_DIR:<k>:, 1 is
+    full resolution) holding each. A directory is a level when its size is an
+    overview's and its type and band count are the full-resolution ones (a
+    mask IFD of the same size is Byte with one band); found by probing the
+    directories in order, not by assuming k = level + 2."""
+    ds = gdal.Open(path)
+    b = ds.GetRasterBand(1)
+    want = [(b.GetOverview(i).XSize, b.GetOverview(i).YSize) for i in range(b.GetOverviewCount())]
+    if not want:
+        return []
+    out, k, i = [], 2, 0
+    while i < len(want):
+        try:
+            d = gdal.Open(f"GTIFF_DIR:{k}:{path}")
+        except RuntimeError:
+            sys.exit(f"plan_cog: {path}: overview {i} ({want[i][0]} x {want[i][1]}) has no TIFF directory")
+        db = d.GetRasterBand(1)
+        if ((d.RasterXSize, d.RasterYSize) == want[i] and d.RasterCount == ds.RasterCount
+                and db.DataType == b.DataType):
+            out.append((k, d.RasterXSize, d.RasterYSize))
+            i += 1
+        k += 1
+    return out
+
+
+def attribute(name, value):
+    """A multidim VRT <Attribute>: a string, or a list of numbers."""
+    if isinstance(value, str):
+        return [f'      <Attribute name="{name}">', "        <DataType>String</DataType>",
+                f"        <Value>{escape(value)}</Value>", "      </Attribute>"]
+    return ([f'      <Attribute name="{name}">', "        <DataType>Float64</DataType>"]
+            + [f"        <Value>{v:.17g}</Value>" for v in value] + ["      </Attribute>"])
+
+
+def plan(sources, array, pattern, cadence="day", overviews=False, resampling="unknown"):
     files = dated(sources, pattern, cadence)
     if not files:
         sys.exit("plan_cog: no source matches the pattern")
@@ -138,45 +187,75 @@ def plan(sources, array, pattern, cadence="day"):
         "      <Unit>days since 1970-01-01</Unit>",
         "    </Array>",
     ]
-    for name, start, inc in (("y", y0 + dy / 2, dy), ("x", x0 + dx / 2, dx)):
-        lines += [
+    def grid(suffix, nyl, nxl, dyl, dxl):
+        out = []
+        if suffix:
+            out += [f'    <Dimension name="y{suffix}" size="{nyl}" type="HORIZONTAL_Y" indexingVariable="y{suffix}"/>',
+                    f'    <Dimension name="x{suffix}" size="{nxl}" type="HORIZONTAL_X" indexingVariable="x{suffix}"/>']
+        for name, start, inc in ((f"y{suffix}", y0 + dyl / 2, dyl), (f"x{suffix}", x0 + dxl / 2, dxl)):
+            out += [
+                f'    <Array name="{name}">',
+                "      <DataType>Float64</DataType>",
+                f'      <DimensionRef ref="{name}"/>',
+                f'      <RegularlySpacedValues start="{start:.10g}" increment="{inc:.10g}"/>',
+                "    </Array>",
+            ]
+        return out
+
+    def data_array(name, suffix, nyl, nxl, prefix="", attrs=()):
+        out = [
             f'    <Array name="{name}">',
-            "      <DataType>Float64</DataType>",
-            f'      <DimensionRef ref="{name}"/>',
-            f'      <RegularlySpacedValues start="{start:.10g}" increment="{inc:.10g}"/>',
-            "    </Array>",
+            f"      <DataType>{VRT_TYPE[b.DataType]}</DataType>",
+            '      <DimensionRef ref="time"/>',
+            f'      <DimensionRef ref="y{suffix}"/>',
+            f'      <DimensionRef ref="x{suffix}"/>',
+            f"      <BlockSize>1,{by},{bx}</BlockSize>",
         ]
-    lines += [
-        f'    <Array name="{array}">',
-        f"      <DataType>{VRT_TYPE[b.DataType]}</DataType>",
-        '      <DimensionRef ref="time"/>',
-        '      <DimensionRef ref="y"/>',
-        '      <DimensionRef ref="x"/>',
-        f"      <BlockSize>1,{by},{bx}</BlockSize>",
-    ]
-    if srs is not None:
-        lines.append(f'      <SRS dataAxisToSRSAxisMapping="2,1">{escape(srs.ExportToWkt())}</SRS>')
-    if b.GetUnitType():
-        lines.append(f"      <Unit>{escape(b.GetUnitType())}</Unit>")
-    if b.GetNoDataValue() is not None:
-        lines.append(f"      <NoDataValue>{b.GetNoDataValue():.17g}</NoDataValue>")
-    if b.GetOffset():
-        lines.append(f"      <Offset>{b.GetOffset():.17g}</Offset>")
-    if b.GetScale() not in (None, 1):
-        lines.append(f"      <Scale>{b.GetScale():.17g}</Scale>")
-    for d, s in files:
-        lines += [
-            "      <Source>",
-            f"        <SourceFilename>{escape(s)}</SourceFilename>",
-            "        <SourceBand>1</SourceBand>",
-            "        <SourceTranspose>-1,0,1</SourceTranspose>",
-            f'        <SourceSlab offset="0,0,0" count="1,{ny},{nx}" step="1,1,1"/>',
-            f'        <DestSlab offset="{index(d)},0,0"/>',
-            "      </Source>",
-        ]
-    lines += ["    </Array>", "  </Group>", "</VRTDataset>", ""]
+        if srs is not None:
+            out.append(f'      <SRS dataAxisToSRSAxisMapping="2,1">{escape(srs.ExportToWkt())}</SRS>')
+        if b.GetUnitType():
+            out.append(f"      <Unit>{escape(b.GetUnitType())}</Unit>")
+        if b.GetNoDataValue() is not None:
+            out.append(f"      <NoDataValue>{b.GetNoDataValue():.17g}</NoDataValue>")
+        if b.GetOffset():
+            out.append(f"      <Offset>{b.GetOffset():.17g}</Offset>")
+        if b.GetScale() not in (None, 1):
+            out.append(f"      <Scale>{b.GetScale():.17g}</Scale>")
+        for k, v in attrs:
+            out += attribute(k, v)
+        for d, s in files:
+            out += [
+                "      <Source>",
+                f"        <SourceFilename>{escape(prefix + s)}</SourceFilename>",
+                "        <SourceBand>1</SourceBand>",
+                "        <SourceTranspose>-1,0,1</SourceTranspose>",
+                f'        <SourceSlab offset="0,0,0" count="1,{nyl},{nxl}" step="1,1,1"/>',
+                f'        <DestSlab offset="{index(d)},0,0"/>',
+                "      </Source>",
+            ]
+        return out + ["    </Array>"]
+
+    levels = overview_dirs(files[0][1]) if overviews else []
+    seen = set()
+    for k, ox, oy in levels:
+        fx, fy = nx / ox, ny / oy
+        f = round(fx)
+        if f in seen:
+            sys.exit(f"plan_cog: two overview levels round to factor {f}")
+        seen.add(f)
+    # level dimensions go with the others, ahead of every array
+    lines[5:5] = [ln for k, ox, oy in levels for ln in grid(f"_x{round(nx / ox)}", oy, ox, dy * ny / oy, dx * nx / ox)[:2]]
+    lines += grid("", ny, nx, dy, dx)
+    lines += data_array(array, "", ny, nx)
+    for k, ox, oy in levels:
+        sfx = f"_x{round(nx / ox)}"
+        lines += grid(sfx, oy, ox, dy * ny / oy, dx * nx / ox)[2:]
+        lines += data_array(array + sfx, sfx, oy, ox, prefix=f"GTIFF_DIR:{k}:",
+                            attrs=[("overview_of", array), ("overview_factor", [ny / oy, nx / ox]),
+                                   ("overview_resampling", resampling)])
+    lines += ["  </Group>", "</VRTDataset>", ""]
     missing = sorted(set(steps) - {d for d, _ in files})
-    return "\n".join(lines), len(files), nt, missing
+    return "\n".join(lines), len(files), nt, missing, len(levels)
 
 
 def main():
@@ -188,11 +267,16 @@ def main():
     ap.add_argument("--cadence", choices=("day", "5day", "month"), default="day")
     ap.add_argument("--max-missing", type=int, default=-1,
                     help="fail when more steps than this have no file (-1: no limit)")
+    ap.add_argument("--overviews", action="store_true",
+                    help="add each overview level as an array <array>_x<factor>")
+    ap.add_argument("--resampling", default="unknown",
+                    help="overview resampling to record (GDAL does not store it)")
     ap.add_argument("vrt")
     a = ap.parse_args()
     with open(a.sources) as f:
         sources = [s.strip() for s in f if s.strip()]
-    text, nfiles, nt, missing = plan(sources, a.array, a.pattern, a.cadence)
+    text, nfiles, nt, missing, nlev = plan(sources, a.array, a.pattern, a.cadence,
+                                           a.overviews, a.resampling)
     unit = {"day": "days", "5day": "5-day periods", "month": "months"}[a.cadence]
     if missing:
         shown = ", ".join(str(d) for d in missing[:20]) + (" ..." if len(missing) > 20 else "")
@@ -202,7 +286,8 @@ def main():
                  "no plan written (check the listing, or raise the limit)")
     with open(a.vrt, "w") as f:
         f.write(text)
-    print(f"plan_cog: {nfiles} files over {nt} {unit} -> {a.vrt}")
+    lev = f", {nlev} overview levels" if a.overviews else ""
+    print(f"plan_cog: {nfiles} files over {nt} {unit}{lev} -> {a.vrt}")
 
 
 if __name__ == "__main__":

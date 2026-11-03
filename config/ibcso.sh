@@ -15,6 +15,10 @@
 #   IBCSO_COG      local COG directory (default work/ibcso-<prefix>-cog)
 #   IBCSO_COG_URL  public URL of the COGs
 #   IBCSO_LOCAL    1: forms reference the local COGs (see below)
+#   IBCSO_OVERVIEWS 1 (default): every overview level of the COGs is an
+#                  array of its own, <name>_x<factor> (py/plan_static.py
+#                  --overviews; AVERAGE, NEAREST for rid and tid, as
+#                  py/ibcso_cog.py writes them); 0: full resolution only
 IBCSO_RELEASE=${IBCSO_RELEASE:-v2}
 case $IBCSO_RELEASE in
   v2) IBCSO_PREFIX=v2; raw=ibcso-raw; released=2022-05-20T12:03:02Z ;;
@@ -31,7 +35,10 @@ IBCSO_COG_URL=${IBCSO_COG_URL:-https://data.source.coop/ausantarctic/ibcso/$IBCS
 ARRAYS="bed ice_surface rid tid"
 prepare() { "$PYTHON" "$HERE/py/ibcso_cog.py" --release "$IBCSO_RELEASE" --raw "$IBCSO_RAW" --out "$IBCSO_COG"; }
 sources() { for a in $ARRAYS; do echo "$IBCSO_COG/$a.tif"; done; }
-make_plan() { "$PYTHON" "$HERE/py/plan_static.py" --sources "$WORK/sources.txt" "$WORK/plan.vrt"; }
+make_plan() {
+  "$PYTHON" "$HERE/py/plan_static.py" --sources "$WORK/sources.txt" \
+    $([ "${IBCSO_OVERVIEWS:-1}" = 1 ] && echo --resampling AVERAGE --resampling rid=NEAREST --resampling tid=NEAREST) "$WORK/plan.vrt"
+}
 # target|prefix|replacement, applied at publish only (sources stay verbatim)
 REMAPS=("public|$IBCSO_COG|$IBCSO_COG_URL" "gdal|$IBCSO_COG|/vsicurl/$IBCSO_COG_URL")
 # IBCSO_LOCAL=1: the forms reference the local COGs, so verify passes before

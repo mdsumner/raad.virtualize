@@ -11,6 +11,11 @@
 #   BEDMAP3_COG      local COG directory (default work/bedmap3-cog)
 #   BEDMAP3_COG_URL  public URL of the COGs
 #   BEDMAP3_LOCAL    1: forms reference the local COGs (see below)
+#   BEDMAP3_OVERVIEWS 1 (default): every overview level of the COGs is an
+#                    array of its own, <name>_x<factor> (py/plan_static.py
+#                    --overviews; AVERAGE, NEAREST for mask and
+#                    thickness_survey_count, as py/bedmap3_cog.py writes them);
+#                    0: full resolution only
 #
 #   bash hpc/vm/docker-run.sh run.sh config/bedmap3.sh prepare
 #   SOURCECOOP_REPO=ausantarctic/bedmap SOURCECOOP_PRODUCTION=1 \
@@ -27,7 +32,10 @@ prepare() {
     --fetch "$BEDMAP3_RAW/fetch.tsv" --out "$BEDMAP3_COG"
 }
 sources() { for a in $ARRAYS; do echo "$BEDMAP3_COG/$a.tif"; done; }
-make_plan() { "$PYTHON" "$HERE/py/plan_static.py" --sources "$WORK/sources.txt" "$WORK/plan.vrt"; }
+make_plan() {
+  "$PYTHON" "$HERE/py/plan_static.py" --sources "$WORK/sources.txt" \
+    $([ "${BEDMAP3_OVERVIEWS:-1}" = 1 ] && echo --resampling AVERAGE --resampling mask=NEAREST --resampling thickness_survey_count=NEAREST) "$WORK/plan.vrt"
+}
 # target|prefix|replacement, applied at publish only (sources stay verbatim)
 REMAPS=("public|$BEDMAP3_COG|$BEDMAP3_COG_URL" "gdal|$BEDMAP3_COG|/vsicurl/$BEDMAP3_COG_URL")
 # BEDMAP3_LOCAL=1: the forms reference the local COGs and verify

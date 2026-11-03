@@ -302,6 +302,10 @@ mr_plan_vrt <- function(vrt) {
       next
     }
     fn <- xml2::xml_text(xml2::xml_find_first(srcs, "./SourceFilename"))
+    ## an overview level placed as GTIFF_DIR:<k>:<file> (py/plan_cog.py
+    ## --overviews): the source is the file, the directory goes with the band
+    gdir <- ifelse(grepl("^GTIFF_DIR:[0-9]+:", fn), sub("^GTIFF_DIR:([0-9]+):.*$", "\\1", fn), NA_character_)
+    fn <- sub("^GTIFF_DIR:[0-9]+:", "", fn)
     rel <- !grepl("^(/|[a-zA-Z][a-zA-Z0-9+.-]*://)", fn)
     if (any(rel)) fn[rel] <- normalizePath(file.path(dirname(vrt), fn[rel]), mustWork = FALSE)
     ss <- xml2::xml_find_first(srcs, "./SourceSlab"); ds <- xml2::xml_find_first(srcs, "./DestSlab")
@@ -315,6 +319,10 @@ mr_plan_vrt <- function(vrt) {
     sb <- xml2::xml_text(xml2::xml_find_first(srcs, "./SourceBand"))
     band <- is.na(sa) & !is.na(sb)
     sa[band] <- paste0("band:", sb[band])
+    ## "band:<n>/dir:<k>": band n of TIFF directory k (an overview level)
+    dir_band <- band & !is.na(gdir)
+    sa[dir_band] <- paste0(sa[dir_band], "/dir:", gdir[dir_band])
+    if (any(!is.na(gdir) & !band)) stop(sprintf("array '%s': a GTIFF_DIR source must be a <SourceBand>", nm))
     ## a multidim source given a leading length-1 axis the same way (the
     ## plan_lift.py form: 2D files stacked on a new time axis) is recorded as
     ## "lift:<array>"; the rendered VRT writes the transpose back

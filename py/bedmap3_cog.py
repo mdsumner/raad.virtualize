@@ -16,7 +16,8 @@ docs/bedmap-source-coop.md):
   BLOCKSIZE=512           one tile is one Zarr chunk
   SPARSE_OK=FALSE         every tile of the grid has a reference
   AVERAGE overviews       NEAREST for mask and thickness_survey_count, whose
-                          values are class codes and counts
+                          values are class codes and counts; indexed as
+                          <name>_x<f> (py/plan_static.py --overviews)
 
 Usage:
   python py/bedmap3_cog.py --nc RAW/bedmap3.nc --out OUT [--fetch RAW/fetch.tsv]

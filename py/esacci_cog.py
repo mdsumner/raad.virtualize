@@ -22,7 +22,7 @@ docs/esacci-oc.md):
   BLOCKSIZE=512            one tile is one Zarr chunk
   SPARSE_OK=FALSE          every tile has a reference; an all-nodata tile
                            compresses to a few hundred bytes
-  AVERAGE overviews        not indexed
+  AVERAGE overviews        indexed as <var>_x<f> (py/plan_cog.py --overviews)
   values and type          as in the netCDF; for a floating point variable
                            the netCDF _FillValue (9.96921e+36) becomes NaN,
                            the COG nodata (--fill source keeps it)
