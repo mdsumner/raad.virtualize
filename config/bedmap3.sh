@@ -34,7 +34,7 @@ prepare() {
 sources() { for a in $ARRAYS; do echo "$BEDMAP3_COG/$a.tif"; done; }
 make_plan() {
   "$PYTHON" "$HERE/py/plan_static.py" --sources "$WORK/sources.txt" \
-    $([ "${BEDMAP3_OVERVIEWS:-1}" = 1 ] && echo --resampling AVERAGE --resampling mask=NEAREST --resampling thickness_survey_count=NEAREST) "$WORK/plan.vrt"
+    $([ "${BEDMAP3_OVERVIEWS:-1}" = 1 ] && echo --overviews --resampling AVERAGE --resampling mask=NEAREST --resampling thickness_survey_count=NEAREST) "$WORK/plan.vrt"
 }
 # target|prefix|replacement, applied at publish only (sources stay verbatim)
 REMAPS=("public|$BEDMAP3_COG|$BEDMAP3_COG_URL" "gdal|$BEDMAP3_COG|/vsicurl/$BEDMAP3_COG_URL")

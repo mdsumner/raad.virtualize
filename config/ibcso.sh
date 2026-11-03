@@ -37,7 +37,7 @@ prepare() { "$PYTHON" "$HERE/py/ibcso_cog.py" --release "$IBCSO_RELEASE" --raw "
 sources() { for a in $ARRAYS; do echo "$IBCSO_COG/$a.tif"; done; }
 make_plan() {
   "$PYTHON" "$HERE/py/plan_static.py" --sources "$WORK/sources.txt" \
-    $([ "${IBCSO_OVERVIEWS:-1}" = 1 ] && echo --resampling AVERAGE --resampling rid=NEAREST --resampling tid=NEAREST) "$WORK/plan.vrt"
+    $([ "${IBCSO_OVERVIEWS:-1}" = 1 ] && echo --overviews --resampling AVERAGE --resampling rid=NEAREST --resampling tid=NEAREST) "$WORK/plan.vrt"
 }
 # target|prefix|replacement, applied at publish only (sources stay verbatim)
 REMAPS=("public|$IBCSO_COG|$IBCSO_COG_URL" "gdal|$IBCSO_COG|/vsicurl/$IBCSO_COG_URL")

@@ -51,6 +51,8 @@ def main():
     ap.add_argument("vrt")
     a = ap.parse_args()
     how = dict(r.split("=", 1) if "=" in r else ("", r) for r in a.resampling)
+    if a.resampling and not a.overviews:
+        sys.exit("plan_static: --resampling needs --overviews")
     with open(a.sources) as f:
         sources = [s.strip() for s in f if s.strip()]
     nx, ny, gt, wkt, dtype, nodata, block = first = grid(gdal.Open(sources[0]))
