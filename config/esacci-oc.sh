@@ -62,3 +62,6 @@ VRT_TARGET=gdal
 WORKERS=${WORKERS:-8}
 export STAC_LICENSE=${STAC_LICENSE:-other}
 export STAC_TITLE=${STAC_TITLE:-ESA Ocean Colour CCI v6.0 $ESACCI_CADENCE $ESACCI_VAR, merged sensors, 4 km}
+# thumbnail: chlorophyll-a spans orders of magnitude (the bias and RMSD
+# variables are log10 already)
+[ "$ESACCI_VAR" != chlor_a ] || export STAC_THUMB_LOG10=${STAC_THUMB_LOG10:-1}

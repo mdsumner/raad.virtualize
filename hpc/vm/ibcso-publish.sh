@@ -25,7 +25,8 @@ done
 cat > work/ibcso-upload.sh <<'INNER'
 set -euo pipefail
 export AWS_S3_ENDPOINT=data.source.coop AWS_HTTPS=YES AWS_VIRTUAL_HOSTING=FALSE AWS_REGION=us-west-2
-python py/s3_sync.py products/ibcso/README.md /vsis3/ausantarctic/ibcso/README.md
+python py/s3_sync.py work/ibcso/catalog/README.md /vsis3/ausantarctic/ibcso/README.md
 INNER
-dr work/ibcso-upload.sh
+# the product landing page is the catalog's README (previews and links added)
 dr catalog.sh products/ibcso config/source-coop.sh check publish
+dr work/ibcso-upload.sh

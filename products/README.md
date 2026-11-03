@@ -14,10 +14,13 @@ when it is ready, and anything here may change or be removed without notice.
 - `<group>/<dataset>/`: one dataset, in several forms read from the same
   byte references: `mdim.vrt` (GDAL multidimensional VRT), `kerchunk/`
   (kerchunk Parquet), `icechunk/` (Icechunk, virtual references), `flat/`
-  (flat Parquet refs), `stac/`
+  (flat Parquet refs), `stac/` (STAC collection, items as
+  stac-geoparquet), `thumbnail.png` (overview of one field)
 
 Groups: `bluelink/` (Bluelink ReANalysis), `ghrsst/` (GHRSST MUR),
-`oisst/` (NOAA OISST), `seaice/` (sea ice concentration).
+`oisst/` (NOAA OISST), `seaice/` (sea ice concentration), `oceancolour/`
+(ESA Ocean Colour CCI chlorophyll-a). Each group's README shows the
+thumbnail of every dataset.
 
 ## Reading
 

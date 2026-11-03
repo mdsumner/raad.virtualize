@@ -8,7 +8,7 @@
 #   bash hpc/pawsey/singularity-run.sh run.sh config/esacci-oc.sh config/source-coop.sh publish verify-published
 #
 # The Python packages the image lacks (obstore for source.coop publish,
-# imagecodecs and fastparquet) are installed once with pip --user into
+# imagecodecs, fastparquet, rustac) are installed once with pip --user into
 # RV_PYUSER. The environment passes into the container as is.
 #
 #   SIF        default $MYSOFTWARE/sif_lib/gdal-r-python-extras_2026-10-25.sif
@@ -22,10 +22,10 @@ command -v singularity > /dev/null || module load "${SINGULARITY_MODULE:-singula
 command -v singularity > /dev/null || { echo "singularity-run.sh: no singularity (set SINGULARITY_MODULE)" >&2; exit 1; }
 SIF=${SIF:-$MYSOFTWARE/sif_lib/gdal-r-python-extras_2026-10-25.sif}
 export PYTHONUSERBASE=${RV_PYUSER:-$MYSOFTWARE/rv-pyuser}
-PKGS="obstore imagecodecs fastparquet"
+PKGS="obstore imagecodecs fastparquet rustac"
 cd "$HERE"
 exec singularity exec -B "$MYSOFTWARE" "$SIF" bash -c '
-  python -c "import obstore, imagecodecs, fastparquet" 2>/dev/null ||
+  python -c "import obstore, imagecodecs, fastparquet, rustac" 2>/dev/null ||
     python -m pip install -q --user '"$PKGS"' 2>/dev/null ||
     python -m pip install -q --user --break-system-packages '"$PKGS"'
   exec bash "$@"' bash "$@"

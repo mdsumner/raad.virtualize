@@ -8,9 +8,10 @@ PRODUCT_DIR holds product.json (id, title, description, license) and
 datasets.tsv (dataset, config, env, title; # lines skipped). OUT_DIR gets
 catalog.json, with one child link per dataset to
 ./<dataset>/stac/collection.json, and copies of product.json, datasets.tsv
-and README.md (when present, with a generated Links section: repository,
-site, and each row's anchor on the site's Published page), plus any images
-beside them (README banner).
+and README.md (when present, with a generated Previews section, the
+thumbnail of each published collection that has one, and a generated Links
+section: repository, site, and each row's anchor on the site's Published
+page), plus any images beside them (README banner).
 OUT_DIR is synced to the publish prefix, so
 the catalog sits beside the dataset directories that run.sh publishes.
 
@@ -63,6 +64,18 @@ def readme_links(rows, root_mode):
         name = r[key] + ("/" if root_mode else "")
         out.append(f"  - [`{name}`]({SITE_URL}published.html#{r[key]}): {r['title']}")
     return "\n".join(out) + "\n"
+
+
+def readme_previews(previews):
+    """Previews section of the published README.md: the thumbnail asset of
+    each published collection (py/thumbnail.py), by absolute URL, as the
+    source.coop browser shows a README but draws no raster preview."""
+    if not previews:
+        return ""
+    out = ["", "## Previews", ""]
+    for title, href in previews:
+        out += [f"![{title}]({href})", "", f"*{title}*", ""]
+    return "\n".join(out)
 
 
 def read_rows(path, key="dataset", need=("dataset", "config", "env", "title")):
@@ -122,7 +135,8 @@ def summary(coll):
     for k in ("generator", "created", "config"):
         if k in meta:
             out[k] = meta[k]
-    out["items"] = sum(1 for ln in coll.get("links", []) if ln.get("rel") == "item") or None
+    out["items"] = coll.get("rv:items") or \
+        sum(1 for ln in coll.get("links", []) if ln.get("rel") == "item") or None
     return {k: v for k, v in out.items() if v is not None}
 
 
@@ -159,7 +173,7 @@ def main():
     if a.base:
         links.append({"rel": "self", "href": a.base.rstrip("/") + "/catalog.json",
                       "type": "application/json"})
-    status, missing = [], []
+    status, missing, previews = [], [], []
     for r in rows:
         rel = f"{r['group']}/catalog.json" if root_mode else f"{r['dataset']}/stac/collection.json"
         link = {"rel": "child", "href": "./" + rel, "type": "application/json",
@@ -176,6 +190,9 @@ def main():
                     st["datasets"] = sum(1 for ln in doc.get("links", []) if ln.get("rel") == "child")
                 else:
                     st.update(summary(doc))
+                    thumb = (doc.get("assets") or {}).get("thumbnail", {}).get("href", "")
+                    if thumb.startswith(("https://", "http://")):
+                        previews.append((r["title"], thumb))
         links.append(link)
         status.append(st)
 
@@ -209,7 +226,7 @@ def main():
         with open(readme) as f:
             text = f.read().rstrip("\n") + "\n"
         with open(readme, "w") as f:
-            f.write(text + readme_links(rows, root_mode))
+            f.write(text + readme_previews(previews) + readme_links(rows, root_mode))
     n_pub = sum(1 for s in status if s.get("published"))
     print(f"catalog: {len(rows)} {key}s" + (f", {n_pub} published" if a.published else "")
           + f" -> {a.out_dir}/catalog.json")

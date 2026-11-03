@@ -46,7 +46,8 @@ virtual/ibcso-<release>/mdim.vrt      GDAL multidimensional VRT
 virtual/ibcso-<release>/kerchunk/     Kerchunk Parquet
 virtual/ibcso-<release>/icechunk/     Icechunk repository
 virtual/ibcso-<release>/flat/         flat reference tables
-virtual/ibcso-<release>/stac/         STAC collection and items
+virtual/ibcso-<release>/stac/         STAC collection, its one item, stac-geoparquet
+virtual/ibcso-<release>/thumbnail.png overview of bed
 virtual/ibcso-<release>/store.sqlite  byterefs/0.1 store
 ```
 

@@ -30,8 +30,9 @@ virtual/bedmap3/mdim.vrt         GDAL multidimensional VRT
 virtual/bedmap3/kerchunk/        Kerchunk Parquet
 virtual/bedmap3/icechunk/        Icechunk repository
 virtual/bedmap3/flat/            flat reference tables
-virtual/bedmap3/stac/            STAC collection and items
-virtual/bedmap3/store.sqlite     mdim-refs/0.2 store
+virtual/bedmap3/stac/            STAC collection, its one item, stac-geoparquet
+virtual/bedmap3/thumbnail.png    overview of bed_topography
+virtual/bedmap3/store.sqlite     byterefs/0.1 store
 ```
 
 Every virtual form references the COGs by absolute URL.

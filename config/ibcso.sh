@@ -50,5 +50,7 @@ case $IBCSO_RELEASE in
   *) title="International Bathymetric Chart of the Southern Ocean, $IBCSO_RELEASE annual release" ;;
 esac
 export STAC_TITLE=${STAC_TITLE:-$title}
+# thumbnail: bed, blues below sea level and earth tones above
+export STAC_THUMB_PALETTE=${STAC_THUMB_PALETTE:-topo}
 # the grist catalog contract needs a date; a static grid has none
 DEFAULT_STEPS="plan harvest collate render icechunk stac verify"

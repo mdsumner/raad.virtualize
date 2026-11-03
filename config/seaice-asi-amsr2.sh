@@ -89,3 +89,5 @@ KERCHUNK_TARGET=public
 ICECHUNK_TARGET=public
 VRT_TARGET=gdal
 WORKERS=${WORKERS:-8}
+# thumbnail: concentration, dark blue (open water) to white
+export STAC_THUMB_PALETTE=${STAC_THUMB_PALETTE:-ice}
