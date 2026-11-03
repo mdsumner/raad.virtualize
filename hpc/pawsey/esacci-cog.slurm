@@ -13,9 +13,11 @@
 #
 #   sbatch hpc/pawsey/esacci-cog.slurm
 #   sbatch --export=ALL,ESACCI_YEARS="2024 2025",ESACCI_LIMIT=2 hpc/pawsey/esacci-cog.slurm
+#   sbatch --export=ALL,ESACCI_CADENCE=5day hpc/pawsey/esacci-cog.slurm
 #
-#   ESACCI_CATALOG  THREDDS catalog.xml (default the v6.0 geographic monthly
-#                   chlor_a catalog)
+#   ESACCI_CADENCE  monthly (default), 5day or daily: the THREDDS folder
+#   ESACCI_CATALOG  THREDDS catalog.xml (default the v6.0 geographic chlor_a
+#                   catalog of ESACCI_CADENCE)
 #   ESACCI_VARS     netCDF variables, space separated (default chlor_a
 #                   chlor_a_log10_bias chlor_a_log10_rmsd)
 #   ESACCI_YEARS    years, space separated (default every year)
@@ -43,7 +45,8 @@ command -v singularity > /dev/null || { echo "esacci-cog: no singularity (set SI
 command -v rclone > /dev/null || module load "${RCLONE_MODULE:-rclone/1.68.1}"
 command -v rclone > /dev/null || { echo "esacci-cog: no rclone" >&2; exit 1; }
 
-CATALOG=${ESACCI_CATALOG:-https://www.oceancolour.org/thredds/catalog/cci/v6.0-release/geographic/monthly/chlor_a/catalog.xml}
+CADENCE=${ESACCI_CADENCE:-monthly}
+CATALOG=${ESACCI_CATALOG:-https://www.oceancolour.org/thredds/catalog/cci/v6.0-release/geographic/$CADENCE/chlor_a/catalog.xml}
 VARS=${ESACCI_VARS:-chlor_a chlor_a_log10_bias chlor_a_log10_rmsd}
 OUT=${ESACCI_OUT:-$MYSCRATCH/esacci-oc/cog}
 TMP=$(dirname "$OUT")/download
