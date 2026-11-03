@@ -1,0 +1,6 @@
+# Datasets of the group. One row per dataset: dataset name, dataset config,
+# its settings (comma separated, as qsub -v takes them), title. Lines starting
+# with # are skipped. The catalog lists every row; catalog.sh check fails
+# when a row has no published collection.
+dataset	config	env	title
+esacci-oc-v6.0-monthly-chlor_a	config/esacci-oc.sh	ESACCI_VAR=chlor_a	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a, merged sensors, 4 km, from 1997-09
