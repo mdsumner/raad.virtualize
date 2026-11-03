@@ -257,9 +257,10 @@ transfer bucket and to source.coop without a rebuild, apart from `stac/`.
    stops on a shortfall rather than publishing a shorter series.
 2. Overviews: the contract states whether overview IFDs are indexed. The
    current stores index IFD 0 only (22.77M refs); the async-tiff harvest
-   returns overviews too (30.5M rows). Proposed for version 1: IFD 0 only.
-   `GHRSST_OVERVIEWS=1` indexes every level as `<var>_x<f>` (py/plan_cog.py
-   --overviews).
+   returns overviews too (30.5M rows). The scratch stores index every level
+   as `<var>_x<f>` (`GHRSST_OVERVIEWS`, default 1, py/plan_cog.py
+   --overviews; resampling unknown, set in cogger) until the team agrees to
+   fold the indexes into production.
 3. Anonymous read-back passes for VRT and Icechunk (kerchunk via GDAL stays
    a known limit until GDAL Zarr reads the TIFF predictor filter).
 4. The async-tiff harvest is the harvest step for COG sources, with the
