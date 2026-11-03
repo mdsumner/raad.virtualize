@@ -24,7 +24,8 @@
 #   ESACCI_REMOTE   rclone destination of the COG root (default
 #                   pawsey1197:aad-derived/esacci-oc); empty: no upload
 #   ESACCI_WORKERS  files at once (default 8: the downloads, not the CPUs,
-#                   set the pace, and each worker holds about 1 GB)
+#                   set the pace). Job 52031902 (8 workers, 28.75 GB) peaked
+#                   at 99.96% of its memory before the GDAL cache was capped
 #   SIF             container image (default the gdal-r-python-extras SIF
 #                   in $MYSOFTWARE/sif_lib)
 #   SINGULARITY_MODULE  module providing singularity when it is not already
