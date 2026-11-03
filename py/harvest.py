@@ -581,7 +581,14 @@ def main():
     srcs = plan_sources(a.plan, a.array)
     if a.limit:
         srcs = srcs[:a.limit]
-    have_meta = os.path.exists(os.path.join(a.out, "arrays.json"))
+    # arrays.json from an earlier run; arrays it lacks (overview levels added
+    # to the plan since) are described below and merged in
+    meta_path = os.path.join(a.out, "arrays.json")
+    old_meta = {}
+    if os.path.exists(meta_path):
+        with open(meta_path) as f:
+            old_meta = json.load(f)
+    have_meta = all(nm in old_meta for nm in a.array)
     bands = plan_bands(a.plan, a.array)
     tiff = ({"dims": plan_dims(a.plan, a.array), "bands": bands,
              "attrs": plan_attrs(a.plan, a.array)} if bands else None)
@@ -608,7 +615,7 @@ def main():
         # arrays.json from the first source, scanned in this process, and
         # from the first source of any array that one does not hold (one
         # array per file: py/plan_static.py)
-        meta = {}
+        meta = dict(old_meta)
         while True:
             want = [nm for nm in a.array if nm not in meta]
             if meta and not want:
@@ -622,7 +629,7 @@ def main():
             _, n, dt, m = scan_source(first, a.array, a.out, True, a.engine, tiff=tiff, lifts=lifts)
             meta.update(m)
             print(f"  {first}: {n} chunks in {dt:.1f} s", file=sys.stderr)
-        with open(os.path.join(a.out, "arrays.json"), "w") as f:
+        with open(meta_path, "w") as f:
             json.dump(strict(meta), f, indent=1, default=str, allow_nan=False)
 
     t0, total = time.time(), 0
