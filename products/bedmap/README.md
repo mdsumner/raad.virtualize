@@ -1,6 +1,6 @@
 # Bedmap
 
-Cloud-optimised copies of the Bedmap gridded products for Antarctica, with
+Cloud-optimized copies of the Bedmap gridded products for Antarctica, with
 virtual multidimensional indexes over them. Each version has its own prefix.
 This is a repackaged copy. The authoritative release is the UK Polar Data
 Centre record cited below.

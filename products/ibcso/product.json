@@ -1,0 +1,7 @@
+{
+  "id": "ibcso",
+  "title": "IBCSO: International Bathymetric Chart of the Southern Ocean",
+  "description": "Cloud-optimized copies of the International Bathymetric Chart of the Southern Ocean grids, with virtual multidimensional indexes (GDAL VRT, Kerchunk, Icechunk, STAC). 500 m grids in EPSG:9354 south of 50°S: bed and ice surface elevation, with source and type identifiers. Holds Version 2 (doi:10.1594/PANGAEA.937574) and archived snapshots of the rolling annual releases, each under its own prefix. Repackaged from the AWI and IBCSO releases, CC BY 4.0. Not for navigation.",
+  "license": "CC-BY-4.0",
+  "public_base": "https://data.source.coop/ausantarctic/ibcso/virtual"
+}
