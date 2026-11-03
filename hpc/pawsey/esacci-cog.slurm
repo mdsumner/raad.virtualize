@@ -27,14 +27,18 @@
 #                   set the pace, and each worker holds about 1 GB)
 #   SIF             container image (default the gdal-r-python-extras SIF
 #                   in $MYSOFTWARE/sif_lib)
+#   SINGULARITY_MODULE  module providing singularity when it is not already
+#                   on PATH (default singularity/4.3.5-slurm)
 #
 # COGs already under ESACCI_OUT, or listed under ESACCI_REMOTE, are skipped,
 # so a job that runs out of time is resubmitted as is. rclone runs on the
 # host with its own configuration (no keys in the job or the environment).
 set -uo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
-module load singularity/4.1.0-slurm
+command -v singularity > /dev/null || module load "${SINGULARITY_MODULE:-singularity/4.3.5-slurm}"
+command -v singularity > /dev/null || { echo "esacci-cog: no singularity (set SINGULARITY_MODULE)" >&2; exit 1; }
 command -v rclone > /dev/null || module load rclone
+command -v rclone > /dev/null || { echo "esacci-cog: no rclone" >&2; exit 1; }
 
 CATALOG=${ESACCI_CATALOG:-https://www.oceancolour.org/thredds/catalog/cci/v6.0-release/geographic/monthly/chlor_a/catalog.xml}
 VARS=${ESACCI_VARS:-chlor_a chlor_a_log10_bias chlor_a_log10_rmsd}
@@ -54,7 +58,7 @@ if [ -n "$REMOTE" ]; then
 fi
 
 var_flags=(); for v in $VARS; do var_flags+=(--var "$v"); done
-singularity exec -B /scratch "$SIF" python "$PWD/py/esacci_cog.py" \
+singularity exec "$SIF" python "$PWD/py/esacci_cog.py" \
   --catalog "$CATALOG" "${var_flags[@]}" --out "$OUT" --tmp "$TMP" --done "$DONE" \
   --workers "$WORKERS" --threads 2 ${ESACCI_YEARS:+--years $ESACCI_YEARS} \
   ${ESACCI_LIMIT:+--limit "$ESACCI_LIMIT"}

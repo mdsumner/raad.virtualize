@@ -13,15 +13,18 @@
 #
 #   SIF        default $MYSOFTWARE/sif_lib/gdal-r-python-extras_2026-10-25.sif
 #   RV_PYUSER  default $MYSOFTWARE/rv-pyuser
+#   SINGULARITY_MODULE  default singularity/4.3.5-slurm, loaded when
+#              singularity is not already on PATH
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-[ $# -ge 1 ] || { sed -n '2,15p' "$0"; exit 1; }
-module load singularity/4.1.0-slurm 2>/dev/null || true
+[ $# -ge 1 ] || { sed -n '2,17p' "$0"; exit 1; }
+command -v singularity > /dev/null || module load "${SINGULARITY_MODULE:-singularity/4.3.5-slurm}"
+command -v singularity > /dev/null || { echo "singularity-run.sh: no singularity (set SINGULARITY_MODULE)" >&2; exit 1; }
 SIF=${SIF:-$MYSOFTWARE/sif_lib/gdal-r-python-extras_2026-10-25.sif}
 export PYTHONUSERBASE=${RV_PYUSER:-$MYSOFTWARE/rv-pyuser}
 PKGS="obstore imagecodecs fastparquet"
 cd "$HERE"
-exec singularity exec -B /scratch -B "$MYSOFTWARE" "$SIF" bash -c '
+exec singularity exec "$SIF" bash -c '
   python -c "import obstore, imagecodecs, fastparquet" 2>/dev/null ||
     python -m pip install -q --user '"$PKGS"' 2>/dev/null ||
     python -m pip install -q --user --break-system-packages '"$PKGS"'
