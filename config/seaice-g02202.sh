@@ -7,8 +7,10 @@
 # the root group are the same for every sensor (supplementary fields and the
 # AMSR2 prototype are in subgroups, not indexed here).
 #
-# The file list is the aad-filelist collection cdr_sic_G02202_V6 (the raad
-# mirror listing), not a crawl of the NSIDC server.
+# The file list is the aad-filelist collection cdr_sic_G02202_V6: a bowerbird
+# dry-run crawl of noaadata.apps.nsidc.org (it lists the NSIDC server, not
+# the raad mirror; the mirror's own listing is raad_file_db.parquet on the
+# same release).
 #
 #   SEAICE_HEM=south          south or north (separate grids and SRS, so
 #                             separate datasets)
