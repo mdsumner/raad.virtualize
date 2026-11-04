@@ -22,6 +22,11 @@ record on 2024-05-29 and 2018 again on 2026-04-25, so a mirror can hold
 older files under the same names. Size is the gate here, and verify-published
 (which reads the published forms from the server) is the check.
 
+With --corpus SOURCE_ID, the file list and sizes are the listing corpus's
+record of the server (mdsumner/aad-filelist, py/corpus.py; CORPUS_BASE for
+another corpus) instead of the index and one HEAD per file; only the byte
+range check still goes to the server.
+
 --offline lists the mirror only (no server requests, no size check); the
 refs then point at the server unchecked. For a smoke test without network.
 
@@ -86,6 +91,27 @@ def server_files(base, years, rx):
     return out
 
 
+def corpus_files(source, base, rx):
+    """({date: url}, {date: size}) from the listing corpus, for files under base."""
+    import corpus
+    cb = os.environ.get("CORPUS_BASE", corpus.CORPUS)
+    loc = f"{cb.rstrip('/')}/current__{source}.parquet" if re.match(r"^https?://", cb) \
+        else os.path.join(cb, f"current__{source}.parquet")
+    urls, sizes = {}, {}
+    for row in corpus.read_listing(loc, ""):
+        u = row["url"] or ""
+        if not u.startswith(base + "/"):
+            continue
+        m = rx.fullmatch(u.rsplit("/", 1)[-1])
+        if not m:
+            continue
+        if row["size"] is None:
+            sys.exit(f"bremen_sources: corpus has no size for {u}")
+        urls[m.group(1)] = u
+        sizes[m.group(1)] = int(row["size"])
+    return urls, sizes
+
+
 def mirror_files(mirror, years, rx):
     out = {}
     for y in years:
@@ -107,6 +133,8 @@ def main():
     ap.add_argument("--mirror", help="local directory holding the same YYYY/ folders")
     ap.add_argument("--offline", action="store_true", help="mirror only, no server requests")
     ap.add_argument("--threads", type=int, default=16)
+    ap.add_argument("--corpus", default="", metavar="SOURCE_ID",
+                    help="list from this listing corpus source, not the server index")
     a = ap.parse_args()
     base = a.base.rstrip("/")
     rx = re.compile(NAME)
@@ -126,7 +154,11 @@ def main():
               f"against the server)", file=sys.stderr)
         return
 
-    remote = {d: u for d, u in server_files(base, years, rx).items() if keep(d)}
+    if a.corpus:
+        listed, csize = corpus_files(a.corpus, base, rx)
+        remote = {d: u for d, u in listed.items() if keep(d)}
+    else:
+        remote = {d: u for d, u in server_files(base, years, rx).items() if keep(d)}
     if not remote:
         sys.exit(f"bremen_sources: no files listed under {base}")
     first = remote[min(remote)]
@@ -137,8 +169,11 @@ def main():
         sys.exit(f"bremen_sources: {first} is not HDF5 (netCDF4): first bytes {body[:8]!r}")
 
     dates = sorted(remote)
-    with ThreadPoolExecutor(a.threads) as ex:
-        sizes = dict(zip(dates, ex.map(lambda d: head_size(remote[d]), dates)))
+    if a.corpus:
+        sizes = {d: csize[d] for d in dates}
+    else:
+        with ThreadPoolExecutor(a.threads) as ex:
+            sizes = dict(zip(dates, ex.map(lambda d: head_size(remote[d]), dates)))
     n_local = differ = 0
     for d in dates:
         p = local.get(d)

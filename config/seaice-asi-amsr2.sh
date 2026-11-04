@@ -32,6 +32,10 @@
 #                             old mirror file is not the published file.
 #   SEAICE_OFFLINE=1          list the mirror only, no server check (refs
 #                             are remapped unchecked; for a smoke test)
+#   SEAICE_LIST=corpus        the file list and sizes come from the
+#                             aad-filelist listing corpus (source
+#                             amsr2_asi_s3125, south grid only); server:
+#                             list the index and HEAD every file
 #   SEAICE_SRS=file           the plan's SRS. Default file: the files' own
 #                             label, EPSG:3976 (WGS 84 / NSIDC Sea Ice Polar
 #                             Stereographic, WGS 84 ellipsoid). Any other
@@ -62,6 +66,9 @@ sources() {
   local flags=()
   [ -n "$ASI_MIRROR" ] && flags+=(--mirror "$ASI_MIRROR")
   [ "${SEAICE_OFFLINE:-0}" = 1 ] && flags+=(--offline)
+  # the listing corpus lists the south grid (source amsr2_asi_s3125);
+  # SEAICE_LIST=server lists the index and HEADs every file instead
+  [ "${SEAICE_LIST:-corpus}" = corpus ] && [ "$ASI_GRID" = s3125 ] && flags+=(--corpus amsr2_asi_s3125)
   "$PYTHON" "$HERE/py/bremen_sources.py" --base "$ASI_URL" \
     ${SEAICE_FIRST:+--first "$SEAICE_FIRST"} ${SEAICE_LAST:+--last "$SEAICE_LAST"} \
     ${flags[@]+"${flags[@]}"}
