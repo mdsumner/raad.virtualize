@@ -78,8 +78,8 @@ def axis(dates, cadence):
     5day   one step per 5-day period. Three calendars are recognised from
            the dates themselves: periods starting on days 1, 6, 11, 16, 21,
            26 of each month (the last one runs to the month end); periods
-           starting on day of year 1, 6, ..., 361 of each year (the last one
-           runs to the year end; the ESA OC-CCI 5-day product); or a
+           starting on day of year 1, 6, ..., 361 of each year, and 366 in a
+           leap year (the ESA OC-CCI 5-day product); or a
            continuous 5-day sequence from the first date. Dates fitting none
            stop the plan."""
     t0, t1 = dates[0], dates[-1]
@@ -96,9 +96,10 @@ def axis(dates, cadence):
             y, m = (y + 1, 1) if m == 12 else (y, m + 1)
         steps = [d for d in steps if t0 <= d <= t1]
     elif all((d.timetuple().tm_yday - 1) % 5 == 0 for d in dates):
-        steps = [dt.date(y, 1, 1) + dt.timedelta(5 * k)
-                 for y in range(t0.year, t1.year + 1) for k in range(73)]
-        steps = [d for d in steps if t0 <= d <= t1]
+        # 73 periods a year, and a 74th starting on day 366 of a leap year
+        steps = [d for y in range(t0.year, t1.year + 1)
+                 for d in (dt.date(y, 1, 1) + dt.timedelta(5 * k) for k in range(74))
+                 if d.year == y and t0 <= d <= t1]
     elif all((d - t0).days % 5 == 0 for d in dates):
         steps = [t0 + dt.timedelta(5 * i) for i in range((t1 - t0).days // 5 + 1)]
     else:
