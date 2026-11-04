@@ -14,9 +14,14 @@ file, so size is the gate here and verify-published (which reads the
 published forms from the bucket) is the check; --md5 also compares the MD5 of
 each local file with the bucket ETag (reads every local file).
 
+With --corpus, the list is the listing corpus's record of the bucket
+(source noaa_oisst_v21_s3 of mdsumner/aad-filelist, py/corpus.py; key,
+size and etag as the corpus last listed them, CORPUS_BASE for another
+corpus) instead of a fresh S3 listing.
+
 Usage:
   python oisst_sources.py [--months 198109,198110] [--preliminary]
-                          [--mirror DIR [--md5]] > sources.txt
+                          [--mirror DIR [--md5]] [--corpus] > sources.txt
 """
 import argparse
 import hashlib
@@ -52,6 +57,28 @@ def listing(prefix):
         tok = t.text
 
 
+CORPUS_SOURCE = "noaa_oisst_v21_s3"
+
+
+def corpus_listing(prefixes, source=CORPUS_SOURCE):
+    """(key, size, etag) from the listing corpus, for keys under prefixes."""
+    import corpus
+    base = os.environ.get("CORPUS_BASE", corpus.CORPUS)
+    loc = f"{base.rstrip('/')}/current__{source}.parquet" if re.match(r"^https?://", base) \
+        else os.path.join(base, f"current__{source}.parquet")
+    head = f"{URL}/"
+    for row in corpus.read_listing(loc, ""):
+        u = row["url"] or ""
+        if not u.startswith(head):
+            continue
+        key = u[len(head):]
+        if not any(key.startswith(p) for p in prefixes):
+            continue
+        if row["size"] is None:
+            sys.exit(f"oisst_sources: corpus has no size for {key}")
+        yield key, int(row["size"]), (row["etag"] or "")
+
+
 def md5(path):
     h = hashlib.md5()
     with open(path, "rb") as f:
@@ -67,15 +94,17 @@ def main():
                     help="add the preliminary file of dates with no final file")
     ap.add_argument("--mirror", help="local directory holding the YYYYMM/ folders")
     ap.add_argument("--md5", action="store_true", help="also compare local MD5 with the bucket ETag")
+    ap.add_argument("--corpus", action="store_true",
+                    help="list from the aad-filelist listing corpus, not the bucket")
     a = ap.parse_args()
     months = [m for m in re.split(r"[,\s]+", a.months) if m]
     prefixes = [f"{ROOT}/{m}/" for m in months] or [f"{ROOT}/"]
     final, prel = {}, {}
-    for p in prefixes:
-        for key, size, etag in listing(p):
-            m = NAME.search(key)
-            if m:
-                (prel if m.group(4) else final)[m.group(3)] = (m.group(1), m.group(2), size, etag)
+    rows = corpus_listing(prefixes) if a.corpus else (r for p in prefixes for r in listing(p))
+    for key, size, etag in rows:
+        m = NAME.search(key)
+        if m:
+            (prel if m.group(4) else final)[m.group(3)] = (m.group(1), m.group(2), size, etag)
     pick = dict(final)
     if a.preliminary:
         pick.update({d: v for d, v in prel.items() if d not in final})

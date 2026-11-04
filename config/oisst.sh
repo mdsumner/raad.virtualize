@@ -20,7 +20,11 @@
 #                      dates are read from the bucket. OISST_MD5=1 also
 #                      compares each local file's MD5 with the bucket ETag.
 #
-# The file list comes from py/oisst_sources.py (anonymous S3 listing).
+#   OISST_LIST         corpus (default): the file list is the aad-filelist
+#                      listing corpus's record of the bucket (source
+#                      noaa_oisst_v21_s3); s3: list the bucket now
+#
+# The file list comes from py/oisst_sources.py.
 # The plan is py/plan_daily.py: `gdal mdim mosaic` of the first two files,
 # extended to every file (the mosaic opens every source, about 1 s each over
 # /vsicurl/, hours for the full series). It opens a sample of files to check
@@ -37,6 +41,7 @@ sources() {
   [ "${OISST_PRELIMINARY:-0}" = 1 ] && flags+=(--preliminary)
   [ -n "${OISST_MIRROR:-}" ] && flags+=(--mirror "$OISST_MIRROR")
   [ "${OISST_MD5:-0}" = 1 ] && flags+=(--md5)
+  [ "${OISST_LIST:-corpus}" = corpus ] && flags+=(--corpus)
   "$PYTHON" "$HERE/py/oisst_sources.py" --months "${OISST_MONTHS:-}" ${flags[@]+"${flags[@]}"}
 }
 make_plan() {
