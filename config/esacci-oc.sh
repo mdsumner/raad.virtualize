@@ -19,7 +19,9 @@
 #   ESACCI_YEARS     years to include (default all); the dataset name gets a
 #                    -<years> suffix, so a subset never overwrites the series
 #   ESACCI_MAX_MISSING  time steps between the first and last file allowed
-#                    to have no file (default 0)
+#                    to have no file (default 0 monthly, 60 5day, 300 daily:
+#                    the early SeaWiFS record has real gaps); the plan step
+#                    lists every missing step
 #   ESACCI_OVERVIEWS 1 (default): every overview level of the COGs (x2 to
 #                    x32, AVERAGE, py/esacci_cog.py) is an array of its own,
 #                    <var>_x<factor>, beside <var> (py/plan_cog.py --overviews);
@@ -34,9 +36,9 @@ ESACCI_COG_ROOT=${ESACCI_COG_ROOT%/}
 ESACCI_COG_URL=${ESACCI_COG_URL:-https://projects.pawsey.org.au/aad-derived/esacci-oc}
 ESACCI_COG_URL=${ESACCI_COG_URL%/}
 case "$ESACCI_CADENCE" in
-  monthly) ESACCI_STEP=month; ESACCI_DATE='[0-9]{6}' ;;
-  5day)    ESACCI_STEP=5day;  ESACCI_DATE='[0-9]{8}' ;;
-  daily)   ESACCI_STEP=day;   ESACCI_DATE='[0-9]{8}' ;;
+  monthly) ESACCI_STEP=month; ESACCI_DATE='[0-9]{6}'; ESACCI_GAPS=0 ;;
+  5day)    ESACCI_STEP=5day;  ESACCI_DATE='[0-9]{8}'; ESACCI_GAPS=60 ;;
+  daily)   ESACCI_STEP=day;   ESACCI_DATE='[0-9]{8}'; ESACCI_GAPS=300 ;;
   *) echo "esacci-oc.sh: ESACCI_CADENCE must be monthly, 5day or daily" >&2; exit 1 ;;
 esac
 ESACCI_DIR=v6.0-release/geographic/$ESACCI_CADENCE/$ESACCI_VAR
@@ -62,7 +64,7 @@ sources() (
 make_plan() {
   "$PYTHON" "$HERE/py/plan_cog.py" --sources "$WORK/sources.txt" --array "$ESACCI_VAR" \
     --cadence "$ESACCI_STEP" --pattern "$ESACCI_PATTERN" \
-    --max-missing "${ESACCI_MAX_MISSING:-0}" \
+    --max-missing "${ESACCI_MAX_MISSING:-$ESACCI_GAPS}" \
     $([ "${ESACCI_OVERVIEWS:-1}" = 1 ] && echo --overviews --resampling AVERAGE) "$WORK/plan.vrt"
 }
 # target|prefix|replacement, applied at publish only (sources stay verbatim)
