@@ -159,7 +159,7 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `ICECHUNK_ARGS` | extra `py/render_icechunk.py` options: `--split N` chunks along the first axis per manifest (default 365, 0 for none; set it to the append unit, such as 1 for daily, for a repository that later takes incremental commits), `--commit-every N` refs (default 1M) |
 | `BRAN_YEARS`, `BRAN_MONTHS`, `BRAN_VAR`, `BRAN_ROOT` | BRAN selection; a month subset gets its own dataset name |
 | `GHRSST_VAR`, `GHRSST_YEARS`, `GHRSST_COG_ROOT` | GHRSST COG selection (`config/ghrsst-cog.sh`) |
-| `SEAICE_HEM`, `SEAICE_FREQ`, `SEAICE_FIRST`, `SEAICE_LAST`, `SEAICE_ARRAYS`, `SEAICE_MIRROR` | G02202 v6 selection (`config/seaice-g02202.sh`); the source list is the aad-filelist collection `cdr_sic_G02202_V6`, read by `py/filelist.py` |
+| `SEAICE_HEM`, `SEAICE_FREQ`, `SEAICE_FIRST`, `SEAICE_LAST`, `SEAICE_ARRAYS`, `SEAICE_MIRROR` | G02202 v6 selection (`config/seaice-g02202.sh`); the source list is source `cdr_sic_G02202_V6` of the aad-filelist listing corpus, read by `py/corpus.py` (`SEAICE_LISTING` for another listing, `CORPUS_BASE` for another corpus) |
 | `SEAICE_HEM`, `SEAICE_FIRST`, `SEAICE_LAST`, `SEAICE_ARRAYS`, `SEAICE_MIRROR`, `SEAICE_OFFLINE`, `SEAICE_SRS` | Bremen ASI AMSR2 3.125 km selection (`config/seaice-asi-amsr2.sh`); sources listed from the Bremen server by `py/bremen_sources.py` (mirror files used only when their size matches), plan by `py/plan_lift.py` (2D files stacked on a new time axis) |
 | `OISST_MONTHS`, `OISST_PRELIMINARY`, `OISST_MIRROR`, `OISST_MD5` | OISST v2.1 selection (`config/oisst.sh`); the source list is an anonymous listing of the NOAA bucket, read by `py/oisst_sources.py` |
 | `VERIFY_WINDOWS` | explicit `--window ARRAY:START:COUNT` checks |
