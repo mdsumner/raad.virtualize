@@ -1,8 +1,8 @@
 """filelist.py -- source list from an aad-filelist Parquet file list.
 
-mdsumner/aad-filelist publishes one Parquet file per collection of the raad
-mirror (release `latest`), with a `url` column holding the original HTTPS
-URL of every file. This script prints the selected URLs, one per line, in
+mdsumner/aad-filelist publishes one Parquet file per collection (release
+`latest`), each a bowerbird dry-run crawl of the publisher's server, with a
+`url` column holding the original HTTPS URL of every file. This script prints the selected URLs, one per line, in
 date order, for a dataset config's sources() function.
 
   --filelist   local path or https URL of the Parquet file

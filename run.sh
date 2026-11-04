@@ -188,7 +188,7 @@ for s in $STEPS; do
       if [ -f "$WORK/out/grist/catalog.parquet" ]; then
         gcat=${GRIST_BASE-${STAC_BASE:-}}; gcat=${gcat:-$PUB}
         step verify-published "$PYTHON" "$HERE/py/verify_grist.py" \
-          --catalog "${gcat%/}/grist/catalog.parquet" \
+          --catalog "${gcat%/}/grist/catalog.parquet" --require-url \
           --boundaries "${GRIST_VERIFY_BOUNDARIES:-8}" --window "${GRIST_VERIFY_WINDOW:-0}"
       fi ;;
     *) echo "unknown step $s"; exit 1 ;;

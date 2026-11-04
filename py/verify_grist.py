@@ -49,6 +49,8 @@ from osgeo import gdal
 gdal.UseExceptions()
 gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
 
+URL_DSN = re.compile(r"^(/vsicurl/|/vsis3/|/vsigs/|/vsiaz/|https?://|s3://)")
+
 UNIT_SECONDS = {"second": 1, "seconds": 1, "s": 1, "sec": 1, "secs": 1,
                 "minute": 60, "minutes": 60, "min": 60, "mins": 60,
                 "hour": 3600, "hours": 3600, "h": 3600, "hr": 3600, "hrs": 3600,
@@ -235,6 +237,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--catalog", required=True)
     p.add_argument("--vrt", help="open this VRT in place of each row's dsn")
+    p.add_argument("--require-url", action="store_true",
+                   help="fail when a dsn is not a URL (/vsicurl/, /vsis3/, http(s)://)")
     p.add_argument("--boundaries", default="8", help="source changes to check per array and level, or all")
     p.add_argument("--window", type=int, default=0,
                    help="read an N x N window of each field (0: the whole field)")
@@ -251,6 +255,14 @@ def main():
           f"dataset {md.get('rv:dataset')}")
     if a.vrt:
         print(f"  reading {a.vrt} in place of dsn {rows[0]['dsn']}")
+    if a.require_url:
+        # a published catalog must name its dsn by URL; a build-machine path
+        # opens on that machine only, so this check passes there and fails
+        # for everyone else (the oceancolour catalogs, 2026-11-04)
+        local = sorted({r["dsn"] for r in rows if not URL_DSN.match(r["dsn"] or "")})
+        if local:
+            print(f"verify-grist: {len(local)} dsn value(s) are not URLs, e.g. {local[0]}")
+            sys.exit(1)
     bad = 0
     vcache, scache = {}, {}
     if a.window:
