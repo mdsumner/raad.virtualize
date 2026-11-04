@@ -7,10 +7,13 @@
 # the root group are the same for every sensor (supplementary fields and the
 # AMSR2 prototype are in subgroups, not indexed here).
 #
-# The file list is the aad-filelist collection cdr_sic_G02202_V6: a bowerbird
-# dry-run crawl of noaadata.apps.nsidc.org (it lists the NSIDC server, not
-# the raad mirror; the mirror's own listing is raad_file_db.parquet on the
-# same release).
+# The file list is source cdr_sic_G02202_V6 of the aad-filelist listing
+# corpus (py/corpus.py reads current__cdr_sic_G02202_V6.parquet from its
+# `corpus` release): a bowerbird dry-run crawl of noaadata.apps.nsidc.org,
+# HEADed for size/mtime/etag (it lists the NSIDC server, not the raad
+# mirror; the mirror's own listing is raad_file_db.parquet on the `latest`
+# release). What the corpus knows of each selected file goes to
+# $WORK/sources.meta.tsv.
 #
 #   SEAICE_HEM=south          south or north (separate grids and SRS, so
 #                             separate datasets)
@@ -30,7 +33,11 @@
 #                             raad layout): sources are read from it and
 #                             remapped to the NSIDC URLs at publish; files
 #                             listed but missing from the mirror are skipped
-#   SEAICE_FILELIST           the file list Parquet (URL or local path)
+#   SEAICE_LISTING            a listing Parquet (URL or local path) in place
+#                             of the corpus: a current__ file, or the old
+#                             aad-filelist `latest` shape (url column)
+#   CORPUS_BASE               the corpus release or a local copy (default
+#                             the aad-filelist `corpus` release)
 SEAICE_HEM=${SEAICE_HEM:-south}
 SEAICE_FREQ=${SEAICE_FREQ:-daily}
 case "$SEAICE_HEM" in south|north) ;; *) echo "SEAICE_HEM must be south or north" >&2; exit 1 ;; esac
@@ -43,11 +50,11 @@ DATASET=g02202-v6-$SEAICE_FREQ-$SEAICE_HEM${SEAICE_FIRST:+-$SEAICE_FIRST}${SEAIC
 # product group (products/seaice/): the scratch prefix on source.coop
 PRODUCT_GROUP=seaice
 ARRAYS=${SEAICE_ARRAYS:-$SEAICE_CONC}
-SEAICE_FILELIST=${SEAICE_FILELIST:-https://github.com/mdsumner/aad-filelist/releases/download/latest/cdr_sic_G02202_V6.parquet}
 if [ -n "${SEAICE_MIRROR:-}" ]; then SEAICE_ROOT="${SEAICE_MIRROR%/}/"
 else SEAICE_ROOT=/vsicurl/https://; fi
 sources() {
-  "$PYTHON" "$HERE/py/filelist.py" --filelist "$SEAICE_FILELIST" --cache "$WORK/filelist.parquet" \
+  "$PYTHON" "$HERE/py/corpus.py" --source cdr_sic_G02202_V6 ${SEAICE_LISTING:+--listing "$SEAICE_LISTING"} \
+    --cache "$WORK/listing.parquet" --meta "$WORK/sources.meta.tsv" \
     --match "/G02202_V6/$SEAICE_HEM/$SEAICE_FREQ/" --date "$SEAICE_DATE" \
     ${SEAICE_FIRST:+--first "$SEAICE_FIRST"} ${SEAICE_LAST:+--last "$SEAICE_LAST"} \
     --prefix https:// "$SEAICE_ROOT" ${SEAICE_MIRROR:+--exists}
