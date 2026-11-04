@@ -45,12 +45,15 @@ v6.0-release/geographic/monthly/chlor_a/1997/ESACCI-OC-L3S-CHLOR_A-MERGED-1M_MON
 - `month`: one step per calendar month, the first day of the month as days
   since 1970-01-01 (`InlineValues`)
 - `5day`: one step per 5-day period. The calendar is taken from the file
-  dates: periods starting on days 1, 6, 11, 16, 21 and 26 of each month, or a
-  continuous 5-day sequence. Dates fitting neither stop the plan.
+  dates: periods starting on days 1, 6, 11, 16, 21 and 26 of each month,
+  on day of year 1, 6, ..., 361 (the OC-CCI 5-day product, restarting each
+  1 January), or a continuous 5-day sequence. Dates fitting none stop the
+  plan.
 - `day`: one step per day
 
-A step with no file is a hole; `ESACCI_MAX_MISSING` (default 0) stops the
-plan when a listing is short. The 5-day and daily datasets publish STAC items
+A step with no file is a hole, listed by the plan step; `ESACCI_MAX_MISSING`
+stops the plan when there are more (default 0 monthly, 60 5-day, 300 daily,
+since the early SeaWiFS record has real gaps). The 5-day and daily datasets publish STAC items
 as ndjson and stac-geoparquet only (`STAC_ITEM_FILES=0`).
 
 ## Procedure on Setonix

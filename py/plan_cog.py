@@ -19,7 +19,8 @@ YYYYMMDD (--cadence 5day), or YYYYMM (--cadence month).
 day of the month in days since 1970-01-01, written as InlineValues (months
 are not evenly spaced in days). The time index of a file is its month minus
 the first month. --cadence 5day: one step per 5-day period, by either of the
-calendars axis() recognises from the file dates. Steps evenly spaced in days
+calendars axis() recognises from the file dates (per month, per year, or
+continuous). Steps evenly spaced in days
 are written as RegularlySpacedValues, others as InlineValues.
 
 Steps (days or months) between the first and last date with no file are
@@ -74,11 +75,13 @@ def axis(dates, cadence):
 
     day    one step per day
     month  one step per calendar month (dates are the first of the month)
-    5day   one step per 5-day period. Two calendars are recognised from the
-           dates themselves: periods starting on days 1, 6, 11, 16, 21, 26
-           of each month (the last one runs to the month end), or a
-           continuous 5-day sequence from the first date. Dates fitting
-           neither stop the plan."""
+    5day   one step per 5-day period. Three calendars are recognised from
+           the dates themselves: periods starting on days 1, 6, 11, 16, 21,
+           26 of each month (the last one runs to the month end); periods
+           starting on day of year 1, 6, ..., 361 of each year (the last one
+           runs to the year end; the ESA OC-CCI 5-day product); or a
+           continuous 5-day sequence from the first date. Dates fitting none
+           stop the plan."""
     t0, t1 = dates[0], dates[-1]
     if cadence == "day":
         steps = [t0 + dt.timedelta(i) for i in range((t1 - t0).days + 1)]
@@ -92,12 +95,16 @@ def axis(dates, cadence):
             steps += [dt.date(y, m, k) for k in PENTAD_DAYS]
             y, m = (y + 1, 1) if m == 12 else (y, m + 1)
         steps = [d for d in steps if t0 <= d <= t1]
+    elif all((d.timetuple().tm_yday - 1) % 5 == 0 for d in dates):
+        steps = [dt.date(y, 1, 1) + dt.timedelta(5 * k)
+                 for y in range(t0.year, t1.year + 1) for k in range(73)]
+        steps = [d for d in steps if t0 <= d <= t1]
     elif all((d - t0).days % 5 == 0 for d in dates):
         steps = [t0 + dt.timedelta(5 * i) for i in range((t1 - t0).days // 5 + 1)]
     else:
         bad = ", ".join(str(d) for d in dates[:12])
-        sys.exit(f"plan_cog: 5day dates fit neither days {PENTAD_DAYS} of each month "
-                 f"nor a continuous 5-day sequence (first dates: {bad})")
+        sys.exit(f"plan_cog: 5day dates fit none of days {PENTAD_DAYS} of each month, "
+                 f"day of year 1, 6, ..., 361, or a continuous 5-day sequence (first dates: {bad})")
     pos = {d: i for i, d in enumerate(steps)}
     return pos.__getitem__, steps
 
@@ -279,7 +286,7 @@ def main():
                                            a.overviews, a.resampling)
     unit = {"day": "days", "5day": "5-day periods", "month": "months"}[a.cadence]
     if missing:
-        shown = ", ".join(str(d) for d in missing[:20]) + (" ..." if len(missing) > 20 else "")
+        shown = ", ".join(str(d) for d in missing[:200]) + (" ..." if len(missing) > 200 else "")
         print(f"plan_cog: {len(missing)} of {nt} {unit} have no file: {shown}", file=sys.stderr)
     if 0 <= a.max_missing < len(missing):
         sys.exit(f"plan_cog: {len(missing)} missing {unit}, more than --max-missing {a.max_missing}; "
