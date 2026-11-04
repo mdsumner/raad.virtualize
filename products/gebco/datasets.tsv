@@ -1,0 +1,7 @@
+# Datasets of the group. One row per dataset: dataset name, dataset config,
+# its settings (comma separated, as qsub -v takes them), title. Lines starting
+# with # are skipped.
+dataset	config	env	title
+gebco-2026	config/gebco.sh	GEBCO_YEAR=2026	GEBCO_2026 Grid
+gebco-2025	config/gebco.sh	GEBCO_YEAR=2025	GEBCO_2025 Grid
+gebco-2024	config/gebco.sh	GEBCO_YEAR=2024	GEBCO_2024 Grid

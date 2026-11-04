@@ -1,0 +1,7 @@
+{
+  "id": "gebco",
+  "title": "GEBCO: General Bathymetric Chart of the Oceans",
+  "description": "Cloud-optimized copies of the GEBCO global grids (15 arc-second elevation of ocean and land, EPSG:4326), with virtual multidimensional indexes over them (GDAL VRT, Kerchunk, Icechunk, STAC). Each annual release is its own dataset. The indexes read the COGs in place; no data is copied. GEBCO grids are in the public domain; attribution to the GEBCO Compilation Group is requested. Not for navigation.",
+  "license": "other",
+  "public_base": "https://data.source.coop/ausantarctic/gebco/virtual"
+}

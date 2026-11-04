@@ -2,7 +2,7 @@
 
 For a set of single-band GeoTIFFs on one grid with no time axis (Bedmap3).
 Each file is one array of dimensions (y, x), named by its file name without
-the extension. Sources are <SourceBand> with no <SourceTranspose>; the
+the extension, or by NAME on a sources line of the form NAME<TAB>SOURCE. Sources are <SourceBand> with no <SourceTranspose>; the
 <SourceSlab> states the extent so a read opens only the sources it touches.
 
 Every file must share the grid, type, nodata and tiling of the first; all
@@ -54,7 +54,14 @@ def main():
     if a.resampling and not a.overviews:
         sys.exit("plan_static: --resampling needs --overviews")
     with open(a.sources) as f:
-        sources = [s.strip() for s in f if s.strip()]
+        lines_in = [s.strip() for s in f if s.strip()]
+    # NAME<TAB>SOURCE names the array; a bare SOURCE is named by its file
+    named = [ln.split("\t", 1) if "\t" in ln else
+             [os.path.splitext(os.path.basename(ln))[0], ln] for ln in lines_in]
+    names = {n: s for n, s in named}
+    sources = [s for _, s in named]
+    if len(names) < len(named):
+        sys.exit("plan_static: two sources have the same array name")
     nx, ny, gt, wkt, dtype, nodata, block = first = grid(gdal.Open(sources[0]))
     x0, dx, _, y0, _, dy = gt
     levels = overview_dirs(sources[0]) if a.overviews else []
@@ -72,11 +79,10 @@ def main():
                       f'      <DimensionRef ref="{name}"/>',
                       f'      <RegularlySpacedValues start="{start:.17g}" increment="{inc:.17g}"/>',
                       "    </Array>"]
-    for s in sources:
+    for name, s in named:
         ds = gdal.Open(s)
         if grid(ds) != first:
             sys.exit(f"plan_static: {s} differs from {sources[0]} in grid, type, nodata or tiling")
-        name = os.path.splitext(os.path.basename(s))[0]
         unit = ds.GetRasterBand(1).GetUnitType()
         mine = overview_dirs(s) if a.overviews else []
         if [(ox, oy) for _, ox, oy in mine] != [(ox, oy) for _, ox, oy in levels]:
