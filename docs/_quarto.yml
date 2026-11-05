@@ -19,25 +19,29 @@ website:
     left:
       - href: index.qmd
         text: Overview
-      - href: examples/index.qmd
-        text: Examples
       - href: published.md
-        text: Published
+        text: Datasets
+      - href: how-it-works.md
+        text: How it works
       - href: readers.qmd
         text: Readers
-      - href: results.md
-        text: Results
-      - text: Guides
+      - href: related.md
+        text: Related
+      - text: Working notes
         menu:
+          - href: notes.md
+          - href: results.md
           - href: reading-published-stores.md
+          - href: examples/index.qmd
           - href: indexes-only-product.md
           - href: ghrsst-source-coop.md
           - href: esacci-oc.md
+          - href: bedmap-source-coop.md
     right:
       - icon: github
         href: https://github.com/mdsumner/raad.virtualize
   page-footer:
-    left: "Working stage: names and layout will change."
+    left: "AAD virtual stores on source.coop. Status 2026-11-05."
     right: "Built with [Quarto](https://quarto.org)"
 
 format:
