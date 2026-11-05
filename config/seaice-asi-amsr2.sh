@@ -69,7 +69,7 @@ sources() {
   # the listing corpus lists the south grid (source amsr2_asi_s3125);
   # SEAICE_LIST=server lists the index and HEADs every file instead
   [ "${SEAICE_LIST:-corpus}" = corpus ] && [ "$ASI_GRID" = s3125 ] && flags+=(--corpus amsr2_asi_s3125)
-  "$PYTHON" "$HERE/py/bremen_sources.py" --base "$ASI_URL" \
+  "$PYTHON" "$HERE/py/bremen_sources.py" --base "$ASI_URL" --meta "$WORK/sources.meta.tsv" --meta-source "amsr2_asi_$ASI_GRID" \
     ${SEAICE_FIRST:+--first "$SEAICE_FIRST"} ${SEAICE_LAST:+--last "$SEAICE_LAST"} \
     ${flags[@]+"${flags[@]}"}
 }

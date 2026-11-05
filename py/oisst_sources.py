@@ -21,7 +21,7 @@ corpus) instead of a fresh S3 listing.
 
 Usage:
   python oisst_sources.py [--months 198109,198110] [--preliminary]
-                          [--mirror DIR [--md5]] [--corpus] > sources.txt
+                          [--mirror DIR [--md5]] [--corpus] [--meta FILE] > sources.txt
 """
 import argparse
 import hashlib
@@ -58,16 +58,14 @@ def listing(prefix):
 
 
 CORPUS_SOURCE = "noaa_oisst_v21_s3"
+CORPUS_ROWS = {}   # key -> the corpus row, for the build record
 
 
 def corpus_listing(prefixes, source=CORPUS_SOURCE):
     """(key, size, etag) from the listing corpus, for keys under prefixes."""
     import corpus
-    base = os.environ.get("CORPUS_BASE", corpus.CORPUS)
-    loc = f"{base.rstrip('/')}/current__{source}.parquet" if re.match(r"^https?://", base) \
-        else os.path.join(base, f"current__{source}.parquet")
     head = f"{URL}/"
-    for row in corpus.read_listing(loc, ""):
+    for row in corpus.read_listing(corpus.current_location(source), ""):
         u = row["url"] or ""
         if not u.startswith(head):
             continue
@@ -76,6 +74,7 @@ def corpus_listing(prefixes, source=CORPUS_SOURCE):
             continue
         if row["size"] is None:
             sys.exit(f"oisst_sources: corpus has no size for {key}")
+        CORPUS_ROWS[key] = row
         yield key, int(row["size"]), (row["etag"] or "")
 
 
@@ -96,6 +95,8 @@ def main():
     ap.add_argument("--md5", action="store_true", help="also compare local MD5 with the bucket ETag")
     ap.add_argument("--corpus", action="store_true",
                     help="list from the aad-filelist listing corpus, not the bucket")
+    ap.add_argument("--meta", default="",
+                    help="write the build record (py/corpus.py write_meta) for py/stale.py")
     a = ap.parse_args()
     months = [m for m in re.split(r"[,\s]+", a.months) if m]
     prefixes = [f"{ROOT}/{m}/" for m in months] or [f"{ROOT}/"]
@@ -112,6 +113,7 @@ def main():
         sys.exit("oisst_sources: no files listed")
     local = remote = 0
     why = {}
+    meta = []
     for d in sorted(pick):
         month, name, size, etag = pick[d]
         src = f"/vsicurl/{URL}/{ROOT}/{month}/{name}"
@@ -132,6 +134,14 @@ def main():
                 local += 1
         remote += src.startswith("/vsicurl/")
         print(src)
+        key = f"{ROOT}/{month}/{name}"
+        c = CORPUS_ROWS.get(key, {})
+        meta.append({"source_id": CORPUS_SOURCE, "source": src, "url": f"{URL}/{key}", "date": d,
+                     "size": size, "etag": etag, "mtime": c.get("mtime"),
+                     "last_changed": c.get("last_changed")})
+    if a.meta:
+        import corpus
+        corpus.write_meta(a.meta, meta)
     extra = (", ".join(f"{n} {k}" for k, n in sorted(why.items()))) if why else ""
     print(f"oisst_sources: {len(pick)} dates ({len(pick) - len(final) if a.preliminary else 0} preliminary), "
           f"{local} from {a.mirror or 'no mirror'}, {remote} from the bucket"

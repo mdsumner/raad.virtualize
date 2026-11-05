@@ -31,8 +31,9 @@ record a later staleness check compares against the corpus `changes`.
   --exists     keep only entries that exist as local files after the prefix
                swap (a mirror that lags the list); the count dropped goes to
                stderr
-  --meta FILE  write a TSV of the selected files: source (as printed), url
-               (as listed), date, size, mtime, etag, last_changed
+  --meta FILE  write the build record (write_meta): one row per selected
+               file, with what the corpus knew of it; py/stale.py compares
+               it with the corpus later
 
 Usage:
   python corpus.py --source cdr_sic_G02202_V6 \
@@ -63,11 +64,7 @@ def listing_location(a):
         return a.listing
     if not a.source:
         sys.exit("corpus: give --source or --listing")
-    if _is_url(a.corpus):
-        return f"{a.corpus.rstrip('/')}/current__{a.source}.parquet"
-    flat = os.path.join(a.corpus, f"current__{a.source}.parquet")
-    tree = os.path.join(a.corpus, "current", f"{a.source}.parquet")
-    return flat if os.path.exists(flat) or not os.path.exists(tree) else tree
+    return current_location(a.source, a.corpus)
 
 
 def read_listing(loc, cache):
@@ -92,6 +89,34 @@ def read_listing(loc, cache):
     d = t.select(have).to_pydict()
     n = t.num_rows
     return [{c: (d[c][i] if c in d else None) for c in COLS} for i in range(n)]
+
+
+## the build record: what a store was built against, one row per source
+## file. source is the path as harvested (a mirror path or /vsicurl/ URL),
+## url the file as the corpus lists it (the published reference), and size,
+## mtime, etag, last_changed what the corpus (or the lister) knew then.
+META_COLS = ["source_id", "source", "url", "date", "size", "mtime", "etag", "last_changed"]
+
+
+def current_location(source, base=None):
+    """Where current__<source>.parquet is: base URL or local directory."""
+    base = base or os.environ.get("CORPUS_BASE", CORPUS)
+    if _is_url(base):
+        return f"{base.rstrip('/')}/current__{source}.parquet"
+    flat = os.path.join(base, f"current__{source}.parquet")
+    tree = os.path.join(base, "current", f"{source}.parquet")
+    return flat if os.path.exists(flat) or not os.path.exists(tree) else tree
+
+
+def write_meta(path, rows):
+    """rows: dicts with META_COLS keys (missing ones are empty)."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", newline="") as f:
+        w = csv.writer(f, delimiter="\t", lineterminator="\n")
+        w.writerow(META_COLS)
+        for r in rows:
+            w.writerow([_fmt(r.get(c)) for c in META_COLS])
+    os.replace(tmp, path)
 
 
 def _fmt(v):
@@ -153,13 +178,8 @@ def main():
     if unsized:
         sys.stderr.write(f"corpus: {unsized} of {len(out)} selected files have no size in the corpus\n")
     if a.meta:
-        tmp = a.meta + ".tmp"
-        with open(tmp, "w", newline="") as f:
-            w = csv.writer(f, delimiter="\t", lineterminator="\n")
-            w.writerow(["source", "url", "date"] + COLS[1:])
-            for d, s, r in out:
-                w.writerow([s, r["url"], d] + [_fmt(r[c]) for c in COLS[1:]])
-        os.replace(tmp, a.meta)
+        sid = a.source or os.path.basename(loc).removeprefix("current__").removesuffix(".parquet")
+        write_meta(a.meta, ({**r, "source_id": sid, "source": s, "date": d} for d, s, r in out))
     sys.stdout.write("".join(s + "\n" for _, s, _ in out))
 
 

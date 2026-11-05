@@ -9,7 +9,8 @@
 #
 # Every leading *.sh argument is sourced, in order (dataset, then a publish
 # target). Steps: deps plan harvest collate render icechunk grist stac verify, and
-# prepare publish publish-stac verify-published (not run by default).
+# prepare publish publish-stac verify-published stale (not run by default).
+# stale compares the build record (sources.meta.tsv) with the listing corpus.
 # publish-stac republishes only stac/ and thumbnail.png. prepare runs the
 # config's prepare function, for a dataset that writes its sources first.
 # Env: E2E_WORK (default ./work/<DATASET>), PYTHON, RSCRIPT, GDAL, WORKERS,
@@ -73,6 +74,9 @@ for s in $STEPS; do
     plan)
       # sources go to the mosaic as a response file (@file): a full GHRSST
       # or multi-year BRAN listing is longer than the argument limit
+      # sources() may also write the build record (sources.meta.tsv, for the
+      # stale step); drop the last one so a lister that writes none leaves none
+      rm -f "$WORK/sources.meta.tsv"
       sources > "$WORK/sources.txt"
       [ -s "$WORK/sources.txt" ] || { echo "plan: no sources"; exit 1; }
       # a config may define make_plan (sources.txt -> plan.vrt) for sources
@@ -157,10 +161,14 @@ for s in $STEPS; do
       # endpoints that reject GDAL's request signing
       if [ "${PUBLISH_WITH:-gdal}" = obstore ]; then
         step publish "$PYTHON" "$HERE/py/s3_sync.py" ${S3_SYNC_ARGS:-} "$WORK/out" "$PUB"
-        for f in plan.vrt store.sqlite; do step publish "$PYTHON" "$HERE/py/s3_sync.py" ${S3_SYNC_ARGS:-} "$WORK/$f" "$PUB/$f"; done
+        for f in plan.vrt store.sqlite sources.meta.tsv; do
+          [ -f "$WORK/$f" ] && step publish "$PYTHON" "$HERE/py/s3_sync.py" ${S3_SYNC_ARGS:-} "$WORK/$f" "$PUB/$f"
+        done
       else
         step publish "$GDAL" vsi sync -r -j 8 "$WORK/out/" "$PUB/"
-        for f in plan.vrt store.sqlite; do step publish "$GDAL" vsi copy "$WORK/$f" "$PUB/$f"; done
+        for f in plan.vrt store.sqlite sources.meta.tsv; do
+          [ -f "$WORK/$f" ] && step publish "$GDAL" vsi copy "$WORK/$f" "$PUB/$f"
+        done
       fi ;;
     publish-stac)
       # the STAC render and thumbnail only, after a stac step on a dataset
@@ -191,6 +199,12 @@ for s in $STEPS; do
           --catalog "${gcat%/}/grist/catalog.parquet" --require-url \
           --boundaries "${GRIST_VERIFY_BOUNDARIES:-8}" --window "${GRIST_VERIFY_WINDOW:-0}"
       fi ;;
+    stale)
+      # source files that changed or went away since the build, against the
+      # listing corpus now (py/stale.py); STALE_ARGS e.g. --warn
+      [ -f "$WORK/sources.meta.tsv" ] || { echo "stale: no $WORK/sources.meta.tsv (a config whose lister writes no build record)"; exit 1; }
+      step stale "$PYTHON" "$HERE/py/stale.py" --meta "$WORK/sources.meta.tsv" \
+        --out "$WORK/stale.tsv" ${STALE_ARGS:-} ;;
     *) echo "unknown step $s"; exit 1 ;;
   esac
 done
