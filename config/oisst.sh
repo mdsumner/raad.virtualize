@@ -42,7 +42,8 @@ sources() {
   [ -n "${OISST_MIRROR:-}" ] && flags+=(--mirror "$OISST_MIRROR")
   [ "${OISST_MD5:-0}" = 1 ] && flags+=(--md5)
   [ "${OISST_LIST:-corpus}" = corpus ] && flags+=(--corpus)
-  "$PYTHON" "$HERE/py/oisst_sources.py" --months "${OISST_MONTHS:-}" ${flags[@]+"${flags[@]}"}
+  "$PYTHON" "$HERE/py/oisst_sources.py" --months "${OISST_MONTHS:-}" --meta "$WORK/sources.meta.tsv" \
+    ${flags[@]+"${flags[@]}"}
 }
 make_plan() {
   arr=(); for a in $ARRAYS; do arr+=(--array "$a"); done

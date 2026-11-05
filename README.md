@@ -215,7 +215,8 @@ can, so arrow does not build from source.
 (`transfer.data.aad.gov.au`, path style; private, keys from the AADC
 website). Credentials come from `AWS_ACCESS_KEY_ID` and
 `AWS_SECRET_ACCESS_KEY` in the environment and are not stored. `publish`
-syncs `out/`, `plan.vrt` and `store.sqlite` to `<prefix>/<DATASET>/`.
+syncs `out/`, `plan.vrt`, `store.sqlite` and `sources.meta.tsv` (when the
+config's lister wrote one) to `<prefix>/<DATASET>/`.
 `verify-published` reads the VRT, kerchunk and Icechunk forms back from the
 bucket and checks them against GDAL on the sources.
 
@@ -254,6 +255,24 @@ per dataset; `check` fails when a dataset has no published collection, and
 `publish` writes the product files at the prefix root.
 `hpc/nci/submit-product.sh` submits the build and publish jobs for every row.
 Template and layout: [docs/indexes-only-product.md](docs/indexes-only-product.md).
+
+### Stale sources
+
+A config whose sources come from the aad-filelist listing corpus
+(seaice-g02202, oisst, seaice-asi-amsr2) writes a build record,
+`sources.meta.tsv`: one row per source file with the corpus source id, the
+path as harvested, the URL as listed, and the size, mtime, etag and
+`last_changed` known at build time. The `stale` step (not run by default)
+compares it with the corpus now and lists every referenced file the corpus
+no longer lists (`removed`) or lists with a different etag, else a different
+size (`changed`): a file replaced at the same URL leaves the store's byte
+offsets pointing at the wrong bytes. It writes `stale.tsv` and exits 1 when
+anything is stale (`STALE_ARGS=--warn` to report only). The published copy
+of the record works the same way, from anywhere:
+
+```bash
+python py/stale.py --meta https://data.source.coop/ausantarctic/ausantarctic-scratch/oisst/oisst-v2.1-daily/sources.meta.tsv
+```
 
 ### Reading the outputs
 
@@ -314,6 +333,8 @@ float32 type of `scale_factor`. Results and findings are in
 
 - `catalog.sh`, `py/catalog.py`: product catalog. `products/*/`: products
   (dataset lists, no code).
+- `py/corpus.py`: source lists from the aad-filelist listing corpus, and
+  the build record; `py/stale.py`: the record against the corpus now.
 - `run.sh`: driver. `config/*.sh`: datasets (sources, arrays, remap rules,
   render targets) and publish targets.
 - `py/harvest.py`: harvest engines (GDAL `GetRawBlockInfo`, h5py

@@ -91,14 +91,14 @@ def server_files(base, years, rx):
     return out
 
 
+CORPUS_ROWS = {}   # date -> the corpus row, for the build record
+
+
 def corpus_files(source, base, rx):
     """({date: url}, {date: size}) from the listing corpus, for files under base."""
     import corpus
-    cb = os.environ.get("CORPUS_BASE", corpus.CORPUS)
-    loc = f"{cb.rstrip('/')}/current__{source}.parquet" if re.match(r"^https?://", cb) \
-        else os.path.join(cb, f"current__{source}.parquet")
     urls, sizes = {}, {}
-    for row in corpus.read_listing(loc, ""):
+    for row in corpus.read_listing(corpus.current_location(source), ""):
         u = row["url"] or ""
         if not u.startswith(base + "/"):
             continue
@@ -109,6 +109,7 @@ def corpus_files(source, base, rx):
             sys.exit(f"bremen_sources: corpus has no size for {u}")
         urls[m.group(1)] = u
         sizes[m.group(1)] = int(row["size"])
+        CORPUS_ROWS[m.group(1)] = row
     return urls, sizes
 
 
@@ -135,6 +136,10 @@ def main():
     ap.add_argument("--threads", type=int, default=16)
     ap.add_argument("--corpus", default="", metavar="SOURCE_ID",
                     help="list from this listing corpus source, not the server index")
+    ap.add_argument("--meta", default="",
+                    help="write the build record (py/corpus.py write_meta) for py/stale.py")
+    ap.add_argument("--meta-source", default="amsr2_asi_s3125",
+                    help="corpus source id recorded in --meta when not listing with --corpus")
     a = ap.parse_args()
     base = a.base.rstrip("/")
     rx = re.compile(NAME)
@@ -175,14 +180,23 @@ def main():
         with ThreadPoolExecutor(a.threads) as ex:
             sizes = dict(zip(dates, ex.map(lambda d: head_size(remote[d]), dates)))
     n_local = differ = 0
+    meta = []
     for d in dates:
         p = local.get(d)
         if p and os.path.getsize(p) == sizes[d]:
-            print(p)
+            src = p
             n_local += 1
         else:
             differ += bool(p)
-            print(f"/vsicurl/{remote[d]}")
+            src = f"/vsicurl/{remote[d]}"
+        print(src)
+        c = CORPUS_ROWS.get(d, {})
+        meta.append({"source_id": a.corpus or a.meta_source, "source": src, "url": remote[d],
+                     "date": d, "size": sizes[d], "etag": c.get("etag"), "mtime": c.get("mtime"),
+                     "last_changed": c.get("last_changed")})
+    if a.meta:
+        import corpus
+        corpus.write_meta(a.meta, meta)
     only_mirror = sorted(set(local) - set(remote))
     print(f"bremen_sources: {len(dates)} dates on the server, {n_local} read from the mirror, "
           f"{len(dates) - n_local} from the server ({differ} mirror files differ in size); "
