@@ -144,7 +144,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("flat")
     p.add_argument("repo")
-    p.add_argument("--target", default="public")
+    p.add_argument("--target", default=None,
+                   help="remap target (default: meta.default_target, else public)")
     p.add_argument("--batch", type=int, default=200_000)
     p.add_argument("--commit-every", type=int, default=1_000_000)
     p.add_argument("--split", type=int, default=365,
@@ -154,6 +155,8 @@ def main():
     doc = json.load(open(os.path.join(a.flat, "arrays.json")))
     if doc.get("format_version") not in FORMATS_READ:
         sys.exit(f"not a byterefs flat store: format_version {doc.get('format_version')!r}")
+    if a.target is None:
+        a.target = doc.get("meta", {}).get("default_target", "public")
     rules = remap_rules(doc, a.target)
     rows = doc["arrays"]
 

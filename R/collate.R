@@ -2,6 +2,7 @@
 ##
 ## Rscript collate.R SCAN_DIR PLAN_VRT STORE DATASET [REMAP ...]
 ##   REMAP is "target|prefix|replacement", repeatable, applied only at publish.
+##   DEFAULT_TARGET (environment) is written to meta.default_target.
 ##
 ## Ingests every harvest fragment (physical layer: rows keyed within source),
 ## copies the mosaic VRT's SourceSlab/DestSlab into `placements` (plan layer,
@@ -28,6 +29,14 @@ for (r in args[-(1:4)]) {
   stopifnot(length(p) == 3L)
   mr_set_remap(con, p[1], p[2], p[3])
 }
+## byterefs decision 0004: meta.default_target is the target a reader applies
+## when told none ("" = verbatim); run.sh sets it from the config
+dt <- Sys.getenv("DEFAULT_TARGET")
+targets <- unique(dbGetQuery(con, "SELECT target FROM remap")$target)
+if (nzchar(dt) && !dt %in% targets)
+  stop(sprintf("DEFAULT_TARGET '%s' has no remap rules (targets: %s)", dt,
+               paste(targets, collapse = ", ")))
+mr_init(con, meta = list(default_target = dt))
 for (a in dbGetQuery(con, "SELECT array FROM arrays WHERE storage = 'referenced'")$array) {
   n <- dbGetQuery(con, sprintf('SELECT count(*) AS n, sum(present) AS p FROM "refs_%s"', a))
   message(sprintf("  refs_%s: %s chunks, %s present", a, n$n, n$p))
