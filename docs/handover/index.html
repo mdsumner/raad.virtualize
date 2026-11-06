@@ -68,6 +68,7 @@ section { display: flex; flex-direction: column; gap: 18px; }
 .chip.scr { background: var(--scr-soft); color: var(--scr); }
 .chip.pass { background: var(--ours-soft); color: var(--ours); }
 .chip.gap { background: var(--prop-soft); color: var(--prop); }
+.chip.partial { background: transparent; border: 1px solid var(--prop); color: var(--prop); }
 .chip.site { background: transparent; border: 1px solid var(--rule); color: var(--ink); }
 .scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; }
 figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -426,14 +427,14 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="gate-ibcso">
   <div class="eyebrow">Proposed gate, one dataset</div>
   <h2>IBCSO v2 against the gate</h2>
-  <p>The gate items applied to one production pilot, with the file or check behind each. Two items pass and three are gaps; the gaps are the work for its first rebuild through the gate.</p>
+  <p>The gate items applied to one production pilot, with the file or check behind each. One item passes, one is partial and three are gaps; the gaps and the partial item are the work for its first rebuild through the gate.</p>
   <div class="tbl"><table>
     <thead><tr><th>Gate item</th><th>IBCSO v2 today</th><th></th></tr></thead>
     <tbody>
       <tr><td>Config in a product repo</td><td>Config <a href="https://github.com/mdsumner/raad.virtualize/blob/main/config/ibcso.sh"><code>config/ibcso.sh</code></a> and product files <a href="https://github.com/mdsumner/raad.virtualize/blob/main/products/ibcso"><code>products/ibcso/</code></a> live in raad.virtualize, not in a product repo.</td><td><span class="chip gap">gap</span></td></tr>
       <tr><td>File list from corpus</td><td>The build lists its own local COG directory (<code>sources()</code> in the config). The corpus lists the published COGs, but this build does not read it.</td><td><span class="chip gap">gap</span></td></tr>
       <tr><td>Build record</td><td>No <code>sources.meta.tsv</code>, so <a href="https://github.com/mdsumner/raad.virtualize/blob/main/py/stale.py"><code>py/stale.py</code></a> has nothing to compare. The store records the repo commit and config used (<a href="https://github.com/mdsumner/raad.virtualize/blob/main/R/collate.R"><code>R/collate.R</code></a>), not which file versions it read. Only the OISST, G02202 and AMSR2 configs write a build record today.</td><td><span class="chip gap">gap</span></td></tr>
-      <tr><td>Verify passes</td><td><code>verify</code> and <code>verify-published</code> run in <a href="https://github.com/mdsumner/raad.virtualize/blob/main/hpc/vm/ibcso-publish.sh"><code>hpc/vm/ibcso-publish.sh</code></a>, which stops at the first failure. The log stays on the VM (<code>work/ibcso-v2/log.txt</code>); nothing published records the result.</td><td><span class="chip pass">pass</span></td></tr>
+      <tr><td>Verify passes</td><td><code>verify</code> and <code>verify-published</code> run in <a href="https://github.com/mdsumner/raad.virtualize/blob/main/hpc/vm/ibcso-publish.sh"><code>hpc/vm/ibcso-publish.sh</code></a>, which stops at the first failure. The log stays on the VM (<code>work/ibcso-v2/log.txt</code>); nothing published records the result, so production cannot audit it. Recording the outcome in the build record closes this.</td><td><span class="chip partial">partial</span></td></tr>
       <tr><td>Byte layout rule</td><td>COGs at <code>ibcso/v2/cog/</code>, the candidate rule itself.</td><td><span class="chip pass">pass</span></td></tr>
     </tbody>
   </table></div>
@@ -500,7 +501,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
   <h2>Questions to decide together</h2>
   <p>None of these is decided.</p>
   <ol class="qs">
-    <li><strong>Gate.</strong> What a dataset must meet to move to production (proposed list in the diagram).</li>
+    <li><strong>Gate.</strong> What a dataset must meet to move to production (proposed list in the diagram, applied to one dataset in <a href="#gate-ibcso">IBCSO v2 against the gate</a>).</li>
     <li><strong>Product shape.</strong> One production product per scratch group (sea ice as one product), one per source, or one index product with groups.</li>
     <li><strong>Byte layout.</strong> One rule for project COGs (IBCSO's <code>&lt;release&gt;/cog/</code> is the candidate); GEBCO and GHRSST differ today.</li>
     <li><strong>Landing pages.</strong> One fixed "where things are" block at the top of every product README: bytes, index, where it's built, how to open it.</li>
