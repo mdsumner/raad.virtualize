@@ -79,6 +79,13 @@ bash hpc/pawsey/singularity-run.sh run.sh config/esacci-oc.sh config/source-coop
 bash hpc/pawsey/singularity-run.sh catalog.sh products/oceancolour config/source-coop.sh publish
 ```
 
+The build steps can also run as a batch job sized for the harvest (4 cores,
+no `--mem`; see the header of `hpc/pawsey/run.slurm` for the measurements):
+
+```sh
+sbatch --export=ALL,ESACCI_CADENCE=5day,RUN_ARGS="config/esacci-oc.sh" hpc/pawsey/run.slurm
+```
+
 The local `verify` step reads the forms, which reference the public URL, so
 the COGs are uploaded before the index is built.
 
