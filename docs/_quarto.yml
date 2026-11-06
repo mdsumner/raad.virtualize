@@ -6,6 +6,9 @@ project:
     - "*.qmd"
     - "*.md"
     - "examples/**/*.qmd"
+    - "handover/*.md"
+  resources:
+    - "handover/snapshot.html"
 
 website:
   title: "raad.virtualize"
