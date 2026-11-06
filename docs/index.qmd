@@ -19,7 +19,7 @@ to make an index.
 </div>
 <div class="column-page"><figure class="rv-fig">
     <div class="scroll">
-    <svg class="svg-wide" viewBox="0 0 1040 520" role="img" aria-label="Upstream publishers feed bytes; some are converted to COGs we host on source.coop or Pawsey Acacia. Harvest runs on the Nectar VM, NCI Gadi or Pawsey Setonix, reading file lists from the aad-filelist corpus. Indexes are published to source.coop scratch groups or production virtual prefixes, and their references point back to the bytes.">
+    <svg class="svg-wide" viewBox="0 0 1040 572" role="img" aria-label="Upstream publishers feed bytes; some are converted to COGs we host on source.coop or Pawsey Acacia. Harvest runs on the Nectar VM, NCI Gadi or Pawsey Setonix, reading file lists from the aad-filelist corpus. Indexes are published to source.coop scratch groups or production virtual prefixes, and their references point back to the bytes.">
       <defs>
         <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
         <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--theirs)"/></marker>
@@ -127,9 +127,25 @@ to make an index.
         <path d="M910 408 V470 H100 V294" fill="none" stroke="var(--theirs)" stroke-width="1.4" stroke-dasharray="2 4" marker-end="url(#ahp)"/>
         <text x="300" y="490" fill="var(--theirs)">every reference in an index points back at the bytes, wherever they are (decision 0004 remap rules give the public URL)</text>
       </g>
-    </svg>
+          <!-- key -->
+      <g font-family="Source Sans 3, sans-serif" font-size="12">
+        <line x1="20" y1="532" x2="1020" y2="532" stroke="var(--rule)"/>
+        <rect x="20" y="546" width="22" height="14" rx="3" fill="var(--theirs-soft)" stroke="var(--theirs)"/>
+        <text x="48" y="557" fill="var(--ink)">theirs: publisher hosts</text>
+        <rect x="190" y="546" width="22" height="14" rx="3" fill="var(--ours-soft)" stroke="var(--ours)"/>
+        <text x="218" y="557" fill="var(--ink)">ours: COGs we host</text>
+        <line x1="350" y1="553" x2="384" y2="553" stroke="var(--ink)" stroke-width="1.4"/>
+        <text x="392" y="557" fill="var(--ink)">runs today</text>
+        <line x1="480" y1="553" x2="514" y2="553" stroke="var(--ours)" stroke-width="1.4" stroke-dasharray="5 4"/>
+        <text x="522" y="557" fill="var(--ink)">file listing</text>
+        <line x1="612" y1="553" x2="646" y2="553" stroke="var(--prop)" stroke-width="1.4" stroke-dasharray="5 3"/>
+        <text x="654" y="557" fill="var(--ink)">proposed</text>
+        <line x1="736" y1="553" x2="770" y2="553" stroke="var(--theirs)" stroke-width="1.4" stroke-dasharray="2 4"/>
+        <text x="778" y="557" fill="var(--ink)">references point back to bytes</text>
+      </g>
+</svg>
     </div>
-    <figcaption>Our COGs are made by ghrsst-cogger (MUR), VM scripts (IBCSO, Bedmap3, GEBCO) and Setonix jobs (ESA CCI). Solid arrows are what runs today. Dashed amber is the proposed central refs collation. raad.virtualize is the engine on all three sites: one checkout per machine, same <code>run.sh</code>.</figcaption>
+    <figcaption>Our COGs are made by ghrsst-cogger (MUR), VM scripts (IBCSO, Bedmap3, GEBCO) and Setonix jobs (ESA CCI). raad.virtualize is the engine on all three sites: one checkout per machine, same <code>run.sh</code>.</figcaption>
   </figure></div>
 ```
 
