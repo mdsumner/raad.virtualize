@@ -12,7 +12,7 @@
 # byte harvest (hpc/pawsey/singularity-run.sh does the container work).
 # From the repository root:
 #
-#   sbatch --export=ALL,RUN_ARGS="config/esacci-oc.sh" hpc/pawsey/run.slurm
+#   sbatch --export=ALL,RUN_ARGS="config/esacci-oc.sh config/source-coop.sh" hpc/pawsey/run.slurm
 #   sbatch --export=ALL,ESACCI_CADENCE=5day,RUN_ARGS="config/esacci-oc.sh plan harvest" hpc/pawsey/run.slurm
 #
 #   RUN_ARGS  the run.sh arguments: config files, then steps (required)
@@ -29,6 +29,8 @@
 # (collate render icechunk verify) are not measured yet.
 #
 # Publish steps belong on a login node (the source.coop keys last one hour).
+# Source the publish config at build time too (config/source-coop.sh), so
+# the grist and STAC steps write public URLs, not local paths.
 set -uo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
 [ -n "${RUN_ARGS:-}" ] || { echo "run.slurm: set RUN_ARGS (run.sh arguments)" >&2; exit 1; }

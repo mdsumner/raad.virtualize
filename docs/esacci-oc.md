@@ -83,7 +83,7 @@ The build steps can also run as a batch job sized for the harvest (4 cores,
 no `--mem`; see the header of `hpc/pawsey/run.slurm` for the measurements):
 
 ```sh
-sbatch --export=ALL,ESACCI_CADENCE=5day,RUN_ARGS="config/esacci-oc.sh" hpc/pawsey/run.slurm
+sbatch --export=ALL,ESACCI_CADENCE=5day,RUN_ARGS="config/esacci-oc.sh config/source-coop.sh" hpc/pawsey/run.slurm
 ```
 
 The local `verify` step reads the forms, which reference the public URL, so
