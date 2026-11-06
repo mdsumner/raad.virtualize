@@ -1,0 +1,6 @@
+# Datasets of the group. One row per dataset: dataset name, dataset config,
+# its settings (comma separated, as qsub -v takes them), title. Lines starting
+# with # are skipped. The catalog lists every row; catalog.sh check fails
+# when a row has no published collection.
+dataset	config	env	title
+access-esm1-6.historical.ocean-3d-temp-1mon-mean	config/access-esm1-6.sh	ESM16_STEM=ocean-3d-temp-1mon-mean	Monthly ocean temperature (temp), 50 levels, 1850-2021, with the 2D cell centres geolon_t, geolat_t

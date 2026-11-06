@@ -1,0 +1,7 @@
+{
+  "id": "access-esm",
+  "title": "ACCESS-ESM1.6 virtual stores",
+  "description": "Byte-reference indexes of ACCESS-ESM1.6 historical simulation output (native model output, 1850-2021), read in place from the netCDF files on the ACCESS-NRI pilot bucket ct-esm1-6 on Pawsey Acacia. No data is copied. Each dataset is published as a GDAL multidimensional VRT, kerchunk Parquet, an Icechunk repository with virtual references, a flat Parquet refs store and a STAC collection. Drafts.",
+  "license": "other",
+  "public_base": "https://data.source.coop/ausantarctic/ausantarctic-scratch/access-esm"
+}
