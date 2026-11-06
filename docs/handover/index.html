@@ -146,23 +146,17 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <header style="display:flex;flex-direction:column;gap:14px">
   <div class="eyebrow">Australian Antarctic Division &middot; source.coop ausantarctic &middot; handover 2026-11-06</div>
   <h1>Production handover</h1>
-  <p class="lede">We index Southern Ocean and Antarctic array data where it already sits and publish cloud-readable indexes on source.coop, so nobody has to copy the data to read it fast. Each dataset gets one table of byte references (which bytes of which file hold each chunk); the GDAL VRT, kerchunk, Icechunk and STAC forms are all rendered from that table. This page shows how the pieces sit now, how we propose they fit in production, and what is open. Everything marked <span class="chip prop">proposal</span> is for design with the production team, not done.</p>
+  <p class="lede">We index Southern Ocean and Antarctic array data and publish them in cloud-readable form on source.coop. This page shows how the pieces sit now, how we propose they fit in production, and what is open. Anything marked <span class="chip prop">proposal</span> is not done.</p>
   <div class="links">
-    <span class="muted">Technical detail lives on the project site:</span>
+    <span class="muted">Project site:</span>
     <a href="../">Overview</a><a href="../published.html">Datasets</a><a href="../how-it-works.html">How it works</a><a href="../readers.html">Readers</a>
-  </div>
-  <div class="key">
-    <span><span class="chip ours">ours</span> bytes we wrote (COGs) and host</span>
-    <span><span class="chip theirs">theirs</span> bytes a publisher hosts; we only index them</span>
-    <span><span class="chip scr">scratch</span> not permanent; may move off source.coop</span>
-    <span><span class="chip prop">proposal</span> not enacted</span>
   </div>
 </header>
 
 <section id="picture">
   <div class="eyebrow">Now</div>
-  <h2>Three kinds of place</h2>
-  <p>Bytes, work and index are separate places. Some bytes are copies we made (COGs) and host on source.coop or Pawsey object storage; most are left where their publisher puts them. The harvest runs wherever the bytes are fastest to read. The index (a byte-reference table plus the forms rendered from it) is published on source.coop and points back at the bytes, wherever they are.</p>
+  <h2>How the pieces sit</h2>
+  <p>Bytes, builds and indexes sit in different places; every index points back at its bytes.</p>
   <figure>
     <div class="scroll">
     <svg class="svg-wide" viewBox="0 0 1040 572" role="img" aria-label="Upstream publishers feed bytes; some are converted to COGs we host on source.coop or Pawsey Acacia. Harvest runs on the Nectar VM, NCI Gadi or Pawsey Setonix, reading file lists from the aad-filelist corpus. Indexes are published to source.coop scratch groups or production virtual prefixes, and their references point back to the bytes.">
@@ -294,15 +288,14 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
       </g>
 </svg>
     </div>
-    <figcaption>Our COGs are made by ghrsst-cogger (MUR), VM scripts (IBCSO, Bedmap3, GEBCO) and Setonix jobs (ESA CCI). The amber box is the proposed central refs collation (repo created 2026-11-05, empty scaffold). raad.virtualize is the engine on all three sites: one checkout per machine, same <code>run.sh</code>.</figcaption>
+    <figcaption>Our COGs are made by ghrsst-cogger (MUR), VM scripts (IBCSO, Bedmap3, GEBCO) and Setonix jobs (ESA CCI). raad.virtualize runs the same <code>run.sh</code> on all three machines.</figcaption>
   </figure>
-  <p class="note">Why three machines. Nectar is the general build box, near the raad <code>/rdsi</code> mirror, and publishes to source.coop. Gadi is where BRAN lives (<code>/g/data/gb6</code>): scanning it in place is far faster than over THREDDS. Pawsey gives compute for writing our own COGs plus Acacia object storage to host them (about 10.6 TB free). The production question is which of these the team wants to own, and which become a runner they schedule.</p>
 </section>
 
 <section id="proposed">
   <div class="eyebrow">Proposed, open to review</div>
   <h2>Where we see it going: one path, one gate</h2>
-  <p>The same pieces, laid out the way we think they should fit. Bytes, file lists and readers are shared. Build and index split into two lanes with a gate between them. Above the gate, Michael owns the research work: new datasets, engine changes, and cleaning up the Nectar, NCI, Pawsey and scratch complexity. Below the gate, the production team owns scheduled builds and production products. The team sets the requirements a dataset must meet to cross the gate; nothing crosses until those are defined and planned.</p>
+  <p>Bytes, file lists and readers are shared. Build and index split into two lanes with a gate between them. Michael owns the lane above the gate, including cleaning up the Nectar, NCI, Pawsey and scratch side. The production team owns the lane below it and sets what a dataset must meet to cross.</p>
   <figure>
     <div class="scroll">
     <svg class="svg-wide" viewBox="0 0 1040 606" role="img" aria-label="Proposal: bytes and the aad-filelist corpus feed two build lanes. The research lane (Michael) builds on Nectar, Gadi or Setonix and publishes unlisted scratch drafts. A production-ready gate, with requirements set by production, separates it from the production lane: a per-product repo and scheduled runner publishing production indexes and collecting tables in central refs, whose stale check compares against the latest listing. Readers read both.">
@@ -423,42 +416,35 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
       </g>
     </svg>
     </div>
-    <figcaption>Proposal only; every box and the gate list are for design with the production team. What drops out compared with the picture above: three sites feeding two index places by crossing arrows, and a central refs box with no owner. As now, every reference still points back at the bytes, wherever they sit.</figcaption>
+    <figcaption>Proposal, open to review.</figcaption>
   </figure>
 </section>
 
 
 <section id="repos">
   <div class="eyebrow">Repos, in one line each</div>
-  <h2>What each repo is for, and what production changes</h2>
+  <h2>What each repo does, and what production changes</h2>
   <div class="repos">
     <div class="repo"><div class="role">engine</div><h3>mdsumner/raad.virtualize</h3>
       <dl><dt>does</dt><dd>plan, harvest, collate, render (VRT, kerchunk, Icechunk, flat, STAC, grist), verify, publish</dd>
-      <dt>why</dt><dd>one table per collection, every form rendered from it, checked against GDAL on the sources</dd>
       <dt>at prod</dt><dd class="change">pinned by tag; dataset configs and product READMEs move out to product repos</dd></dl></div>
     <div class="repo"><div class="role">file lists</div><h3>mdsumner/aad-filelist</h3>
       <dl><dt>does</dt><dd>listing corpus: every source listed on a schedule, every run kept, <code>current</code> and <code>changes</code> per source</dd>
-      <dt>why</dt><dd>builds read file lists from here; a file replaced at the same URL shows up as a change</dd>
       <dt>at prod</dt><dd class="change">stays; publishes to source.coop once Actions has a credential (GitHub releases now)</dd></dl></div>
     <div class="repo"><div class="role">refs collation</div><h3>mdsumner/bowerbird-byterefs</h3>
       <dl><dt>does</dt><dd>nothing yet: README scaffold for the central refs product and the scheduled stale check</dd>
-      <dt>why</dt><dd>answers which stores reference a file, without crawling every product</dd>
       <dt>at prod</dt><dd class="change">location of the refs product, Lance or Parquet, keep or drop per-product copies</dd></dl></div>
     <div class="repo"><div class="role">format</div><h3>byterefs/spec</h3>
       <dl><dt>does</dt><dd>byterefs/0.1 table spec and decision records (0004 paths per target)</dd>
-      <dt>why</dt><dd>lets other readers (wxy-refs, arrir, zaro, DuckDB) use the table without our code</dd>
       <dt>at prod</dt><dd class="change">nothing to move; production stores stamp the version</dd></dl></div>
     <div class="repo"><div class="role">bytes maker</div><h3>ghrsst-cogger</h3>
       <dl><dt>does</dt><dd>MUR netCDF to COG, into <code>ausantarctic/ghrsst-mur-v2</code></dd>
-      <dt>why</dt><dd>MUR as COG is far faster to read than the netCDF; the first production-style AWS leg</dd>
       <dt>at prod</dt><dd class="change">could also own the GHRSST index, beside its bytes</dd></dl></div>
     <div class="repo"><div class="role">upstream</div><h3>bowerbird, blueant</h3>
       <dl><dt>does</dt><dd>source definitions and the listing engine (Ben Raymond)</dd>
-      <dt>why</dt><dd>the existing record of what the raad mirror holds</dd>
       <dt>at prod</dt><dd class="change">size and mtime in dry runs, upstreamed rather than forked</dd></dl></div>
     <div class="repo"><div class="role">consumers</div><h3>grist, sds, raadtools, sooty</h3>
       <dl><dt>does</dt><dd>read the published catalogs and stores (grist reads <code>grist/catalog.parquet</code>)</dd>
-      <dt>why</dt><dd>they are the R users' way in; raadtools and sooty refactors are parked</dd>
       <dt>at prod</dt><dd class="change">every catalog row carries the store URL, so a move rewrites them</dd></dl></div>
   </div>
 </section>
@@ -466,7 +452,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="datasets">
   <div class="eyebrow">Per dataset</div>
   <h2>Where things are today</h2>
-  <p>Three datasets are in production; the rest are drafts in scratch. Per-dataset detail (array names, time ranges, how to open each one) is on the <a href="../published.html">Datasets</a> page.</p>
+  <p>Three are in production; the rest are drafts in scratch. Detail per dataset is on the <a href="../published.html">Datasets</a> page.</p>
   <div class="tbl"><table>
     <thead><tr><th>Dataset</th><th>Bytes</th><th>Built on</th><th>Index now</th></tr></thead>
     <tbody>
@@ -487,9 +473,9 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="questions">
   <div class="eyebrow">Open</div>
   <h2>Questions to decide together</h2>
-  <p>None of these is decided. Cleaning up the site and scratch side (Nectar, NCI, Pawsey, scratch layout) is Michael's work; these are the production side's calls, to design together.</p>
+  <p>None of these is decided.</p>
   <ol class="qs">
-    <li><strong>Gate.</strong> What a dataset must meet before it moves to production (the proposed list is in the diagram above).</li>
+    <li><strong>Gate.</strong> What a dataset must meet to move to production (proposed list in the diagram).</li>
     <li><strong>Product shape.</strong> One production product per scratch group (sea ice as one product), one per source, or one index product with groups.</li>
     <li><strong>Byte layout.</strong> One rule for our own COGs (IBCSO's <code>&lt;release&gt;/cog/</code> is the candidate); GEBCO and GHRSST differ today.</li>
     <li><strong>Landing pages.</strong> One fixed "where things are" block at the top of every product README: bytes, index, where it's built, how to open it.</li>
@@ -502,7 +488,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="brief">
   <div class="eyebrow">Getting up to speed</div>
   <h2>A brief for your coding agent</h2>
-  <p>Point a coding agent at the repos (read-only) to build your own picture, then land the design with Michael in shared sessions. A starting brief:</p>
+  <p>Point a coding agent at the repos (read-only), then land the design with Michael in shared sessions. A starting brief:</p>
   <div class="brief"><pre>Read mdsumner/raad.virtualize (read-only; do not run builds or publish).
 Explain for an operations team taking over production:
 - what each step of run.sh does and what it reads and writes
