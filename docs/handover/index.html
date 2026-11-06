@@ -448,18 +448,8 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 
 <section id="credentials">
   <div class="eyebrow">Credentials</div>
-  <h2>What each machine uses to write</h2>
-  <p>No keys are kept in the repos. Who holds write access to each product is kept off this page.</p>
-  <div class="tbl"><table>
-    <thead><tr><th>Where</th><th>Writes to</th><th>Credential</th></tr></thead>
-    <tbody>
-      <tr><td>Nectar VM</td><td>source.coop products, scratch and production</td><td>source.coop temporary product keys (one hour, from the product page), exported by hand for each publish (<a href="https://github.com/mdsumner/raad.virtualize/blob/main/config/source-coop.sh"><code>config/source-coop.sh</code></a>)</td></tr>
-      <tr><td>NCI Gadi</td><td>source.coop scratch (BRAN)</td><td>the same temporary keys, passed to the copyq publish job with <code>qsub -v</code> (<a href="https://github.com/mdsumner/raad.virtualize/blob/main/hpc/nci/bran-publish.pbs"><code>hpc/nci/bran-publish.pbs</code></a>); reads <code>/g/data/gb6</code> through NCI project membership</td></tr>
-      <tr><td>Pawsey Setonix</td><td>Acacia <code>aad-derived/esacci-oc</code>; source.coop scratch</td><td>rclone configured on the host for Acacia (<a href="https://github.com/mdsumner/raad.virtualize/blob/main/hpc/pawsey/esacci-cog.slurm"><code>esacci-cog.slurm</code></a>); source.coop temporary keys from the login node</td></tr>
-      <tr><td>aad-filelist Actions</td><td>GitHub releases</td><td>none for source.coop yet</td></tr>
-      <tr><td>AADC transfer bucket</td><td>no longer used for BRAN</td><td>static keys, exported by hand (<a href="https://github.com/mdsumner/raad.virtualize/blob/main/config/aadc-transfer.sh"><code>config/aadc-transfer.sh</code></a>)</td></tr>
-    </tbody>
-  </table></div>
+  <h2>Who writes today</h2>
+  <p>Michael holds every write key today and publishes with source.coop's one-hour product keys, from whichever machine built the index. The production team has source.coop IAM; a scheduled runner gets its own credential (see Runners).</p>
 </section>
 
 <section id="repos">
@@ -468,7 +458,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="repos">
     <div class="repo"><div class="role">engine</div><h3>mdsumner/raad.virtualize</h3>
       <dl><dt>does</dt><dd>plan, harvest, collate, render (VRT, kerchunk, Icechunk, flat, STAC, grist), verify, publish</dd>
-      <dt>at prod</dt><dd class="change">pinned by tag; dataset configs and product READMEs move out to product repos</dd></dl></div>
+      <dt>at prod</dt><dd class="change">pinned by tag (first tag v0.1.0 proposed, <a href="https://github.com/mdsumner/raad.virtualize/blob/main/VERSIONING.md">VERSIONING.md</a>); dataset configs and product READMEs move out to product repos</dd></dl></div>
     <div class="repo"><div class="role">file lists</div><h3>mdsumner/aad-filelist</h3>
       <dl><dt>does</dt><dd>listing corpus: every source listed on a schedule, every run kept, <code>current</code> and <code>changes</code> per source</dd>
       <dt>at prod</dt><dd class="change">stays; publishes to source.coop once Actions has a credential (GitHub releases now)</dd></dl></div>
