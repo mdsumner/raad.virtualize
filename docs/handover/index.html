@@ -68,6 +68,7 @@ section { display: flex; flex-direction: column; gap: 18px; }
 .chip.scr { background: var(--scr-soft); color: var(--scr); }
 .chip.pass { background: var(--ours-soft); color: var(--ours); }
 .chip.gap { background: var(--prop-soft); color: var(--prop); }
+.chip.partial { background: transparent; border: 1px solid var(--prop); color: var(--prop); }
 .chip.site { background: transparent; border: 1px solid var(--rule); color: var(--ink); }
 .scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; }
 figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -297,10 +298,10 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="proposed">
   <div class="eyebrow">Proposed, open to review</div>
   <h2>One path, one gate</h2>
-  <p>Bytes, file lists and readers are shared. Build and index split into two lanes with a gate between them. Michael owns the lane above the gate, including cleaning up the Nectar, NCI, Pawsey and scratch side. The production team owns the lane below it and sets what a dataset must meet to cross.</p>
+  <p>Bytes, file lists and readers are shared. Build and index split into two lanes with a gate between them. The research team owns the lane above the gate, including cleaning up the Nectar, NCI, Pawsey and scratch side. The production team owns the lane below it and sets what a dataset must meet to cross.</p>
   <figure>
     <div class="scroll">
-    <svg class="svg-wide" viewBox="0 0 1040 606" role="img" aria-label="Proposal: bytes and the aad-filelist corpus feed two build lanes. The research lane (Michael) builds on Nectar, Gadi or Setonix and publishes unlisted scratch drafts. A production-ready gate, with requirements set by production, separates it from the production lane: a per-product repo and scheduled runner publishing production indexes and collecting tables in central refs, whose stale check compares against the latest listing. Readers read both.">
+    <svg class="svg-wide" viewBox="0 0 1040 606" role="img" aria-label="Proposal: bytes and the aad-filelist corpus feed two build lanes. The research lane builds on Nectar, Gadi or Setonix and publishes unlisted scratch drafts. A production-ready gate, with requirements set by production, separates it from the production lane: a per-product repo and scheduled runner publishing production indexes and collecting tables in central refs, whose stale check compares against the latest listing. Readers read both.">
       <defs>
         <marker id="bho" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ours)"/></marker>
         <marker id="bhm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker>
@@ -340,7 +341,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
         <text x="244" y="214" fill="var(--muted)">both lanes</text>
         <!-- lane A -->
         <rect x="410" y="44" width="440" height="192" rx="6" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>
-        <text x="840" y="62" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">RESEARCH AND SCRATCH: MICHAEL</text>
+        <text x="840" y="62" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">RESEARCH: RESEARCH TEAM</text>
         <rect x="420" y="76" width="190" height="146" rx="5" fill="var(--surface)" stroke="var(--muted)"/>
         <text x="434" y="100" font-weight="700" fill="var(--ink)">Nectar, Gadi, Setonix</text>
         <text x="434" y="122" fill="var(--ink)">wherever the bytes</text>
@@ -404,9 +405,9 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
       <g font-family="Source Sans 3, sans-serif" font-size="12">
         <line x1="20" y1="556" x2="1020" y2="556" stroke="var(--rule)"/>
         <rect x="20" y="572" width="22" height="14" rx="3" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>
-        <text x="48" y="583" fill="var(--ink)">Michael's lane</text>
+        <text x="48" y="583" fill="var(--ink)">research lane</text>
         <rect x="160" y="572" width="22" height="14" rx="3" fill="none" stroke="var(--ink)" stroke-width="1.4"/>
-        <text x="188" y="583" fill="var(--ink)">production team's lane</text>
+        <text x="188" y="583" fill="var(--ink)">production lane</text>
         <rect x="340" y="572" width="22" height="14" rx="3" fill="var(--prop-soft)" stroke="var(--prop)" stroke-dasharray="5 3"/>
         <text x="368" y="583" fill="var(--ink)">gate: what a dataset must meet</text>
         <line x1="560" y1="579" x2="594" y2="579" stroke="var(--ours)" stroke-width="1.4"/>
@@ -426,14 +427,14 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="gate-ibcso">
   <div class="eyebrow">Proposed gate, one dataset</div>
   <h2>IBCSO v2 against the gate</h2>
-  <p>The gate items applied to one production pilot, with the file or check behind each. Two items pass and three are gaps; the gaps are the work for its first rebuild through the gate.</p>
+  <p>The gate items applied to one production pilot, with the file or check behind each. One item passes, one is partial and three are gaps; the gaps and the partial item are the work for its first rebuild through the gate.</p>
   <div class="tbl"><table>
     <thead><tr><th>Gate item</th><th>IBCSO v2 today</th><th></th></tr></thead>
     <tbody>
       <tr><td>Config in a product repo</td><td>Config <a href="https://github.com/mdsumner/raad.virtualize/blob/main/config/ibcso.sh"><code>config/ibcso.sh</code></a> and product files <a href="https://github.com/mdsumner/raad.virtualize/blob/main/products/ibcso"><code>products/ibcso/</code></a> live in raad.virtualize, not in a product repo.</td><td><span class="chip gap">gap</span></td></tr>
       <tr><td>File list from corpus</td><td>The build lists its own local COG directory (<code>sources()</code> in the config). The corpus lists the published COGs, but this build does not read it.</td><td><span class="chip gap">gap</span></td></tr>
       <tr><td>Build record</td><td>No <code>sources.meta.tsv</code>, so <a href="https://github.com/mdsumner/raad.virtualize/blob/main/py/stale.py"><code>py/stale.py</code></a> has nothing to compare. The store records the repo commit and config used (<a href="https://github.com/mdsumner/raad.virtualize/blob/main/R/collate.R"><code>R/collate.R</code></a>), not which file versions it read. Only the OISST, G02202 and AMSR2 configs write a build record today.</td><td><span class="chip gap">gap</span></td></tr>
-      <tr><td>Verify passes</td><td><code>verify</code> and <code>verify-published</code> run in <a href="https://github.com/mdsumner/raad.virtualize/blob/main/hpc/vm/ibcso-publish.sh"><code>hpc/vm/ibcso-publish.sh</code></a>, which stops at the first failure. The log stays on the VM (<code>work/ibcso-v2/log.txt</code>); nothing published records the result.</td><td><span class="chip pass">pass</span></td></tr>
+      <tr><td>Verify passes</td><td><code>verify</code> and <code>verify-published</code> run in <a href="https://github.com/mdsumner/raad.virtualize/blob/main/hpc/vm/ibcso-publish.sh"><code>hpc/vm/ibcso-publish.sh</code></a>, which stops at the first failure. The log stays on the VM (<code>work/ibcso-v2/log.txt</code>); nothing published records the result, so production cannot audit it. Recording the outcome in the build record closes this.</td><td><span class="chip partial">partial</span></td></tr>
       <tr><td>Byte layout rule</td><td>COGs at <code>ibcso/v2/cog/</code>, the candidate rule itself.</td><td><span class="chip pass">pass</span></td></tr>
     </tbody>
   </table></div>
@@ -500,11 +501,11 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
   <h2>Questions to decide together</h2>
   <p>None of these is decided.</p>
   <ol class="qs">
-    <li><strong>Gate.</strong> What a dataset must meet to move to production (proposed list in the diagram).</li>
+    <li><strong>Gate.</strong> What a dataset must meet to move to production (proposed list in the diagram, applied to one dataset in <a href="#gate-ibcso">IBCSO v2 against the gate</a>).</li>
     <li><strong>Product shape.</strong> One production product per scratch group (sea ice as one product), one per source, or one index product with groups.</li>
     <li><strong>Byte layout.</strong> One rule for project COGs (IBCSO's <code>&lt;release&gt;/cog/</code> is the candidate); GEBCO and GHRSST differ today.</li>
     <li><strong>Landing pages.</strong> One fixed "where things are" block at the top of every product README: bytes, index, where it's built, how to open it.</li>
-    <li><strong>Runners.</strong> Which machine or service runs scheduled production builds, and with which credential.</li>
+    <li><strong>Runners.</strong> Which machine or service runs scheduled production builds, and with which credential. The research team holds every write key in use today; the production team sets the scope and deployment of production keys.</li>
     <li><strong>Central refs.</strong> Where the collected tables live on source.coop, and whether products keep their own copies.</li>
     <li><strong>Moves.</strong> Copy the existing indexes or rebuild them; a rebuild gives every dataset the build record the stale check needs. The three pilot datasets go first.</li>
     <li><strong>After promotion.</strong> Who acts when the stale check fires; how a dataset goes back to the research lane when an upstream format changes; whether a rebuild overwrites the published store or writes a new version beside it (catalog rows embed store URLs, so this decides whether readers' links break); and what to do when "theirs" bytes move or vanish, since their publishers give no availability guarantee.</li>
@@ -514,7 +515,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="brief">
   <div class="eyebrow">Getting up to speed</div>
   <h2>A brief for your coding agent</h2>
-  <p>Point a coding agent at the repos (read-only), then land the design with Michael in shared sessions. A starting brief:</p>
+  <p>Point a coding agent at the repos (read-only), then land the design with the research team in shared sessions. A starting brief:</p>
   <div class="brief"><pre>Read mdsumner/raad.virtualize (read-only; do not run builds or publish).
 Explain for an operations team taking over production:
 - what each step of run.sh does and what it reads and writes
@@ -525,7 +526,7 @@ Explain for an operations team taking over production:
 Answer with file paths. List what you could not work out as questions.</pre></div>
 </section>
 
-<footer>Handover 2026-11-06, from the live source.coop listing of <code>ausantarctic/</code>, raad.virtualize main and aad-filelist main. Scratch is unlisted on source.coop; its URLs still resolve. Project site: <a href="../">raad.virtualize</a>.</footer>
+<footer>Handover 2026-11-06, from the live source.coop listing of <code>ausantarctic/</code>, raad.virtualize main and aad-filelist main. Scratch is unlisted on source.coop; its URLs still resolve. Project site: <a href="../">raad.virtualize</a>. Research team: Michael Sumner, AAD.</footer>
 </div>
 
 </body>
