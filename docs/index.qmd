@@ -1,117 +1,162 @@
 ---
-title: "Byte-reference virtualization of array collections"
-subtitle: "One table of byte references per collection; every published form rendered from it"
+title: "Array data read where it lives"
+subtitle: "Virtual stores for Antarctic and Southern Ocean arrays, ausantarctic on source.coop"
 toc: false
 ---
 
-This repository builds virtual, cloud-readable views of archival array
-collections (netCDF, HDF5, GeoTIFF/COG) without copying the data. Each
-granule's chunk index is read once into a tabular store of byte references;
-every published form is rendered from that store. The repository is a
-working stage: its name and layout will change as the parts move to their
-long-term homes.
+Each dataset's chunk index is read once into a table of byte references:
+which bytes of which file hold each chunk. Every published form (GDAL
+multidimensional VRT, kerchunk, Icechunk, STAC) is rendered from that one
+table and checked against GDAL reading the original files. No data is copied
+to make an index.
+
+```{=html}
+<div class="rv-figs">
+  <div class="rv-num"><b>22,771,404</b><span>byte references in one store: GHRSST MUR, 8,909 COGs, 2002 to 2026</span></div>
+  <div class="rv-num"><b>27</b><span>datasets indexed: 20 drafts, 7 in production</span></div>
+  <div class="rv-num"><b>4 forms</b><span>from one table, each verified against GDAL on the sources</span></div>
+  <div class="rv-num"><b>3 sites</b><span>Nectar, NCI Gadi and Pawsey build where the bytes are fastest to read</span></div>
+</div>
+<div class="column-page"><figure class="rv-fig">
+    <div class="scroll">
+    <svg class="svg-wide" viewBox="0 0 1040 520" role="img" aria-label="Upstream publishers feed bytes; some are converted to COGs we host on source.coop or Pawsey Acacia. Harvest runs on the Nectar VM, NCI Gadi or Pawsey Setonix, reading file lists from the aad-filelist corpus. Indexes are published to source.coop scratch groups or production virtual prefixes, and their references point back to the bytes.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
+        <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--theirs)"/></marker>
+      </defs>
+      <g font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" style="color:var(--muted)">
+        <text x="20" y="28">UPSTREAM PUBLISHERS</text>
+        <text x="280" y="28">BYTES WE HOST</text>
+        <text x="540" y="28">WHERE HARVEST RUNS</text>
+        <text x="800" y="28">PUBLISHED INDEX</text>
+      </g>
+      <!-- column 1: upstream -->
+      <g font-family="Source Sans 3, sans-serif" font-size="13">
+        <rect x="20" y="44" width="220" height="250" rx="5" fill="var(--theirs-soft)" stroke="var(--theirs)"/>
+        <g fill="var(--ink)">
+          <text x="34" y="70">NOAA public S3 (OISST)</text>
+          <text x="34" y="94">NSIDC https (G02202)</text>
+          <text x="34" y="118">Uni Bremen (AMSR2 ASI)</text>
+          <text x="34" y="142">NCI THREDDS gb6 (BRAN)</text>
+          <text x="34" y="166">PO.DAAC (MUR netCDF)</text>
+          <text x="34" y="190">oceancolour.org (ESA CCI)</text>
+          <text x="34" y="214">PANGAEA, ibcso.org (IBCSO)</text>
+          <text x="34" y="238">UK PDC (Bedmap3)</text>
+          <text x="34" y="262">BODC / CEDA (GEBCO)</text>
+          <text x="34" y="286">PGC bucket (REMA, listed only)</text>
+        </g>
+        <!-- column 2: ours -->
+        <rect x="280" y="44" width="220" height="170" rx="5" fill="var(--ours-soft)" stroke="var(--ours)"/>
+        <g fill="var(--ink)">
+          <text x="294" y="68" font-weight="700">source.coop ausantarctic/</text>
+          <text x="294" y="92" font-family="IBM Plex Mono, monospace" font-size="11.5">ghrsst-mur-v2/  4.0 TiB</text>
+          <text x="294" y="112" font-family="IBM Plex Mono, monospace" font-size="11.5">ibcso/&lt;release&gt;/cog/</text>
+          <text x="294" y="132" font-family="IBM Plex Mono, monospace" font-size="11.5">bedmap/bedmap3/cog/</text>
+          <text x="294" y="152" font-family="IBM Plex Mono, monospace" font-size="11.5">gebco/GEBCO_&lt;year&gt;.tif</text>
+          <text x="294" y="180" font-weight="700">Pawsey Acacia</text>
+          <text x="294" y="200" font-family="IBM Plex Mono, monospace" font-size="11.5">aad-derived/esacci-oc/</text>
+        </g>
+        <!-- column 3: sites -->
+        <g>
+          <rect x="540" y="44" width="220" height="70" rx="5" fill="var(--surface)" stroke="currentColor" style="color:var(--ink)"/>
+          <text x="554" y="68" font-weight="700" fill="var(--ink)">Nectar VM (docker)</text>
+          <text x="554" y="88" fill="var(--muted)">OISST, sea ice, GHRSST,</text>
+          <text x="554" y="105" fill="var(--muted)">IBCSO, Bedmap3, GEBCO</text>
+          <rect x="540" y="134" width="220" height="70" rx="5" fill="var(--surface)" stroke="currentColor" style="color:var(--ink)"/>
+          <text x="554" y="158" font-weight="700" fill="var(--ink)">NCI Gadi (PBS)</text>
+          <text x="554" y="178" fill="var(--muted)">BRAN, scanned in place</text>
+          <text x="554" y="195" fill="var(--muted)">on /g/data/gb6</text>
+          <rect x="540" y="224" width="220" height="70" rx="5" fill="var(--surface)" stroke="currentColor" style="color:var(--ink)"/>
+          <text x="554" y="248" font-weight="700" fill="var(--ink)">Pawsey Setonix (Slurm)</text>
+          <text x="554" y="268" fill="var(--muted)">ESA CCI: convert to COG,</text>
+          <text x="554" y="285" fill="var(--muted)">write Acacia, harvest</text>
+        </g>
+        <!-- column 4: index -->
+        <rect x="800" y="44" width="220" height="130" rx="5" fill="var(--surface)" stroke="var(--rule)"/>
+        <text x="814" y="68" font-weight="700" fill="var(--ink)">scratch (unlisted)</text>
+        <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--ink)">
+          <text x="814" y="90">ausantarctic-scratch/</text>
+          <text x="826" y="108">bluelink/  ghrsst/</text>
+          <text x="826" y="126">oisst/  seaice/</text>
+          <text x="826" y="144">oceancolour/</text>
+        </g>
+        <text x="814" y="164" fill="var(--muted)">20 datasets</text>
+        <rect x="800" y="194" width="220" height="100" rx="5" fill="var(--surface)" stroke="var(--rule)"/>
+        <text x="814" y="218" font-weight="700" fill="var(--ink)">production</text>
+        <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--ink)">
+          <text x="814" y="240">ibcso/virtual/</text>
+          <text x="814" y="258">bedmap/virtual/</text>
+          <text x="814" y="276">gebco/virtual/</text>
+        </g>
+      </g>
+      <!-- arrows -->
+      <g fill="none" stroke="currentColor" stroke-width="1.4" style="color:var(--ink)" font-family="Source Sans 3, sans-serif" font-size="12">
+        <path d="M240 150 H280" marker-end="url(#ah)"/>
+        <text x="244" y="142" fill="var(--muted)" stroke="none">COG</text>
+        <path d="M500 90 H540" marker-end="url(#ah)"/>
+        <path d="M500 200 C520 200 520 250 540 250" marker-end="url(#ah)"/>
+        <path d="M240 262 H512 C528 262 526 170 540 170" marker-end="url(#ah)"/>
+        <path d="M512 262 C532 262 522 100 540 100" marker-end="url(#ah)"/>
+        <text x="300" y="254" fill="var(--muted)" stroke="none">scan in place (theirs)</text>
+        <path d="M760 80 H800" marker-end="url(#ah)"/>
+        <path d="M760 170 C780 170 780 120 800 120" marker-end="url(#ah)"/>
+        <path d="M760 90 C780 90 780 240 800 240" marker-end="url(#ah)"/>
+        <path d="M760 258 C780 258 780 150 800 150" marker-end="url(#ah)"/>
+        <text x="764" y="300" fill="var(--muted)" stroke="none">publish</text>
+      </g>
+      <!-- corpus band -->
+      <g font-family="Source Sans 3, sans-serif" font-size="13">
+        <rect x="270" y="352" width="490" height="56" rx="5" fill="none" stroke="var(--ours)" stroke-width="1.4"/>
+        <text x="284" y="376" font-weight="700" fill="var(--ink)">aad-filelist listing corpus</text>
+        <text x="284" y="396" fill="var(--muted)">lists every source weekly, ours included; keeps every run</text>
+        <path d="M200 294 C200 340 230 380 270 380" stroke="var(--ours)" stroke-width="1.4" stroke-dasharray="5 4" fill="none" marker-end="url(#ah)" style="color:var(--ours)"/>
+        <path d="M390 214 V352" stroke="var(--ours)" stroke-width="1.4" stroke-dasharray="5 4" fill="none" marker-end="url(#ah)" style="color:var(--ours)"/>
+        <text x="206" y="330" fill="var(--muted)">lists</text>
+        <path d="M650 352 V294" stroke="var(--ours)" stroke-width="1.4" fill="none" marker-end="url(#ah)" style="color:var(--ours)"/>
+        <text x="658" y="330" fill="var(--muted)">file list per build</text>
+        <!-- refs product -->
+        <rect x="800" y="352" width="220" height="56" rx="5" fill="var(--prop-soft)" stroke="var(--prop)" stroke-dasharray="5 3"/>
+        <text x="814" y="376" font-weight="700" fill="var(--ink)">bowerbird-byterefs</text>
+        <text x="814" y="396" fill="var(--prop)">central refs + stale check</text>
+        <path d="M910 294 V352" stroke="var(--prop)" stroke-width="1.4" stroke-dasharray="5 3" fill="none" marker-end="url(#ah)" style="color:var(--prop)"/>
+        <text x="918" y="330" fill="var(--prop)">collect tables</text>
+        <path d="M800 392 H760" stroke="var(--prop)" stroke-width="1.4" stroke-dasharray="5 3" fill="none" marker-end="url(#ah)" style="color:var(--prop)"/>
+      </g>
+      <!-- refs point back -->
+      <g font-family="Source Sans 3, sans-serif" font-size="12">
+        <path d="M910 408 V470 H100 V294" fill="none" stroke="var(--theirs)" stroke-width="1.4" stroke-dasharray="2 4" marker-end="url(#ahp)"/>
+        <text x="300" y="490" fill="var(--theirs)">every reference in an index points back at the bytes, wherever they are (decision 0004 remap rules give the public URL)</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Our COGs are made by ghrsst-cogger (MUR), VM scripts (IBCSO, Bedmap3, GEBCO) and Setonix jobs (ESA CCI). Solid arrows are what runs today. Dashed amber is the proposed central refs collation. raad.virtualize is the engine on all three sites: one checkout per machine, same <code>run.sh</code>.</figcaption>
+  </figure></div>
+```
 
 ::: {.grid}
 
-::: {.g-col-12 .g-col-md-4}
-### [Examples](examples/index.qmd)
-Worked reads of published datasets, one query per page, every reader in
-its own tab, with who ran it, when, and what came back.
+::: {.g-col-12 .g-col-md-3}
+### [Datasets](published.md)
+Every dataset, where its bytes are, and the URL of each form.
 :::
 
-::: {.g-col-12 .g-col-md-4}
-### [Published](published.md)
-Every published dataset with the URL of each form (mdim VRT, kerchunk,
-Icechunk, flat refs, STAC).
+::: {.g-col-12 .g-col-md-3}
+### [How it works](how-it-works.md)
+Plan, harvest, collate, render, verify; the table in brief.
 :::
 
-::: {.g-col-12 .g-col-md-4}
+::: {.g-col-12 .g-col-md-3}
 ### [Readers](readers.qmd)
-Which reader opens which form today, and the codec gaps that decide it.
+Which reader opens which form, by codec.
+:::
+
+::: {.g-col-12 .g-col-md-3}
+### [Related](related.md)
+The repos around this one, and why each exists.
 :::
 
 :::
 
-## Model
-
-
-A virtual store is a table plus a plan. The table holds one row per chunk
-of every source file (source, chunk coordinate within the source, present,
-offset, size); the plan places each source in a global array. The forms
-are projections of the two:
-
-| Form | Readers |
-|---|---|
-| Flat refs store (`arrays.json`, `refs_<array>.parquet`, `sources.parquet`) | any Parquet reader; wxylib `wxy-refs` |
-| GDAL multidim VRT | GDAL and its bindings (gdalraster, osgeo.gdal) |
-| kerchunk Parquet | fsspec / xarray; GDAL `/vsikerchunk_parquet_ref/` |
-| Icechunk (virtual references) | zarr-python / xarray |
-
-The store layout is byterefs/0.1 (specification:
-[byterefs/spec](https://github.com/byterefs/spec), `spec/byterefs-0.1.md`;
-stores built before 2026-11 say `mdim-refs/0.2`, the same layout). Source URIs are recorded as harvested and
-rewritten only at render time, so one harvest serves several endpoints.
-
-## Pipeline
-
-```{mermaid}
-flowchart LR
-  S[sources] --> P[plan<br/>gdal mdim mosaic / plan_cog.py]
-  P --> H[harvest<br/>chunk index per source]
-  H --> C[collate<br/>store.sqlite]
-  C --> R1[flat refs]
-  C --> R2[mdim VRT]
-  C --> R3[kerchunk]
-  C --> R4[Icechunk]
-  C --> R5[STAC]
-  R1 & R2 & R3 & R4 --> V[verify<br/>against GDAL on the sources]
-  V --> U[publish<br/>verify-published]
-```
-
-## Early runs
-
-
-| Dataset | Source | Refs | State |
-|---|---|---|---|
-| OISST v2.1 daily, Sept 1981 | NOAA S3 (netCDF) | 120 | all forms verified; test case |
-| BRAN2023 daily `temp` 2010 | NCI THREDDS (netCDF) | 1,116,900 | all forms verified; published to the AADC transfer bucket |
-| BRAN2023 daily `salt` Jan-Feb 2010 | NCI THREDDS (netCDF) | 180,540 | verified from the bucket |
-| GHRSST MUR `analysed_sst` 2024 | source.coop (COG) | 935,496 | VRT and Icechunk verified from the bucket |
-| GHRSST MUR `analysed_sst` 2002-2026 | source.coop (COG) | 22,771,404 | harvest 17 min, collate 6 min (1.2 GB store), render 5 min, Icechunk 105 s (568 MB, 23 commits); verify in progress |
-
-The AADC transfer bucket is private staging. Current public datasets are
-on the [Published](published.md) page.
-
-## Ongoing work
-
-
-- Full GHRSST MUR series through render, Icechunk and verify (the
-  Icechunk scale test).
-- BRAN2023 multi-decade, a second scale test over THREDDS.
-- A TIFF horizontal-predictor filter in GDAL's Zarr reader.
-- Predictor decode in wxy-refs, so R reads the flat store directly.
-- Serial COG tile fetches when GDAL reads through the VRT.
-- Attribute types in the store, so readers keep float32 packing.
-- GDAL `gdal mdim` block-info for bulk harvest into the flat store.
-- A Lance render: refs until a chunk is needed, then held bytes in the
-  same row, with versions and tags for history (wxylib/design m16).
-- Incremental Icechunk commits per append unit, with manifests split by
-  that unit.
-- Feeding the store from local file mirrors (the collection table) and
-  publishing to the public endpoints.
-
-## Related work
-
-
-- [byterefs/spec](https://github.com/byterefs/spec): the byte-reference
-  table specification this store follows
-- [wxylib/design](https://github.com/wxylib/design): design notes and the
-  wxy-refs reader
-- [hypertidy/vrtstack](https://github.com/hypertidy/vrtstack): COG
-  collections as multidim VRT, the form `py/plan_cog.py` writes
-- [hypertidy/blocklist](https://github.com/hypertidy/blocklist): the
-  kerchunk writer vendored here
-- [Tensors and tables](https://www.hypertidy.org/posts/2026-10-12_tensors-tables/):
-  the tabular view of array data behind the store
-- [ausantarctic/ghrsst-mur-v2](https://source.coop/ausantarctic/ghrsst-mur-v2):
-  the GHRSST MUR COGs
+[Status 2026-11-05: drafts in `ausantarctic/ausantarctic-scratch` (unlisted);
+IBCSO, Bedmap3 and GEBCO in production. Moving to production with the AAD
+cloud team.]{.rv-status}

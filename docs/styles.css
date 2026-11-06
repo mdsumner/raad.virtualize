@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap");
 /* status badges used on example pages and the readers matrix */
 .status { display: inline-block; padding: 0 .45em; border-radius: .3em;
           font-size: .85em; font-weight: 600; white-space: nowrap; }
@@ -9,3 +10,26 @@
 [data-bs-theme="dark"] .status-partial { background: #713f12; color: #fdf0c4; }
 [data-bs-theme="dark"] .status-no      { background: #7f1d1d; color: #f8d4d4; }
 [data-bs-theme="dark"] .status-todo    { background: #374151; color: #e5e7eb; }
+
+/* Overview page: tokens shared with the handover snapshot (diagram colours) */
+:root {
+  --ink: #15232e; --muted: #5a6b78; --rule: #d3dde4; --surface: #ffffff;
+  --ours: #0f7f86; --ours-soft: #dcf0f1; --theirs: #4c5d9a; --theirs-soft: #e3e7f5;
+  --prop: #b06a00; --prop-soft: #fbefd9;
+}
+body.quarto-dark {
+  --ink: #e3ebf0; --muted: #94a6b3; --rule: #2a3a46; --surface: #15212a;
+  --ours: #4cc3c9; --ours-soft: #12343a; --theirs: #9fb0ec; --theirs-soft: #222a48;
+  --prop: #f0b44c; --prop-soft: #3a2c12;
+}
+h1.title, h2, h3 { font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif; letter-spacing: .01em; }
+.rv-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 1.2rem 0; }
+.rv-num { border-top: 2px solid var(--ours); padding-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+.rv-num b { font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif; font-size: 1.9rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.rv-num span { font-size: .88rem; color: var(--muted); }
+.rv-fig { margin: 1rem 0 1.5rem; }
+.rv-fig .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; padding: 12px; background: var(--surface); }
+.rv-fig svg { display: block; max-width: 100%; height: auto; }
+.rv-fig .svg-wide { min-width: 860px; }
+.rv-fig figcaption { font-size: .9rem; color: var(--muted); margin-top: .5rem; }
+.rv-status { display: block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .8rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: .6rem; margin-top: 1.5rem; }

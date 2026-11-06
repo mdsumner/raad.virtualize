@@ -29,17 +29,8 @@ is per source family:
 | wxy-refs | flat refs | [partial]{.status .status-partial} synthetic BRAN only | [no]{.status .status-no} predictor decode pending |
 | gdalraster multidim | mdim VRT | [not run]{.status .status-todo} | [not run]{.status .status-todo} |
 
-fsspec reads kerchunk refs with fastparquet by default, and fastparquet
-silently drops chunk paths in refs files written with arrow dictionary
-encoding once the dictionary overflows (OISST and sea ice G02202 stores
-published before 2026-11-03; bluelink, GHRSST and ASI were not affected).
-Pass a `LazyReferenceMapper(..., engine="pyarrow")` as shown in [Reading
-published stores](reading-published-stores.md).
-
-xarray decodes the packed int16 to float64 from the Zarr forms because the
-JSON attributes do not keep the float32 type of `scale_factor`.
-
-Sources for each cell: [Results](results.md), [Reading published
-stores](reading-published-stores.md) and the [Examples](examples/index.qmd).
-A new run that changes a cell updates this table and adds or updates an
-example page.
+Notes. fsspec reads kerchunk refs with fastparquet by default, which drops
+chunk paths in some refs files published before 2026-11-03; pass
+`engine="pyarrow"`. xarray decodes packed int16 to float64 from the Zarr
+forms, because the JSON attributes do not keep the float32 `scale_factor`.
+The "no" cells are GDAL codec gaps, tracked upstream.
