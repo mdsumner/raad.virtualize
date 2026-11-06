@@ -47,6 +47,7 @@ import io
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 
 import pyarrow.parquet as pq
@@ -70,8 +71,14 @@ def listing_location(a):
 def read_listing(loc, cache):
     if _is_url(loc):
         req = urllib.request.Request(loc, headers={"User-Agent": "raad.virtualize corpus.py"})
-        with urllib.request.urlopen(req) as r:
-            data = r.read()
+        try:
+            with urllib.request.urlopen(req) as r:
+                data = r.read()
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                sys.exit(f"corpus: no listing at {loc} (HTTP 404): the source is not "
+                         "in the corpus yet; run the aad-filelist sync for it first")
+            raise
         if cache:
             tmp = cache + ".tmp"
             with open(tmp, "wb") as f:
