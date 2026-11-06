@@ -66,6 +66,8 @@ section { display: flex; flex-direction: column; gap: 18px; }
 .chip.theirs { background: var(--theirs-soft); color: var(--theirs); }
 .chip.prop { background: var(--prop-soft); color: var(--prop); }
 .chip.scr { background: var(--scr-soft); color: var(--scr); }
+.chip.pass { background: var(--ours-soft); color: var(--ours); }
+.chip.gap { background: var(--prop-soft); color: var(--prop); }
 .chip.site { background: transparent; border: 1px solid var(--rule); color: var(--ink); }
 .scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; }
 figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -131,7 +133,7 @@ th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rul
 th { font-family: var(--f-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 500; }
 tr:last-child td { border-bottom: 0; }
 td code { font-size: 0.8rem; }
-ol.qs { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 8px; max-width: 75ch; }
+.qs { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 8px; max-width: 75ch; }
 .brief { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; }
 .brief pre { margin: 0; font-family: var(--f-mono); font-size: 0.82rem; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; }
 .links { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.95rem; }
@@ -146,7 +148,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <header style="display:flex;flex-direction:column;gap:14px">
   <div class="eyebrow">Australian Antarctic Division &middot; source.coop ausantarctic &middot; handover 2026-11-06</div>
   <h1>Production handover</h1>
-  <p class="lede">We index Southern Ocean and Antarctic array data and publish them in cloud-readable form on source.coop. This page shows how the pieces sit now, how we propose they fit in production, and what is open. Anything marked <span class="chip prop">proposal</span> is not done.</p>
+  <p class="lede">We index Southern Ocean and Antarctic array data and publish them in cloud-readable form on source.coop. This page shows how the pieces sit now, the proposed production shape, and what is open. Anything marked <span class="chip prop">proposal</span> is not done.</p>
   <div class="links">
     <span class="muted">Project site:</span>
     <a href="../">Overview</a><a href="../published.html">Datasets</a><a href="../how-it-works.html">How it works</a><a href="../readers.html">Readers</a>
@@ -159,14 +161,14 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
   <p>Bytes, builds and indexes sit in different places; every index points back at its bytes.</p>
   <figure>
     <div class="scroll">
-    <svg class="svg-wide" viewBox="0 0 1040 572" role="img" aria-label="Upstream publishers feed bytes; some are converted to COGs we host on source.coop or Pawsey Acacia. Harvest runs on the Nectar VM, NCI Gadi or Pawsey Setonix, reading file lists from the aad-filelist corpus. Indexes are published to source.coop scratch groups or production virtual prefixes, and their references point back to the bytes.">
+    <svg class="svg-wide" viewBox="0 0 1040 572" role="img" aria-label="Upstream publishers feed bytes; some are converted to project-hosted COGs on source.coop or Pawsey Acacia. Harvest runs on the Nectar VM, NCI Gadi or Pawsey Setonix, reading file lists from the aad-filelist corpus. Indexes are published to source.coop scratch groups or production virtual prefixes, and their references point back to the bytes.">
       <defs>
         <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
         <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--theirs)"/></marker>
       </defs>
       <g font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" style="color:var(--muted)">
         <text x="20" y="28">UPSTREAM PUBLISHERS</text>
-        <text x="280" y="28">BYTES WE HOST</text>
+        <text x="280" y="28">PROJECT-HOSTED BYTES</text>
         <text x="540" y="28">WHERE HARVEST RUNS</text>
         <text x="800" y="28">PUBLISHED INDEX</text>
       </g>
@@ -288,13 +290,13 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
       </g>
 </svg>
     </div>
-    <figcaption>Our COGs are made by ghrsst-cogger (MUR), VM scripts (IBCSO, Bedmap3, GEBCO) and Setonix jobs (ESA CCI). raad.virtualize runs the same <code>run.sh</code> on all three machines.</figcaption>
+    <figcaption>Project COGs are made by ghrsst-cogger (MUR), VM scripts (IBCSO, Bedmap3, GEBCO) and Setonix jobs (ESA CCI). raad.virtualize runs the same <code>run.sh</code> on all three machines.</figcaption>
   </figure>
 </section>
 
 <section id="proposed">
   <div class="eyebrow">Proposed, open to review</div>
-  <h2>Where we see it going: one path, one gate</h2>
+  <h2>One path, one gate</h2>
   <p>Bytes, file lists and readers are shared. Build and index split into two lanes with a gate between them. Michael owns the lane above the gate, including cleaning up the Nectar, NCI, Pawsey and scratch side. The production team owns the lane below it and sets what a dataset must meet to cross.</p>
   <figure>
     <div class="scroll">
@@ -322,7 +324,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
         <text x="34" y="152" fill="var(--muted)">NCI THREDDS, PGC</text>
         <rect x="20" y="288" width="180" height="214" rx="5" fill="var(--ours-soft)" stroke="var(--ours)"/>
         <text x="34" y="312" font-weight="700" fill="var(--ink)">Ours</text>
-        <text x="34" y="334" fill="var(--ink)">COGs we write, one</text>
+        <text x="34" y="334" fill="var(--ink)">project COGs, one</text>
         <text x="34" y="352" fill="var(--ink)">layout rule on source.coop</text>
         <text x="34" y="378" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ours)">&lt;product&gt;/&lt;release&gt;/cog/</text>
         <text x="34" y="404" fill="var(--muted)">Acacia stays a stopgap</text>
@@ -421,13 +423,36 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 </section>
 
 
+<section id="gate-ibcso">
+  <div class="eyebrow">Proposed gate, one dataset</div>
+  <h2>IBCSO v2 against the gate</h2>
+  <p>The gate items applied to one production pilot, with the file or check behind each. Two items pass and three are gaps; the gaps are the work for its first rebuild through the gate.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Gate item</th><th>IBCSO v2 today</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>Config in a product repo</td><td>Config <a href="https://github.com/mdsumner/raad.virtualize/blob/main/config/ibcso.sh"><code>config/ibcso.sh</code></a> and product files <a href="https://github.com/mdsumner/raad.virtualize/blob/main/products/ibcso"><code>products/ibcso/</code></a> live in raad.virtualize, not in a product repo.</td><td><span class="chip gap">gap</span></td></tr>
+      <tr><td>File list from corpus</td><td>The build lists its own local COG directory (<code>sources()</code> in the config). The corpus lists the published COGs, but this build does not read it.</td><td><span class="chip gap">gap</span></td></tr>
+      <tr><td>Build record</td><td>No <code>sources.meta.tsv</code>, so <a href="https://github.com/mdsumner/raad.virtualize/blob/main/py/stale.py"><code>py/stale.py</code></a> has nothing to compare. The store records the repo commit and config used (<a href="https://github.com/mdsumner/raad.virtualize/blob/main/R/collate.R"><code>R/collate.R</code></a>), not which file versions it read. Only the OISST, G02202 and AMSR2 configs write a build record today.</td><td><span class="chip gap">gap</span></td></tr>
+      <tr><td>Verify passes</td><td><code>verify</code> and <code>verify-published</code> run in <a href="https://github.com/mdsumner/raad.virtualize/blob/main/hpc/vm/ibcso-publish.sh"><code>hpc/vm/ibcso-publish.sh</code></a>, which stops at the first failure. The log stays on the VM (<code>work/ibcso-v2/log.txt</code>); nothing published records the result.</td><td><span class="chip pass">pass</span></td></tr>
+      <tr><td>Byte layout rule</td><td>COGs at <code>ibcso/v2/cog/</code>, the candidate rule itself.</td><td><span class="chip pass">pass</span></td></tr>
+    </tbody>
+  </table></div>
+  <h3>What verify checks, and what counts as a failure</h3>
+  <ul class="qs">
+    <li><a href="https://github.com/mdsumner/raad.virtualize/blob/main/py/verify.py"><code>verify</code></a> reads the same windows through every rendered form (multidim VRT, kerchunk Parquet through GDAL and, for TIFF predictors, fsspec and zarr, and Icechunk) and compares them with GDAL reading the source files through <code>plan.vrt</code>. Windows per array: the first chunk, one row across every chunk of the last dimension, four random present chunks and one absent chunk. It also checks scale factor and fill value against the sources, and that pyarrow and fastparquet read the same kerchunk paths.</li>
+    <li><code>verify-published</code> runs the same check on the published copy, read anonymously from source.coop, as a public reader would.</li>
+    <li><a href="https://github.com/mdsumner/raad.virtualize/blob/main/py/verify_grist.py"><code>verify_grist.py</code></a> checks grist catalog rows against their source fields, for datasets with a date axis; IBCSO has no grist catalog.</li>
+    <li>A failure is any value that differs (raw values, no tolerance; NaN equals NaN), a wrong scale factor or fill value, or a read error. The script exits 1 and <code>run.sh</code> stops before the next step, so nothing later in that run is published.</li>
+  </ul>
+</section>
+
 <section id="repos">
   <div class="eyebrow">Repos, in one line each</div>
   <h2>What each repo does, and what production changes</h2>
   <div class="repos">
     <div class="repo"><div class="role">engine</div><h3>mdsumner/raad.virtualize</h3>
       <dl><dt>does</dt><dd>plan, harvest, collate, render (VRT, kerchunk, Icechunk, flat, STAC, grist), verify, publish</dd>
-      <dt>at prod</dt><dd class="change">pinned by tag; dataset configs and product READMEs move out to product repos</dd></dl></div>
+      <dt>at prod</dt><dd class="change">pinned by tag (first tag v0.1.0 proposed, <a href="https://github.com/mdsumner/raad.virtualize/blob/main/VERSIONING.md">VERSIONING.md</a>); dataset configs and product READMEs move out to product repos</dd></dl></div>
     <div class="repo"><div class="role">file lists</div><h3>mdsumner/aad-filelist</h3>
       <dl><dt>does</dt><dd>listing corpus: every source listed on a schedule, every run kept, <code>current</code> and <code>changes</code> per source</dd>
       <dt>at prod</dt><dd class="change">stays; publishes to source.coop once Actions has a credential (GitHub releases now)</dd></dl></div>
@@ -442,7 +467,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
       <dt>at prod</dt><dd class="change">could also own the GHRSST index, beside its bytes</dd></dl></div>
     <div class="repo"><div class="role">upstream</div><h3>bowerbird, blueant</h3>
       <dl><dt>does</dt><dd>source definitions and the listing engine (Ben Raymond)</dd>
-      <dt>at prod</dt><dd class="change">size and mtime in dry runs, upstreamed rather than forked</dd></dl></div>
+      <dt>at prod</dt><dd class="change">nothing to move</dd></dl></div>
     <div class="repo"><div class="role">consumers</div><h3>grist, sds, raadtools, sooty</h3>
       <dl><dt>does</dt><dd>read the published catalogs and stores (grist reads <code>grist/catalog.parquet</code>)</dd>
       <dt>at prod</dt><dd class="change">every catalog row carries the store URL, so a move rewrites them</dd></dl></div>
@@ -452,13 +477,13 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="datasets">
   <div class="eyebrow">Per dataset</div>
   <h2>Where things are today</h2>
-  <p>Three are in production; the rest are drafts in scratch. Detail per dataset is on the <a href="../published.html">Datasets</a> page.</p>
+  <p>IBCSO, Bedmap3 and GEBCO are a pilot: they sit in production paths, but were built by hand on the Nectar VM, not through the gate. They are the first to be rebuilt through it (see Moves). The rest are drafts in scratch. Detail per dataset is on the <a href="../published.html">Datasets</a> page.</p>
   <div class="tbl"><table>
     <thead><tr><th>Dataset</th><th>Bytes</th><th>Built on</th><th>Index now</th></tr></thead>
     <tbody>
-      <tr><td>IBCSO v2, 2024, 2025</td><td><span class="chip ours">ours</span> source.coop <code>ibcso/&lt;release&gt;/cog/</code></td><td>Nectar VM</td><td>production <code>ibcso/virtual/</code></td></tr>
-      <tr><td>Bedmap3</td><td><span class="chip ours">ours</span> source.coop <code>bedmap/bedmap3/cog/</code></td><td>Nectar VM</td><td>production <code>bedmap/virtual/</code></td></tr>
-      <tr><td>GEBCO 2024 to 2026</td><td><span class="chip ours">ours</span> source.coop <code>gebco/</code> root</td><td>Nectar VM</td><td>production <code>gebco/virtual/</code></td></tr>
+      <tr><td>IBCSO v2, 2024, 2025</td><td><span class="chip ours">ours</span> source.coop <code>ibcso/&lt;release&gt;/cog/</code></td><td>Nectar VM</td><td>production (pilot) <code>ibcso/virtual/</code></td></tr>
+      <tr><td>Bedmap3</td><td><span class="chip ours">ours</span> source.coop <code>bedmap/bedmap3/cog/</code></td><td>Nectar VM</td><td>production (pilot) <code>bedmap/virtual/</code></td></tr>
+      <tr><td>GEBCO 2024 to 2026</td><td><span class="chip ours">ours</span> source.coop <code>gebco/</code> root</td><td>Nectar VM</td><td>production (pilot) <code>gebco/virtual/</code></td></tr>
       <tr><td>GHRSST MUR</td><td><span class="chip ours">ours</span> source.coop <code>ghrsst-mur-v2/YYYY/MM/DD/</code></td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>ghrsst/</code></td></tr>
       <tr><td>ESA CCI ocean colour (6)</td><td><span class="chip ours">ours</span> Pawsey Acacia <code>aad-derived/esacci-oc</code></td><td>Pawsey Setonix</td><td><span class="chip scr">scratch</span> <code>oceancolour/</code></td></tr>
       <tr><td>OISST v2.1</td><td><span class="chip theirs">theirs</span> NOAA public S3</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>oisst/</code></td></tr>
@@ -477,11 +502,12 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
   <ol class="qs">
     <li><strong>Gate.</strong> What a dataset must meet to move to production (proposed list in the diagram).</li>
     <li><strong>Product shape.</strong> One production product per scratch group (sea ice as one product), one per source, or one index product with groups.</li>
-    <li><strong>Byte layout.</strong> One rule for our own COGs (IBCSO's <code>&lt;release&gt;/cog/</code> is the candidate); GEBCO and GHRSST differ today.</li>
+    <li><strong>Byte layout.</strong> One rule for project COGs (IBCSO's <code>&lt;release&gt;/cog/</code> is the candidate); GEBCO and GHRSST differ today.</li>
     <li><strong>Landing pages.</strong> One fixed "where things are" block at the top of every product README: bytes, index, where it's built, how to open it.</li>
     <li><strong>Runners.</strong> Which machine or service runs scheduled production builds, and with which credential.</li>
     <li><strong>Central refs.</strong> Where the collected tables live on source.coop, and whether products keep their own copies.</li>
-    <li><strong>Moves.</strong> Copy the existing indexes or rebuild them; a rebuild gives every dataset the build record the stale check needs.</li>
+    <li><strong>Moves.</strong> Copy the existing indexes or rebuild them; a rebuild gives every dataset the build record the stale check needs. The three pilot datasets go first.</li>
+    <li><strong>After promotion.</strong> Who acts when the stale check fires; how a dataset goes back to the research lane when an upstream format changes; whether a rebuild overwrites the published store or writes a new version beside it (catalog rows embed store URLs, so this decides whether readers' links break); and what to do when "theirs" bytes move or vanish, since their publishers give no availability guarantee.</li>
   </ol>
 </section>
 
