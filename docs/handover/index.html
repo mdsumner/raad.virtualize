@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Ausantarctic Production Handover</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column of map-like sections; diagrams and trees break wider in their own scroll boxes. */
+:root {
+  --bg: #f3f6f8;
+  --surface: #ffffff;
+  --ink: #15232e;
+  --muted: #5a6b78;
+  --rule: #d3dde4;
+  --ours: #0f7f86;
+  --ours-soft: #dcf0f1;
+  --theirs: #4c5d9a;
+  --theirs-soft: #e3e7f5;
+  --prop: #b06a00;
+  --prop-soft: #fbefd9;
+  --hl: #c2410c;
+  --scr: #b42318;
+  --scr-soft: #fdeceb;
+  --f-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", Helvetica, Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e161c; --surface: #15212a; --ink: #e3ebf0; --muted: #94a6b3; --rule: #2a3a46;
+    --ours: #4cc3c9; --ours-soft: #12343a; --theirs: #9fb0ec; --theirs-soft: #222a48;
+    --prop: #f0b44c; --prop-soft: #3a2c12; --hl: #fb8a5c; --scr: #f6877c; --scr-soft: #3c1b19; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e161c; --surface: #15212a; --ink: #e3ebf0; --muted: #94a6b3; --rule: #2a3a46;
+  --ours: #4cc3c9; --ours-soft: #12343a; --theirs: #9fb0ec; --theirs-soft: #222a48;
+  --prop: #f0b44c; --prop-soft: #3a2c12; --hl: #fb8a5c; --scr: #f6877c; --scr-soft: #3c1b19; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 600; letter-spacing: 0.01em; text-wrap: balance; line-height: 1.1; margin: 0; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.2rem); }
+h2 { font-size: 1.9rem; }
+h3 { font-size: 1.35rem; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+a { color: var(--ours); }
+a:focus-visible { outline: 2px solid var(--hl); outline-offset: 2px; }
+section { display: flex; flex-direction: column; gap: 18px; }
+.eyebrow { font-family: var(--f-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 1.12rem; color: var(--ink); }
+.muted { color: var(--muted); }
+.key { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 0.9rem; color: var(--muted); }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 0.78rem; padding: 2px 8px; border-radius: 3px; white-space: nowrap; }
+.chip.ours { background: var(--ours-soft); color: var(--ours); }
+.chip.theirs { background: var(--theirs-soft); color: var(--theirs); }
+.chip.prop { background: var(--prop-soft); color: var(--prop); }
+.chip.scr { background: var(--scr-soft); color: var(--scr); }
+.chip.site { background: transparent; border: 1px solid var(--rule); color: var(--ink); }
+.scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+figcaption { font-size: 0.92rem; color: var(--muted); max-width: 80ch; }
+svg { display: block; max-width: 100%; height: auto; }
+.svg-wide { min-width: 860px; }
+
+/* repo cards */
+.repos { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.repo { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.repo h3 { font-size: 1.25rem; }
+.repo .role { font-family: var(--f-mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.repo dl { margin: 0; display: grid; grid-template-columns: 5.6em 1fr; gap: 4px 10px; font-size: 0.94rem; }
+.repo dt { color: var(--muted); font-size: 0.82rem; padding-top: 2px; }
+.repo dd { margin: 0; min-width: 0; }
+.repo dd.change { color: var(--prop); }
+
+/* dataset strips */
+.ds-list { display: flex; flex-direction: column; gap: 14px; }
+.ds { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.ds-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.ds-head h3 { font-size: 1.3rem; }
+.ds-head .meta { font-family: var(--f-mono); font-size: 0.78rem; color: var(--muted); }
+.strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; }
+.stn { position: relative; padding: 10px 14px 10px 0; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.stn + .stn { padding-left: 18px; border-left: 1px dashed var(--rule); }
+.stn .lab { font-family: var(--f-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.stn .val { font-size: 0.93rem; overflow-wrap: anywhere; }
+.stn .val code { font-size: 0.8rem; }
+.prod { border-top: 1px solid var(--rule); padding-top: 10px; display: grid; grid-template-columns: 9.5em 1fr; gap: 6px 14px; font-size: 0.94rem; }
+.prod .lab { font-family: var(--f-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--prop); padding-top: 3px; }
+.prod div { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .strip { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .stn:nth-child(3) { padding-left: 0; border-left: 0; }
+  .stn:nth-child(n+3) { border-top: 1px dashed var(--rule); }
+  .prod { grid-template-columns: 1fr; }
+}
+
+/* trees */
+.trees { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.tree { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+.tree h3 { font-size: 1.15rem; margin-bottom: 8px; }
+.tree pre { margin: 0; font-family: var(--f-mono); font-size: 0.8rem; line-height: 1.6; overflow-x: auto; }
+.tree .seg { color: var(--hl); font-weight: 500; }
+.tree .byt { color: var(--ours); }
+.tree .ext { color: var(--theirs); }
+
+/* proposals */
+.props { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+.prop-row { display: grid; grid-template-columns: 13em 1fr; gap: 6px 20px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.prop-row .where { font-family: var(--f-display); font-size: 1.15rem; font-weight: 600; }
+.prop-row .where small { display: block; font-family: var(--f-mono); font-size: 0.72rem; font-weight: 400; color: var(--muted); letter-spacing: 0.04em; }
+.prop-row ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 640px) { .prop-row { grid-template-columns: 1fr; } }
+.landing { background: var(--surface); border: 1px dashed var(--prop); border-radius: 6px; padding: 14px 16px; }
+.landing pre { margin: 0; font-family: var(--f-mono); font-size: 0.8rem; line-height: 1.6; overflow-x: auto; }
+.note { border-left: 3px solid var(--prop); padding: 4px 0 4px 14px; color: var(--ink); max-width: 75ch; }
+/* compact tables */
+.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.94rem; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--f-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 500; }
+tr:last-child td { border-bottom: 0; }
+td code { font-size: 0.8rem; }
+ol.qs { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 8px; max-width: 75ch; }
+.brief { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; }
+.brief pre { margin: 0; font-family: var(--f-mono); font-size: 0.82rem; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; }
+.links { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.95rem; }
+footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 14px; }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+<header style="display:flex;flex-direction:column;gap:14px">
+  <div class="eyebrow">Australian Antarctic Division &middot; source.coop ausantarctic &middot; handover 2026-11-06</div>
+  <h1>Production handover</h1>
+  <p class="lede">We index Southern Ocean and Antarctic array data where it already sits and publish cloud-readable indexes on source.coop, so nobody has to copy the data to read it fast. Each dataset gets one table of byte references (which bytes of which file hold each chunk); the GDAL VRT, kerchunk, Icechunk and STAC forms are all rendered from that table. This page shows how the pieces sit now, how we propose they fit in production, and what is open. Everything marked <span class="chip prop">proposal</span> is for design with the production team, not done.</p>
+  <div class="links">
+    <span class="muted">Technical detail lives on the project site:</span>
+    <a href="../">Overview</a><a href="../published.html">Datasets</a><a href="../how-it-works.html">How it works</a><a href="../readers.html">Readers</a>
+  </div>
+  <div class="key">
+    <span><span class="chip ours">ours</span> bytes we wrote (COGs) and host</span>
+    <span><span class="chip theirs">theirs</span> bytes a publisher hosts; we only index them</span>
+    <span><span class="chip scr">scratch</span> not permanent; may move off source.coop</span>
+    <span><span class="chip prop">proposal</span> not enacted</span>
+  </div>
+</header>
+
+<section id="picture">
+  <div class="eyebrow">Now</div>
+  <h2>Three kinds of place</h2>
+  <p>Bytes, work and index are separate places. Some bytes are copies we made (COGs) and host on source.coop or Pawsey object storage; most are left where their publisher puts them. The harvest runs wherever the bytes are fastest to read. The index (a byte-reference table plus the forms rendered from it) is published on source.coop and points back at the bytes, wherever they are.</p>
+  <figure>
+    <div class="scroll">
+    <svg class="svg-wide" viewBox="0 0 1040 572" role="img" aria-label="Upstream publishers feed bytes; some are converted to COGs we host on source.coop or Pawsey Acacia. Harvest runs on the Nectar VM, NCI Gadi or Pawsey Setonix, reading file lists from the aad-filelist corpus. Indexes are published to source.coop scratch groups or production virtual prefixes, and their references point back to the bytes.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
+        <marker id="ahp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--theirs)"/></marker>
+      </defs>
+      <g font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" style="color:var(--muted)">
+        <text x="20" y="28">UPSTREAM PUBLISHERS</text>
+        <text x="280" y="28">BYTES WE HOST</text>
+        <text x="540" y="28">WHERE HARVEST RUNS</text>
+        <text x="800" y="28">PUBLISHED INDEX</text>
+      </g>
+      <!-- column 1: upstream -->
+      <g font-family="Source Sans 3, sans-serif" font-size="13">
+        <rect x="20" y="44" width="220" height="250" rx="5" fill="var(--theirs-soft)" stroke="var(--theirs)"/>
+        <g fill="var(--ink)">
+          <text x="34" y="70">NOAA public S3 (OISST)</text>
+          <text x="34" y="94">NSIDC https (G02202)</text>
+          <text x="34" y="118">Uni Bremen (AMSR2 ASI)</text>
+          <text x="34" y="142">NCI THREDDS gb6 (BRAN)</text>
+          <text x="34" y="166">PO.DAAC (MUR netCDF)</text>
+          <text x="34" y="190">oceancolour.org (ESA CCI)</text>
+          <text x="34" y="214">PANGAEA, ibcso.org (IBCSO)</text>
+          <text x="34" y="238">UK PDC (Bedmap3)</text>
+          <text x="34" y="262">BODC / CEDA (GEBCO)</text>
+          <text x="34" y="286">PGC bucket (REMA, listed only)</text>
+        </g>
+        <!-- column 2: ours -->
+        <rect x="280" y="44" width="220" height="170" rx="5" fill="var(--ours-soft)" stroke="var(--ours)"/>
+        <g fill="var(--ink)">
+          <text x="294" y="68" font-weight="700">source.coop ausantarctic/</text>
+          <text x="294" y="92" font-family="IBM Plex Mono, monospace" font-size="11.5">ghrsst-mur-v2/  4.0 TiB</text>
+          <text x="294" y="112" font-family="IBM Plex Mono, monospace" font-size="11.5">ibcso/&lt;release&gt;/cog/</text>
+          <text x="294" y="132" font-family="IBM Plex Mono, monospace" font-size="11.5">bedmap/bedmap3/cog/</text>
+          <text x="294" y="152" font-family="IBM Plex Mono, monospace" font-size="11.5">gebco/GEBCO_&lt;year&gt;.tif</text>
+          <text x="294" y="180" font-weight="700">Pawsey Acacia</text>
+          <text x="294" y="200" font-family="IBM Plex Mono, monospace" font-size="11.5">aad-derived/esacci-oc/</text>
+        </g>
+        <!-- column 3: sites -->
+        <g>
+          <rect x="540" y="44" width="220" height="70" rx="5" fill="var(--surface)" stroke="currentColor" style="color:var(--ink)"/>
+          <text x="554" y="68" font-weight="700" fill="var(--ink)">Nectar VM (docker)</text>
+          <text x="554" y="88" fill="var(--muted)">OISST, sea ice, GHRSST,</text>
+          <text x="554" y="105" fill="var(--muted)">IBCSO, Bedmap3, GEBCO</text>
+          <rect x="540" y="134" width="220" height="70" rx="5" fill="var(--surface)" stroke="currentColor" style="color:var(--ink)"/>
+          <text x="554" y="158" font-weight="700" fill="var(--ink)">NCI Gadi (PBS)</text>
+          <text x="554" y="178" fill="var(--muted)">BRAN, scanned in place</text>
+          <text x="554" y="195" fill="var(--muted)">on /g/data/gb6</text>
+          <rect x="540" y="224" width="220" height="70" rx="5" fill="var(--surface)" stroke="currentColor" style="color:var(--ink)"/>
+          <text x="554" y="248" font-weight="700" fill="var(--ink)">Pawsey Setonix (Slurm)</text>
+          <text x="554" y="268" fill="var(--muted)">ESA CCI: convert to COG,</text>
+          <text x="554" y="285" fill="var(--muted)">write Acacia, harvest</text>
+        </g>
+        <!-- column 4: index -->
+        <rect x="800" y="44" width="220" height="130" rx="5" fill="var(--scr-soft)" stroke="var(--scr)" stroke-dasharray="4 3"/>
+        <text x="814" y="68" font-weight="700" fill="var(--ink)">scratch (unlisted)</text>
+        <text x="1006" y="68" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--scr)">NOT PERMANENT</text>
+        <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--ink)">
+          <text x="814" y="90">ausantarctic-scratch/</text>
+          <text x="826" y="108">bluelink/  ghrsst/</text>
+          <text x="826" y="126">oisst/  seaice/</text>
+          <text x="826" y="144">oceancolour/</text>
+        </g>
+        <text x="814" y="164" fill="var(--scr)">20 datasets, drafts</text>
+        <rect x="800" y="194" width="220" height="100" rx="5" fill="var(--surface)" stroke="var(--rule)"/>
+        <text x="814" y="218" font-weight="700" fill="var(--ink)">production</text>
+        <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--ink)">
+          <text x="814" y="240">ibcso/virtual/</text>
+          <text x="814" y="258">bedmap/virtual/</text>
+          <text x="814" y="276">gebco/virtual/</text>
+        </g>
+      </g>
+      <!-- arrows -->
+      <g fill="none" stroke="currentColor" stroke-width="1.4" style="color:var(--ink)" font-family="Source Sans 3, sans-serif" font-size="12">
+        <path d="M240 150 H280" marker-end="url(#ah)"/>
+        <text x="244" y="142" fill="var(--muted)" stroke="none">COG</text>
+        <path d="M500 90 H540" marker-end="url(#ah)"/>
+        <path d="M500 200 C520 200 520 250 540 250" marker-end="url(#ah)"/>
+        <path d="M240 262 H512 C528 262 526 170 540 170" marker-end="url(#ah)"/>
+        <path d="M512 262 C532 262 522 100 540 100" marker-end="url(#ah)"/>
+        <text x="300" y="254" fill="var(--muted)" stroke="none">scan in place (theirs)</text>
+        <path d="M760 80 H800" marker-end="url(#ah)"/>
+        <path d="M760 170 C780 170 780 120 800 120" marker-end="url(#ah)"/>
+        <path d="M760 90 C780 90 780 240 800 240" marker-end="url(#ah)"/>
+        <path d="M760 258 C780 258 780 150 800 150" marker-end="url(#ah)"/>
+        <text x="764" y="300" fill="var(--muted)" stroke="none">publish</text>
+      </g>
+      <!-- corpus band -->
+      <g font-family="Source Sans 3, sans-serif" font-size="13">
+        <rect x="270" y="352" width="490" height="56" rx="5" fill="none" stroke="var(--ours)" stroke-width="1.4"/>
+        <text x="284" y="376" font-weight="700" fill="var(--ink)">aad-filelist listing corpus</text>
+        <text x="284" y="396" fill="var(--muted)">lists every source weekly, ours included; keeps every run</text>
+        <path d="M200 294 C200 340 230 380 270 380" stroke="var(--ours)" stroke-width="1.4" stroke-dasharray="5 4" fill="none" marker-end="url(#ah)" style="color:var(--ours)"/>
+        <path d="M390 214 V352" stroke="var(--ours)" stroke-width="1.4" stroke-dasharray="5 4" fill="none" marker-end="url(#ah)" style="color:var(--ours)"/>
+        <text x="206" y="330" fill="var(--muted)">lists</text>
+        <path d="M650 352 V294" stroke="var(--ours)" stroke-width="1.4" fill="none" marker-end="url(#ah)" style="color:var(--ours)"/>
+        <text x="658" y="330" fill="var(--muted)">file list per build</text>
+        <!-- refs product -->
+        <rect x="800" y="352" width="220" height="56" rx="5" fill="var(--prop-soft)" stroke="var(--prop)" stroke-dasharray="5 3"/>
+        <text x="814" y="376" font-weight="700" fill="var(--ink)">bowerbird-byterefs</text>
+        <text x="814" y="396" fill="var(--prop)">central refs + stale check</text>
+        <path d="M910 294 V352" stroke="var(--prop)" stroke-width="1.4" stroke-dasharray="5 3" fill="none" marker-end="url(#ah)" style="color:var(--prop)"/>
+        <text x="918" y="330" fill="var(--prop)">collect tables</text>
+        <path d="M800 392 H760" stroke="var(--prop)" stroke-width="1.4" stroke-dasharray="5 3" fill="none" marker-end="url(#ah)" style="color:var(--prop)"/>
+      </g>
+      <!-- refs point back -->
+      <g font-family="Source Sans 3, sans-serif" font-size="12">
+        <path d="M910 408 V470 H100 V294" fill="none" stroke="var(--theirs)" stroke-width="1.4" stroke-dasharray="2 4" marker-end="url(#ahp)"/>
+        <text x="300" y="490" fill="var(--theirs)">every reference in an index points back at the bytes, wherever they are (decision 0004 remap rules give the public URL)</text>
+      </g>
+          <!-- key -->
+      <g font-family="Source Sans 3, sans-serif" font-size="12">
+        <line x1="20" y1="532" x2="1020" y2="532" stroke="var(--rule)"/>
+        <rect x="20" y="546" width="22" height="14" rx="3" fill="var(--theirs-soft)" stroke="var(--theirs)"/>
+        <text x="48" y="557" fill="var(--ink)">theirs</text>
+        <rect x="100" y="546" width="22" height="14" rx="3" fill="var(--ours-soft)" stroke="var(--ours)"/>
+        <text x="128" y="557" fill="var(--ink)">ours</text>
+        <rect x="174" y="546" width="22" height="14" rx="3" fill="var(--scr-soft)" stroke="var(--scr)" stroke-dasharray="4 3"/>
+        <text x="202" y="557" fill="var(--ink)">scratch: not permanent</text>
+        <line x1="350" y1="553" x2="384" y2="553" stroke="var(--ink)" stroke-width="1.4"/>
+        <text x="392" y="557" fill="var(--ink)">runs today</text>
+        <line x1="480" y1="553" x2="514" y2="553" stroke="var(--ours)" stroke-width="1.4" stroke-dasharray="5 4"/>
+        <text x="522" y="557" fill="var(--ink)">file listing</text>
+        <line x1="612" y1="553" x2="646" y2="553" stroke="var(--prop)" stroke-width="1.4" stroke-dasharray="5 3"/>
+        <text x="654" y="557" fill="var(--ink)">proposed</text>
+        <line x1="736" y1="553" x2="770" y2="553" stroke="var(--theirs)" stroke-width="1.4" stroke-dasharray="2 4"/>
+        <text x="778" y="557" fill="var(--ink)">references point back to bytes</text>
+      </g>
+</svg>
+    </div>
+    <figcaption>Our COGs are made by ghrsst-cogger (MUR), VM scripts (IBCSO, Bedmap3, GEBCO) and Setonix jobs (ESA CCI). The amber box is the proposed central refs collation (repo created 2026-11-05, empty scaffold). raad.virtualize is the engine on all three sites: one checkout per machine, same <code>run.sh</code>.</figcaption>
+  </figure>
+  <p class="note">Why three machines. Nectar is the general build box, near the raad <code>/rdsi</code> mirror, and publishes to source.coop. Gadi is where BRAN lives (<code>/g/data/gb6</code>): scanning it in place is far faster than over THREDDS. Pawsey gives compute for writing our own COGs plus Acacia object storage to host them (about 10.6 TB free). The production question is which of these the team wants to own, and which become a runner they schedule.</p>
+</section>
+
+<section id="proposed">
+  <div class="eyebrow">Proposed, open to review</div>
+  <h2>Where we see it going: one path, one gate</h2>
+  <p>The same pieces, laid out the way we think they should fit. Bytes, file lists and readers are shared. Build and index split into two lanes with a gate between them. Above the gate, Michael owns the research work: new datasets, engine changes, and cleaning up the Nectar, NCI, Pawsey and scratch complexity. Below the gate, the production team owns scheduled builds and production products. The team sets the requirements a dataset must meet to cross the gate; nothing crosses until those are defined and planned.</p>
+  <figure>
+    <div class="scroll">
+    <svg class="svg-wide" viewBox="0 0 1040 606" role="img" aria-label="Proposal: bytes and the aad-filelist corpus feed two build lanes. The research lane (Michael) builds on Nectar, Gadi or Setonix and publishes unlisted scratch drafts. A production-ready gate, with requirements set by production, separates it from the production lane: a per-product repo and scheduled runner publishing production indexes and collecting tables in central refs, whose stale check compares against the latest listing. Readers read both.">
+      <defs>
+        <marker id="bho" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ours)"/></marker>
+        <marker id="bhm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker>
+        <marker id="bhi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker>
+        <marker id="bhp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--prop)"/></marker>
+      </defs>
+      <g font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">
+        <text x="20" y="28">BYTES</text>
+        <text x="230" y="28">FILE LISTS</text>
+        <text x="420" y="28">BUILD</text>
+        <text x="640" y="28">INDEX</text>
+        <text x="870" y="28">READERS</text>
+      </g>
+      <g font-family="Source Sans 3, sans-serif" font-size="13">
+        <!-- bytes -->
+        <rect x="20" y="44" width="180" height="214" rx="5" fill="var(--theirs-soft)" stroke="var(--theirs)"/>
+        <text x="34" y="68" font-weight="700" fill="var(--ink)">Theirs</text>
+        <text x="34" y="90" fill="var(--ink)">publishers' own files,</text>
+        <text x="34" y="108" fill="var(--ink)">left where they are</text>
+        <text x="34" y="134" fill="var(--muted)">NOAA, NSIDC, Bremen,</text>
+        <text x="34" y="152" fill="var(--muted)">NCI THREDDS, PGC</text>
+        <rect x="20" y="288" width="180" height="214" rx="5" fill="var(--ours-soft)" stroke="var(--ours)"/>
+        <text x="34" y="312" font-weight="700" fill="var(--ink)">Ours</text>
+        <text x="34" y="334" fill="var(--ink)">COGs we write, one</text>
+        <text x="34" y="352" fill="var(--ink)">layout rule on source.coop</text>
+        <text x="34" y="378" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ours)">&lt;product&gt;/&lt;release&gt;/cog/</text>
+        <text x="34" y="404" fill="var(--muted)">Acacia stays a stopgap</text>
+        <!-- listing -->
+        <rect x="230" y="44" width="160" height="458" rx="5" fill="var(--surface)" stroke="var(--ours)" stroke-width="1.4"/>
+        <text x="244" y="68" font-weight="700" fill="var(--ink)">aad-filelist</text>
+        <text x="244" y="90" fill="var(--ink)">every source listed</text>
+        <text x="244" y="108" fill="var(--ink)">on a schedule,</text>
+        <text x="244" y="126" fill="var(--ink)">every run kept</text>
+        <text x="244" y="152" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">current__&lt;id&gt;</text>
+        <text x="244" y="168" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">.parquet</text>
+        <text x="244" y="196" fill="var(--muted)">one input for</text>
+        <text x="244" y="214" fill="var(--muted)">both lanes</text>
+        <!-- lane A -->
+        <rect x="410" y="44" width="440" height="192" rx="6" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>
+        <text x="840" y="62" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">RESEARCH AND SCRATCH: MICHAEL</text>
+        <rect x="420" y="76" width="190" height="146" rx="5" fill="var(--surface)" stroke="var(--muted)"/>
+        <text x="434" y="100" font-weight="700" fill="var(--ink)">Nectar, Gadi, Setonix</text>
+        <text x="434" y="122" fill="var(--ink)">wherever the bytes</text>
+        <text x="434" y="140" fill="var(--ink)">read fastest</text>
+        <text x="434" y="166" fill="var(--muted)">new datasets, engine</text>
+        <text x="434" y="184" fill="var(--muted)">changes, site and scratch</text>
+        <text x="434" y="202" fill="var(--muted)">clean-up</text>
+        <rect x="640" y="76" width="200" height="146" rx="5" fill="var(--scr-soft)" stroke="var(--scr)" stroke-dasharray="4 3"/>
+        <text x="654" y="100" font-weight="700" fill="var(--ink)">scratch drafts</text>
+        <text x="654" y="118" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--scr)">NOT PERMANENT</text>
+        <text x="654" y="142" fill="var(--ink)">today source.coop</text>
+        <text x="654" y="160" fill="var(--ink)">ausantarctic-scratch;</text>
+        <text x="654" y="178" fill="var(--muted)">could be S3 scratch, an</text>
+        <text x="654" y="196" fill="var(--muted)">AADC or Pawsey endpoint</text>
+        <!-- gate -->
+        <rect x="410" y="246" width="440" height="58" rx="5" fill="var(--prop-soft)" stroke="var(--prop)" stroke-dasharray="5 3"/>
+        <text x="540" y="264" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="500" fill="var(--prop)">PRODUCTION-READY GATE, SET BY PRODUCTION</text>
+        <text x="540" y="282" font-size="12" fill="var(--ink)">config in a product repo, file list from corpus,</text>
+        <text x="540" y="298" font-size="12" fill="var(--ink)">build record, verify passes, byte layout rule</text>
+        <!-- lane B -->
+        <rect x="410" y="310" width="440" height="192" rx="6" fill="none" stroke="var(--ink)" stroke-width="1.4"/>
+        <text x="840" y="328" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink)">PRODUCTION: PRODUCTION TEAM</text>
+        <rect x="420" y="342" width="190" height="146" rx="5" fill="var(--surface)" stroke="var(--ink)"/>
+        <text x="434" y="366" font-weight="700" fill="var(--ink)">Product repo + runner</text>
+        <text x="434" y="388" fill="var(--ink)">scheduled, own credential,</text>
+        <text x="434" y="406" fill="var(--ink)">engine pinned by tag</text>
+        <text x="434" y="432" fill="var(--muted)">the machine is a</text>
+        <text x="434" y="450" fill="var(--muted)">detail of the runner</text>
+        <rect x="640" y="342" width="200" height="64" rx="5" fill="var(--surface)" stroke="var(--ink)"/>
+        <text x="654" y="366" font-weight="700" fill="var(--ink)">production products</text>
+        <text x="654" y="388" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">&lt;product&gt;/virtual/&lt;ds&gt;/</text>
+        <rect x="640" y="424" width="200" height="64" rx="5" fill="var(--surface)" stroke="var(--ink)"/>
+        <text x="654" y="448" font-weight="700" fill="var(--ink)">central refs</text>
+        <text x="654" y="470" fill="var(--muted)">every table, stale check</text>
+        <!-- readers -->
+        <rect x="870" y="44" width="150" height="458" rx="5" fill="var(--surface)" stroke="var(--rule)"/>
+        <text x="884" y="68" font-weight="700" fill="var(--ink)">Readers</text>
+        <text x="884" y="90" fill="var(--ink)">grist, sds,</text>
+        <text x="884" y="108" fill="var(--ink)">raadtools</text>
+        <text x="884" y="134" fill="var(--ink)">GDAL VRT,</text>
+        <text x="884" y="152" fill="var(--ink)">kerchunk, Icechunk,</text>
+        <text x="884" y="170" fill="var(--ink)">STAC, xarray</text>
+      </g>
+      <!-- arrows -->
+      <g fill="none" stroke-width="1.4" font-family="Source Sans 3, sans-serif" font-size="12">
+        <path d="M200 151 H230" stroke="var(--ours)" stroke-dasharray="5 4" marker-end="url(#bho)"/>
+        <path d="M200 395 H230" stroke="var(--ours)" stroke-dasharray="5 4" marker-end="url(#bho)"/>
+        <path d="M390 149 H420" stroke="var(--ours)" marker-end="url(#bho)"/>
+        <path d="M390 415 H420" stroke="var(--ours)" marker-end="url(#bho)"/>
+        <path d="M610 149 H640" stroke="var(--muted)" marker-end="url(#bhm)"/>
+        <path d="M840 149 H870" stroke="var(--muted)" stroke-dasharray="2 3" marker-end="url(#bhm)"/>
+        <path d="M610 374 H640" stroke="var(--ink)" marker-end="url(#bhi)"/>
+        <path d="M610 456 H640" stroke="var(--ink)" marker-end="url(#bhi)"/>
+        <path d="M840 374 H870" stroke="var(--ink)" marker-end="url(#bhi)"/>
+        <path d="M470 222 V342" stroke="var(--prop)" stroke-width="2" marker-end="url(#bhp)"/>
+        <text x="478" y="280" fill="var(--prop)" stroke="none" font-weight="700">promote</text>
+        <path d="M740 488 V528 H310 V502" stroke="var(--prop)" stroke-dasharray="5 3" marker-end="url(#bhp)"/>
+        <text x="324" y="544" fill="var(--prop)" stroke="none">stale check: compare tables with the latest listing, rebuild what changed</text>
+      </g>
+      <!-- key -->
+      <g font-family="Source Sans 3, sans-serif" font-size="12">
+        <line x1="20" y1="556" x2="1020" y2="556" stroke="var(--rule)"/>
+        <rect x="20" y="572" width="22" height="14" rx="3" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>
+        <text x="48" y="583" fill="var(--ink)">Michael's lane</text>
+        <rect x="160" y="572" width="22" height="14" rx="3" fill="none" stroke="var(--ink)" stroke-width="1.4"/>
+        <text x="188" y="583" fill="var(--ink)">production team's lane</text>
+        <rect x="340" y="572" width="22" height="14" rx="3" fill="var(--prop-soft)" stroke="var(--prop)" stroke-dasharray="5 3"/>
+        <text x="368" y="583" fill="var(--ink)">gate: what a dataset must meet</text>
+        <line x1="560" y1="579" x2="594" y2="579" stroke="var(--ours)" stroke-width="1.4"/>
+        <text x="602" y="583" fill="var(--ink)">file list per build</text>
+        <line x1="720" y1="579" x2="754" y2="579" stroke="var(--prop)" stroke-width="2"/>
+        <text x="762" y="583" fill="var(--ink)">promote a dataset</text>
+        <line x1="880" y1="579" x2="914" y2="579" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="2 3"/>
+        <text x="922" y="583" fill="var(--ink)">draft reads</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Proposal only; every box and the gate list are for design with the production team. What drops out compared with the picture above: three sites feeding two index places by crossing arrows, and a central refs box with no owner. As now, every reference still points back at the bytes, wherever they sit.</figcaption>
+  </figure>
+</section>
+
+
+<section id="repos">
+  <div class="eyebrow">Repos, in one line each</div>
+  <h2>What each repo is for, and what production changes</h2>
+  <div class="repos">
+    <div class="repo"><div class="role">engine</div><h3>mdsumner/raad.virtualize</h3>
+      <dl><dt>does</dt><dd>plan, harvest, collate, render (VRT, kerchunk, Icechunk, flat, STAC, grist), verify, publish</dd>
+      <dt>why</dt><dd>one table per collection, every form rendered from it, checked against GDAL on the sources</dd>
+      <dt>at prod</dt><dd class="change">pinned by tag; dataset configs and product READMEs move out to product repos</dd></dl></div>
+    <div class="repo"><div class="role">file lists</div><h3>mdsumner/aad-filelist</h3>
+      <dl><dt>does</dt><dd>listing corpus: every source listed on a schedule, every run kept, <code>current</code> and <code>changes</code> per source</dd>
+      <dt>why</dt><dd>builds read file lists from here; a file replaced at the same URL shows up as a change</dd>
+      <dt>at prod</dt><dd class="change">stays; publishes to source.coop once Actions has a credential (GitHub releases now)</dd></dl></div>
+    <div class="repo"><div class="role">refs collation</div><h3>mdsumner/bowerbird-byterefs</h3>
+      <dl><dt>does</dt><dd>nothing yet: README scaffold for the central refs product and the scheduled stale check</dd>
+      <dt>why</dt><dd>answers which stores reference a file, without crawling every product</dd>
+      <dt>at prod</dt><dd class="change">location of the refs product, Lance or Parquet, keep or drop per-product copies</dd></dl></div>
+    <div class="repo"><div class="role">format</div><h3>byterefs/spec</h3>
+      <dl><dt>does</dt><dd>byterefs/0.1 table spec and decision records (0004 paths per target)</dd>
+      <dt>why</dt><dd>lets other readers (wxy-refs, arrir, zaro, DuckDB) use the table without our code</dd>
+      <dt>at prod</dt><dd class="change">nothing to move; production stores stamp the version</dd></dl></div>
+    <div class="repo"><div class="role">bytes maker</div><h3>ghrsst-cogger</h3>
+      <dl><dt>does</dt><dd>MUR netCDF to COG, into <code>ausantarctic/ghrsst-mur-v2</code></dd>
+      <dt>why</dt><dd>MUR as COG is far faster to read than the netCDF; the first production-style AWS leg</dd>
+      <dt>at prod</dt><dd class="change">could also own the GHRSST index, beside its bytes</dd></dl></div>
+    <div class="repo"><div class="role">upstream</div><h3>bowerbird, blueant</h3>
+      <dl><dt>does</dt><dd>source definitions and the listing engine (Ben Raymond)</dd>
+      <dt>why</dt><dd>the existing record of what the raad mirror holds</dd>
+      <dt>at prod</dt><dd class="change">size and mtime in dry runs, upstreamed rather than forked</dd></dl></div>
+    <div class="repo"><div class="role">consumers</div><h3>grist, sds, raadtools, sooty</h3>
+      <dl><dt>does</dt><dd>read the published catalogs and stores (grist reads <code>grist/catalog.parquet</code>)</dd>
+      <dt>why</dt><dd>they are the R users' way in; raadtools and sooty refactors are parked</dd>
+      <dt>at prod</dt><dd class="change">every catalog row carries the store URL, so a move rewrites them</dd></dl></div>
+  </div>
+</section>
+
+<section id="datasets">
+  <div class="eyebrow">Per dataset</div>
+  <h2>Where things are today</h2>
+  <p>Three datasets are in production; the rest are drafts in scratch. Per-dataset detail (array names, time ranges, how to open each one) is on the <a href="../published.html">Datasets</a> page.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Dataset</th><th>Bytes</th><th>Built on</th><th>Index now</th></tr></thead>
+    <tbody>
+      <tr><td>IBCSO v2, 2024, 2025</td><td><span class="chip ours">ours</span> source.coop <code>ibcso/&lt;release&gt;/cog/</code></td><td>Nectar VM</td><td>production <code>ibcso/virtual/</code></td></tr>
+      <tr><td>Bedmap3</td><td><span class="chip ours">ours</span> source.coop <code>bedmap/bedmap3/cog/</code></td><td>Nectar VM</td><td>production <code>bedmap/virtual/</code></td></tr>
+      <tr><td>GEBCO 2024 to 2026</td><td><span class="chip ours">ours</span> source.coop <code>gebco/</code> root</td><td>Nectar VM</td><td>production <code>gebco/virtual/</code></td></tr>
+      <tr><td>GHRSST MUR</td><td><span class="chip ours">ours</span> source.coop <code>ghrsst-mur-v2/YYYY/MM/DD/</code></td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>ghrsst/</code></td></tr>
+      <tr><td>ESA CCI ocean colour (6)</td><td><span class="chip ours">ours</span> Pawsey Acacia <code>aad-derived/esacci-oc</code></td><td>Pawsey Setonix</td><td><span class="chip scr">scratch</span> <code>oceancolour/</code></td></tr>
+      <tr><td>OISST v2.1</td><td><span class="chip theirs">theirs</span> NOAA public S3</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>oisst/</code></td></tr>
+      <tr><td>G02202 sea ice, north and south</td><td><span class="chip theirs">theirs</span> NSIDC</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>seaice/</code></td></tr>
+      <tr><td>AMSR2 ASI sea ice, south</td><td><span class="chip theirs">theirs</span> Uni Bremen</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>seaice/</code></td></tr>
+      <tr><td>BRAN2023, 9 variables</td><td><span class="chip theirs">theirs</span> NCI THREDDS</td><td>NCI Gadi</td><td><span class="chip scr">scratch</span> <code>bluelink/</code></td></tr>
+      <tr><td>REMA v2</td><td><span class="chip theirs">theirs</span> PGC bucket</td><td>not built</td><td>none, listing only</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="questions">
+  <div class="eyebrow">Open</div>
+  <h2>Questions to decide together</h2>
+  <p>None of these is decided. Cleaning up the site and scratch side (Nectar, NCI, Pawsey, scratch layout) is Michael's work; these are the production side's calls, to design together.</p>
+  <ol class="qs">
+    <li><strong>Gate.</strong> What a dataset must meet before it moves to production (the proposed list is in the diagram above).</li>
+    <li><strong>Product shape.</strong> One production product per scratch group (sea ice as one product), one per source, or one index product with groups.</li>
+    <li><strong>Byte layout.</strong> One rule for our own COGs (IBCSO's <code>&lt;release&gt;/cog/</code> is the candidate); GEBCO and GHRSST differ today.</li>
+    <li><strong>Landing pages.</strong> One fixed "where things are" block at the top of every product README: bytes, index, where it's built, how to open it.</li>
+    <li><strong>Runners.</strong> Which machine or service runs scheduled production builds, and with which credential.</li>
+    <li><strong>Central refs.</strong> Where the collected tables live on source.coop, and whether products keep their own copies.</li>
+    <li><strong>Moves.</strong> Copy the existing indexes or rebuild them; a rebuild gives every dataset the build record the stale check needs.</li>
+  </ol>
+</section>
+
+<section id="brief">
+  <div class="eyebrow">Getting up to speed</div>
+  <h2>A brief for your coding agent</h2>
+  <p>Point a coding agent at the repos (read-only) to build your own picture, then land the design with Michael in shared sessions. A starting brief:</p>
+  <div class="brief"><pre>Read mdsumner/raad.virtualize (read-only; do not run builds or publish).
+Explain for an operations team taking over production:
+- what each step of run.sh does and what it reads and writes
+- where a dataset's source files come from (config/&lt;dataset&gt;.sh, py/corpus.py)
+- what is published for one dataset (ausantarctic/ibcso/virtual/ibcso-v2/)
+  and which files record the store's own URL
+- what needs credentials, and on which machine each config runs (hpc/)
+Answer with file paths. List what you could not work out as questions.</pre></div>
+</section>
+
+<footer>Handover 2026-11-06, from the live source.coop listing of <code>ausantarctic/</code>, raad.virtualize main and aad-filelist main. Scratch is unlisted on source.coop; its URLs still resolve. Project site: <a href="../">raad.virtualize</a>.</footer>
+</div>
+
+</body>
+</html>

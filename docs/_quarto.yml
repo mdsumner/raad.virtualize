@@ -6,8 +6,8 @@ project:
     - "*.qmd"
     - "*.md"
     - "examples/**/*.qmd"
-    - "handover/*.md"
   resources:
+    - "handover/index.html"
     - "handover/snapshot.html"
 
 website:
