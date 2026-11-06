@@ -25,8 +25,10 @@
 # thread (two per core), memory defaults to 920 MB per thread, and billing
 # counts CPUs only, but a --mem request adds cores until the memory fits:
 # 24 cpus with --mem=96G was allocated 54 cores and billed 108. Leave --mem
-# out unless a step needs it. The harvest does not; the serial steps
-# (collate render icechunk verify) are not measured yet.
+# out unless a step needs it. No step of that build did: collate 0.9 GB
+# (36 s), render 0.8 GB (18 s), icechunk 0.9 GB (4 s), verify 2.2 GB (33 s),
+# all inside the 7.4 GB default of 8 threads. A much larger store (GHRSST MUR,
+# BRAN) may need more: check MaxRSS with sacct after its first build.
 #
 # Publish steps belong on a login node (the source.coop keys last one hour).
 # Source the publish config at build time too (config/source-coop.sh), so
