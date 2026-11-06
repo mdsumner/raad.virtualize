@@ -12,8 +12,10 @@ forms are all rendered from that table. Three repos do the work: one lists the
 source files, one builds and checks the indexes, one will collect the tables
 in one place.
 
-The picture of where every dataset's bytes, builds and indexes sit is the
-[handover snapshot](snapshot.html).
+The [handover snapshot](snapshot.html) shows where every dataset's bytes,
+builds and indexes sit now, and next to it a proposed cleaner shape: one path
+from bytes to readers, with a production-ready gate between Michael's research
+lane and the production team's lane ([proposal](snapshot.html#proposed)).
 
 ## The repos
 

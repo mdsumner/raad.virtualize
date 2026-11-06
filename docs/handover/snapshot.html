@@ -142,7 +142,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 </header>
 
 <section id="picture">
-  <div class="eyebrow">The whole picture</div>
+  <div class="eyebrow">Now</div>
   <h2>Three kinds of place</h2>
   <p>Bytes, work and index are separate places. Some bytes are copies we made (COGs) and host on source.coop or Pawsey object storage; most are left where their publisher puts them. The harvest runs wherever the bytes are fastest to read. The index (a byte-reference table plus the forms rendered from it) is published on source.coop and points back at the bytes, wherever they are.</p>
   <figure>
@@ -277,6 +277,132 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
   </figure>
   <p class="note">Why three machines. Nectar is the general build box, near the raad <code>/rdsi</code> mirror, and publishes to source.coop. Gadi is where BRAN lives (<code>/g/data/gb6</code>): scanning it in place is far faster than over THREDDS. Pawsey gives compute for writing our own COGs plus Acacia object storage to host them (about 10.6 TB free). The production question is which of these the team wants to own, and which become a runner they schedule.</p>
 </section>
+
+<section id="proposed">
+  <div class="eyebrow">Proposed, open to review</div>
+  <h2>Where we see it going: one path, one gate</h2>
+  <p>The same pieces, laid out the way we think they should fit. Bytes, file lists and readers are shared. Build and index split into two lanes with a gate between them. Above the gate, Michael owns the research work: new datasets, engine changes, and cleaning up the Nectar, NCI, Pawsey and scratch complexity. Below the gate, the production team owns scheduled builds and production products. The team sets the requirements a dataset must meet to cross the gate; nothing crosses until those are defined and planned.</p>
+  <figure>
+    <div class="scroll">
+    <svg class="svg-wide" viewBox="0 0 1040 606" role="img" aria-label="Proposal: bytes and the aad-filelist corpus feed two build lanes. The research lane (Michael) builds on Nectar, Gadi or Setonix and publishes unlisted scratch drafts. A production-ready gate, with requirements set by production, separates it from the production lane: a per-product repo and scheduled runner publishing production indexes and collecting tables in central refs, whose stale check compares against the latest listing. Readers read both.">
+      <defs>
+        <marker id="bho" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ours)"/></marker>
+        <marker id="bhm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker>
+        <marker id="bhi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker>
+        <marker id="bhp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--prop)"/></marker>
+      </defs>
+      <g font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">
+        <text x="20" y="28">BYTES</text>
+        <text x="230" y="28">FILE LISTS</text>
+        <text x="420" y="28">BUILD</text>
+        <text x="640" y="28">INDEX</text>
+        <text x="870" y="28">READERS</text>
+      </g>
+      <g font-family="Source Sans 3, sans-serif" font-size="13">
+        <!-- bytes -->
+        <rect x="20" y="44" width="180" height="214" rx="5" fill="var(--theirs-soft)" stroke="var(--theirs)"/>
+        <text x="34" y="68" font-weight="700" fill="var(--ink)">Theirs</text>
+        <text x="34" y="90" fill="var(--ink)">publishers' own files,</text>
+        <text x="34" y="108" fill="var(--ink)">left where they are</text>
+        <text x="34" y="134" fill="var(--muted)">NOAA, NSIDC, Bremen,</text>
+        <text x="34" y="152" fill="var(--muted)">NCI THREDDS, PGC</text>
+        <rect x="20" y="288" width="180" height="214" rx="5" fill="var(--ours-soft)" stroke="var(--ours)"/>
+        <text x="34" y="312" font-weight="700" fill="var(--ink)">Ours</text>
+        <text x="34" y="334" fill="var(--ink)">COGs we write, one</text>
+        <text x="34" y="352" fill="var(--ink)">layout rule on source.coop</text>
+        <text x="34" y="378" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ours)">&lt;product&gt;/&lt;release&gt;/cog/</text>
+        <text x="34" y="404" fill="var(--muted)">Acacia stays a stopgap</text>
+        <!-- listing -->
+        <rect x="230" y="44" width="160" height="458" rx="5" fill="var(--surface)" stroke="var(--ours)" stroke-width="1.4"/>
+        <text x="244" y="68" font-weight="700" fill="var(--ink)">aad-filelist</text>
+        <text x="244" y="90" fill="var(--ink)">every source listed</text>
+        <text x="244" y="108" fill="var(--ink)">on a schedule,</text>
+        <text x="244" y="126" fill="var(--ink)">every run kept</text>
+        <text x="244" y="152" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">current__&lt;id&gt;</text>
+        <text x="244" y="168" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">.parquet</text>
+        <text x="244" y="196" fill="var(--muted)">one input for</text>
+        <text x="244" y="214" fill="var(--muted)">both lanes</text>
+        <!-- lane A -->
+        <rect x="410" y="44" width="440" height="192" rx="6" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>
+        <text x="840" y="62" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">RESEARCH AND SCRATCH: MICHAEL</text>
+        <rect x="420" y="76" width="190" height="146" rx="5" fill="var(--surface)" stroke="var(--muted)"/>
+        <text x="434" y="100" font-weight="700" fill="var(--ink)">Nectar, Gadi, Setonix</text>
+        <text x="434" y="122" fill="var(--ink)">wherever the bytes</text>
+        <text x="434" y="140" fill="var(--ink)">read fastest</text>
+        <text x="434" y="166" fill="var(--muted)">new datasets, engine</text>
+        <text x="434" y="184" fill="var(--muted)">changes, site and scratch</text>
+        <text x="434" y="202" fill="var(--muted)">clean-up</text>
+        <rect x="640" y="76" width="200" height="146" rx="5" fill="var(--surface)" stroke="var(--muted)"/>
+        <text x="654" y="100" font-weight="700" fill="var(--ink)">ausantarctic-scratch</text>
+        <text x="654" y="122" fill="var(--ink)">unlisted drafts</text>
+        <text x="654" y="148" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">&lt;group&gt;/&lt;ds&gt;/</text>
+        <!-- gate -->
+        <rect x="410" y="246" width="440" height="58" rx="5" fill="var(--prop-soft)" stroke="var(--prop)" stroke-dasharray="5 3"/>
+        <text x="540" y="264" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="500" fill="var(--prop)">PRODUCTION-READY GATE, SET BY PRODUCTION</text>
+        <text x="540" y="282" font-size="12" fill="var(--ink)">config in a product repo, file list from corpus,</text>
+        <text x="540" y="298" font-size="12" fill="var(--ink)">build record, verify passes, byte layout rule</text>
+        <!-- lane B -->
+        <rect x="410" y="310" width="440" height="192" rx="6" fill="none" stroke="var(--ink)" stroke-width="1.4"/>
+        <text x="840" y="328" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink)">PRODUCTION: PRODUCTION TEAM</text>
+        <rect x="420" y="342" width="190" height="146" rx="5" fill="var(--surface)" stroke="var(--ink)"/>
+        <text x="434" y="366" font-weight="700" fill="var(--ink)">Product repo + runner</text>
+        <text x="434" y="388" fill="var(--ink)">scheduled, own credential,</text>
+        <text x="434" y="406" fill="var(--ink)">engine pinned by tag</text>
+        <text x="434" y="432" fill="var(--muted)">the machine is a</text>
+        <text x="434" y="450" fill="var(--muted)">detail of the runner</text>
+        <rect x="640" y="342" width="200" height="64" rx="5" fill="var(--surface)" stroke="var(--ink)"/>
+        <text x="654" y="366" font-weight="700" fill="var(--ink)">production products</text>
+        <text x="654" y="388" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">&lt;product&gt;/virtual/&lt;ds&gt;/</text>
+        <rect x="640" y="424" width="200" height="64" rx="5" fill="var(--surface)" stroke="var(--ink)"/>
+        <text x="654" y="448" font-weight="700" fill="var(--ink)">central refs</text>
+        <text x="654" y="470" fill="var(--muted)">every table, stale check</text>
+        <!-- readers -->
+        <rect x="870" y="44" width="150" height="458" rx="5" fill="var(--surface)" stroke="var(--rule)"/>
+        <text x="884" y="68" font-weight="700" fill="var(--ink)">Readers</text>
+        <text x="884" y="90" fill="var(--ink)">grist, sds,</text>
+        <text x="884" y="108" fill="var(--ink)">raadtools</text>
+        <text x="884" y="134" fill="var(--ink)">GDAL VRT,</text>
+        <text x="884" y="152" fill="var(--ink)">kerchunk, Icechunk,</text>
+        <text x="884" y="170" fill="var(--ink)">STAC, xarray</text>
+      </g>
+      <!-- arrows -->
+      <g fill="none" stroke-width="1.4" font-family="Source Sans 3, sans-serif" font-size="12">
+        <path d="M200 151 H230" stroke="var(--ours)" stroke-dasharray="5 4" marker-end="url(#bho)"/>
+        <path d="M200 395 H230" stroke="var(--ours)" stroke-dasharray="5 4" marker-end="url(#bho)"/>
+        <path d="M390 149 H420" stroke="var(--ours)" marker-end="url(#bho)"/>
+        <path d="M390 415 H420" stroke="var(--ours)" marker-end="url(#bho)"/>
+        <path d="M610 149 H640" stroke="var(--muted)" marker-end="url(#bhm)"/>
+        <path d="M840 149 H870" stroke="var(--muted)" stroke-dasharray="2 3" marker-end="url(#bhm)"/>
+        <path d="M610 374 H640" stroke="var(--ink)" marker-end="url(#bhi)"/>
+        <path d="M610 456 H640" stroke="var(--ink)" marker-end="url(#bhi)"/>
+        <path d="M840 374 H870" stroke="var(--ink)" marker-end="url(#bhi)"/>
+        <path d="M470 222 V342" stroke="var(--prop)" stroke-width="2" marker-end="url(#bhp)"/>
+        <text x="478" y="280" fill="var(--prop)" stroke="none" font-weight="700">promote</text>
+        <path d="M740 488 V528 H310 V502" stroke="var(--prop)" stroke-dasharray="5 3" marker-end="url(#bhp)"/>
+        <text x="324" y="544" fill="var(--prop)" stroke="none">stale check: compare tables with the latest listing, rebuild what changed</text>
+      </g>
+      <!-- key -->
+      <g font-family="Source Sans 3, sans-serif" font-size="12">
+        <line x1="20" y1="556" x2="1020" y2="556" stroke="var(--rule)"/>
+        <rect x="20" y="572" width="22" height="14" rx="3" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>
+        <text x="48" y="583" fill="var(--ink)">Michael's lane</text>
+        <rect x="160" y="572" width="22" height="14" rx="3" fill="none" stroke="var(--ink)" stroke-width="1.4"/>
+        <text x="188" y="583" fill="var(--ink)">production team's lane</text>
+        <rect x="340" y="572" width="22" height="14" rx="3" fill="var(--prop-soft)" stroke="var(--prop)" stroke-dasharray="5 3"/>
+        <text x="368" y="583" fill="var(--ink)">gate: what a dataset must meet</text>
+        <line x1="560" y1="579" x2="594" y2="579" stroke="var(--ours)" stroke-width="1.4"/>
+        <text x="602" y="583" fill="var(--ink)">file list per build</text>
+        <line x1="720" y1="579" x2="754" y2="579" stroke="var(--prop)" stroke-width="2"/>
+        <text x="762" y="583" fill="var(--ink)">promote a dataset</text>
+        <line x1="880" y1="579" x2="914" y2="579" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="2 3"/>
+        <text x="922" y="583" fill="var(--ink)">draft reads</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Proposal only; every box and the gate list are for design with the production team. What drops out compared with the picture above: three sites feeding two index places by crossing arrows, and a central refs box with no owner. As now, every reference still points back at the bytes, wherever they sit.</figcaption>
+  </figure>
+</section>
+
 
 <section id="repos">
   <div class="eyebrow">Repos, in one line each</div>
