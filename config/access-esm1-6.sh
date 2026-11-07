@@ -91,4 +91,6 @@ ICECHUNK_TARGET=public
 VRT_TARGET=gdal
 export STAC_LICENSE=${STAC_LICENSE:-other}
 export STAC_TITLE=${STAC_TITLE:-ACCESS-ESM1.6 historical $ESM16_STEM (native MOM output, 1 degree)}
+# grist rows need a time axis: list the variable, not the 2D grid arrays
+export GRIST_ARRAYS=${GRIST_ARRAYS:-${ESM16_VAR:-temp}}
 WORKERS=${WORKERS:-8}

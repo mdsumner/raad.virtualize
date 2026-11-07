@@ -118,6 +118,22 @@ def plan_sources(vrt, arrays):
     return out
 
 
+def plan_placed(vrt, arrays):
+    """{source file: the requested arrays it holds, in `arrays` order}: a
+    plan may join arrays from other files (py/plan_join.py), and each
+    source is scanned for its own arrays only."""
+    root = ET.parse(vrt).getroot()
+    base = os.path.dirname(os.path.abspath(vrt))
+    out = {}
+    for arr in root.findall("Group/Array"):
+        if arr.get("name") not in arrays:
+            continue
+        for s in arr.findall("Source/SourceFilename"):
+            _, f = source_file(s.text, base)
+            out.setdefault(f, set()).add(arr.get("name"))
+    return {f: [nm for nm in arrays if nm in got] for f, got in out.items()}
+
+
 def plan_attrs(vrt, arrays):
     """<Attribute>s of each requested array in the plan (overview_of,
     overview_factor, overview_resampling from plan_cog.py --overviews):
@@ -594,6 +610,7 @@ def main():
     for d in ["sources"] + [f"chunks_{nm}" for nm in a.array]:
         os.makedirs(os.path.join(a.out, d), exist_ok=True)
     srcs = plan_sources(a.plan, a.array)
+    placed = plan_placed(a.plan, a.array)
     if a.limit:
         srcs = srcs[:a.limit]
     # arrays.json from an earlier run; arrays it lacks (overview levels added
@@ -612,7 +629,7 @@ def main():
     def done(s):
         k = key_of(s)
         return os.path.exists(os.path.join(a.out, "sources", f"{k}.json")) and all(
-            os.path.exists(os.path.join(a.out, f"chunks_{nm}", f"{k}.parquet")) for nm in a.array)
+            os.path.exists(os.path.join(a.out, f"chunks_{nm}", f"{k}.parquet")) for nm in placed[s])
 
     todo = [s for s in srcs if not done(s)]
     if a.recheck:
@@ -636,20 +653,23 @@ def main():
             if meta and not want:
                 break
             first = next((s for s in (todo or srcs) if not meta or
-                          any((nm, s) in (bands or {}) for nm in want)), None)
+                          any(nm in placed[s] for nm in want)), None)
             if first is None:
                 break
             if first in todo:
                 todo.remove(first)
-            _, n, dt, m = scan_source(first, a.array, a.out, True, a.engine, tiff=tiff, lifts=lifts)
-            meta.update(m)
+            _, n, dt, m = scan_source(first, placed[first], a.out, True, a.engine, tiff=tiff, lifts=lifts)
+            # the arrays this source was scanned for, and any not yet
+            # described: a joined file's own axes (a time of 1) do not
+            # replace those of the first source
+            meta.update({nm: v for nm, v in m.items() if nm in want or nm not in meta})
             print(f"  {first}: {n} chunks in {dt:.1f} s", file=sys.stderr)
         with open(meta_path, "w") as f:
             json.dump(strict(meta), f, indent=1, default=str, allow_nan=False)
 
     t0, total = time.time(), 0
     with ProcessPoolExecutor(a.workers) as ex:
-        futs = [ex.submit(scan_source, s, a.array, a.out, False, a.engine, tiff=tiff, lifts=lifts) for s in todo]
+        futs = [ex.submit(scan_source, s, placed[s], a.out, False, a.engine, tiff=tiff, lifts=lifts) for s in todo]
         for i, f in enumerate(as_completed(futs), 1):
             s, n, dt, _ = f.result()
             total += n
