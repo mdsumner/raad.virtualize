@@ -286,8 +286,14 @@ def source_scale(plan, name):
         ds = gdal.Open(src.find("SourceFilename").text)
         sc = ds.GetRasterBand(int(src.find("SourceBand").text)).GetScale()
         return 1.0 if sc is None else sc
-    lst = os.path.join(os.path.dirname(os.path.abspath(plan)), "sources.txt")
-    src = open(lst).readline().strip()
+    # the plan's own first source of NAME: a plan may join arrays from other
+    # files (py/plan_join.py), so the first of sources.txt need not hold it
+    base = os.path.dirname(os.path.abspath(plan))
+    fn = src.findtext("SourceFilename") if src is not None else None
+    if fn:
+        src = fn if fn.startswith("/") or "://" in fn else os.path.join(base, fn)
+    else:
+        src = open(os.path.join(base, "sources.txt")).readline().strip()
     m = gdal.OpenEx(src, gdal.OF_MULTIDIM_RASTER).GetRootGroup().OpenMDArray(name)
     if m.GetScale() is not None:
         return m.GetScale()
