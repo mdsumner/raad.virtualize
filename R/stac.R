@@ -88,6 +88,14 @@ STAC_EXT <- c(
   o + v * mult
 }
 .iso <- function(t) format(t, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+## meta.created as RFC 3339: it is written as format(Sys.time(), tz = "UTC",
+## usetz = TRUE), "2026-11-07 21:51:00 UTC", which STAC readers refuse
+.created_iso <- function(x) {
+  t <- tryCatch(as.POSIXct(sub("Z$| UTC$", "", x), tz = "UTC",
+                           tryFormats = c("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S")),
+                error = function(e) NA)
+  .iso(if (length(t) != 1L || is.na(t)) Sys.time() else t)
+}
 
 ## the regular spacing of v (12 significant digits, as coordinates written in
 ## float32 or from text rarely carry more), or NULL
@@ -327,11 +335,16 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
       tt <- range(ttime[it])
       if (tt[1] == tt[2]) props$datetime <- .iso(tt[1])
       else props[c("datetime", "start_datetime", "end_datetime")] <- list(NULL, .iso(tt[1]), .iso(tt[2]))
+    } else if (!is.null(ttime)) {
+      ## a static array of a time series (a grid joined from another file,
+      ## py/plan_join.py) holds for the whole series
+      tt <- range(ttime)
+      props[c("datetime", "start_datetime", "end_datetime")] <- list(NULL, .iso(tt[1]), .iso(tt[2]))
     } else {
       ## a static dataset states its coverage (STAC_INTERVAL); the build
       ## time is not a data time
       if (length(interval)) props[c("datetime", "start_datetime", "end_datetime")] <- list(NULL, interval[1], interval[2])
-      else props$datetime <- meta$created %||% .iso(Sys.time())
+      else props$datetime <- .created_iso(meta$created)
     }
     if (is.null(props$datetime)) props["datetime"] <- list(NULL)
     if (!is.na(epsg) && !is.na(dx) && !is.na(dy) && !is.null(arrays[[dx]]$affine) &&
