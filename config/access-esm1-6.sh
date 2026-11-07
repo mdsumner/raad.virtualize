@@ -37,6 +37,8 @@ DATASET=access-esm1-6.historical.$ESM16_STEM${ESM16_FIRST:+-$ESM16_FIRST}${ESM16
 # product group (products/access-esm/): the scratch prefix on source.coop
 PRODUCT_GROUP=access-esm
 ESM16_FX_RX='/output000/ocean/ocean-2d-(geolon_t|geolat_t)-fx\.nc$'
+# corpus.py matches --date against the file name only, so no directory here
+ESM16_FX_NAME='^ocean-2d-(geolon_t|geolat_t)-fx\.nc$'
 # sources.txt: the yearly files, then (ESM16_GRID=1) the two fx files; the
 # build record covers both
 sources() {
@@ -50,7 +52,7 @@ sources() {
         --prefix https:// /vsicurl/https://
       if [ "$ESM16_GRID" = 1 ]; then
         "$PYTHON" "$HERE/py/corpus.py" --listing "$WORK/listing.parquet" \
-          --meta "$WORK/sources.meta.fx.tsv" --match "$ESM16_FX_RX" --date="$ESM16_FX_RX" \
+          --meta "$WORK/sources.meta.fx.tsv" --match "$ESM16_FX_RX" --date="$ESM16_FX_NAME" \
           --prefix https:// /vsicurl/https://
         # --listing records no source_id: take it from the yearly record
         local sid; sid=$(awk -F'\t' 'NR == 2 {print $1; exit}' "$WORK/sources.meta.tsv")
