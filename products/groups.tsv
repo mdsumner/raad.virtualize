@@ -8,3 +8,4 @@ ghrsst	GHRSST MUR sea surface temperature
 oisst	NOAA OISST sea surface temperature
 seaice	Sea ice concentration
 oceancolour	Ocean colour
+access-esm	ACCESS-ESM1.6 climate model output
