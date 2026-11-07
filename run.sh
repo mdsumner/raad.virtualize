@@ -89,6 +89,9 @@ for s in $STEPS; do
         "${arr_flags[@]}" --workers "$WORKERS" --engine "${HARVEST_ENGINE:-auto}" \
         ${HARVEST_LIMIT:+--limit "$HARVEST_LIMIT"} ${HARVEST_RECHECK:+--recheck "$HARVEST_RECHECK"} ;;
     collate)
+      # byterefs decision 0004: the target readers apply when told none;
+      # a config may set DEFAULT_TARGET, else the kerchunk target ("" = verbatim)
+      export DEFAULT_TARGET="${DEFAULT_TARGET-${KERCHUNK_TARGET:-}}"
       step collate "$RSCRIPT" "$HERE/R/collate.R" "$WORK/scan" "$WORK/plan.vrt" \
         "$WORK/store.sqlite" "$DATASET" ${REMAPS[@]+"${REMAPS[@]}"} ;;
     render)
