@@ -435,10 +435,7 @@ mr_view_sql <- function(con, array, target = NULL) {
                   je("dest", i), ch, i)
   inside <- sprintf("c.dim_%d >= %s / %d AND c.dim_%d < (%s + %s + %d - 1) / %d",
                     i, je("src_offset", i), ch, i, je("src_offset", i), je("count", i), ch, ch)
-  path <- if (is.null(target)) "s.source" else sprintf(
-    "COALESCE((SELECT r.replacement || substr(s.source, length(r.prefix) + 1) FROM remap r
-       WHERE r.target = %s AND substr(s.source, 1, length(r.prefix)) = r.prefix
-       ORDER BY length(r.prefix) DESC LIMIT 1), s.source)", dbQuoteString(con, target))
+  path <- .path_sql(con, target)
   sprintf('SELECT %s, c.present, CASE WHEN c."offset" IS NULL THEN NULL ELSE %s END AS path,
        c."offset", c.size, c.info, c.data
   FROM %s c JOIN placements p ON p.array = %s AND p.source_id = c.source_id
@@ -460,10 +457,114 @@ mr_create_views <- function(con) {
 
 mr_refs <- function(con, array, target = NULL) dbGetQuery(con, mr_view_sql(con, array, target))
 
-## one chunk by global coordinate (the per-chunk read path)
+## ---- chunks by global key: placement-first lookup ---------------------------
+## Filtering the view on its computed keys scans every row of the array. The
+## per-chunk read path starts from the placement whose dest slab holds the
+## key, then looks the chunk up by the chunk table's primary key with
+##   source dim_i = global dim_i - dest_i/chunk_i + src_offset_i/chunk_i
+## (byterefs spec, "One chunk by global key"). Columns and values are those of
+## the view: dim_0.., present, path, offset, size, info, data.
+##
+## mr_chunk_sql() writes the query for a set of keys held in a table or CTE
+## named `keys` with columns k (the caller's row number) and dim_0..; the
+## result carries k so rows can be matched back to the request.
+.path_sql <- function(con, target) {
+  if (is.null(target)) "s.source" else sprintf(
+    "COALESCE((SELECT r.replacement || substr(s.source, length(r.prefix) + 1) FROM remap r
+       WHERE r.target = %s AND substr(s.source, 1, length(r.prefix)) = r.prefix
+       ORDER BY length(r.prefix) DESC LIMIT 1), s.source)", dbQuoteString(con, target))
+}
+
+mr_chunk_sql <- function(con, array, target = NULL, keys = "keys") {
+  a  <- dbGetQuery(con, "SELECT chunks FROM arrays WHERE array = ?", params = list(array))
+  ch <- .fj(a$chunks); rank <- length(ch); i <- seq_len(rank) - 1L
+  je <- function(col, k) sprintf("CAST(json_extract(p.%s, '$[%d]') AS INTEGER)", col, k)
+  src <- sprintf("c.dim_%d = q.dim_%d - %s / %d + %s / %d", i, i, je("dest", i), ch,
+                 je("src_offset", i), ch)
+  inside <- sprintf("q.dim_%d >= %s / %d AND q.dim_%d < (%s + %s + %d - 1) / %d",
+                    i, je("dest", i), ch, i, je("dest", i), je("count", i), ch, ch)
+  sprintf('SELECT q.k, %s, c.present, CASE WHEN c."offset" IS NULL THEN NULL ELSE %s END AS path,
+       c."offset", c.size, c.info, c.data
+  FROM %s q
+  JOIN placements p ON p.array = %s
+   AND %s
+  JOIN %s c ON c.source_id = p.source_id
+   AND %s
+  JOIN sources s ON s.source_id = c.source_id
+  ORDER BY q.k',
+    paste0("q.dim_", i, collapse = ", "), .path_sql(con, target), keys,
+    dbQuoteString(con, array), paste(inside, collapse = "\n   AND "),
+    .q(con, array), paste(src, collapse = "\n   AND "))
+}
+
+## many chunks by global key: `idx` is a matrix (or data frame) with one row
+## per key and one column per dimension. Returns the found rows in request
+## order, with k the row of `idx`; a key that no placement holds, or that has
+## no row in the chunk table, is missing from the result. The placements are
+## read once and matched to the keys in R (sorted on the axis with the most
+## distinct slab starts), so the cost grows with the number of keys, not with
+## keys times placements; the chunk rows are then fetched by primary key.
+mr_chunks <- function(con, array, idx, target = NULL) {
+  idx <- as.matrix(idx); storage.mode(idx) <- "integer"
+  rank <- ncol(idx); i <- seq_len(rank) - 1L
+  if (rank != mr_rank(con, array))
+    stop(sprintf("array '%s' has rank %d, keys have %d", array, mr_rank(con, array), rank))
+  if (anyNA(idx)) stop("keys must not be NA")
+  ch <- .fj(dbGetQuery(con, "SELECT chunks FROM arrays WHERE array = ?",
+                       params = list(array))$chunks)
+  P <- dbGetQuery(con, "SELECT source_id, src_offset, count, dest FROM placements
+                        WHERE array = ?", params = list(array))
+  ## each value is a flat JSON array of integers; split rather than parse
+  ## (jsonlite on tens of thousands of placements dominates the call)
+  m <- function(x) matrix(as.integer(unlist(strsplit(gsub("[][[:space:]]", "", x), ",", fixed = TRUE))),
+                          ncol = rank, byrow = TRUE)
+  chm <- matrix(ch, nrow(P), rank, byrow = TRUE)
+  de <- m(P$dest); lo <- de %/% chm
+  hi <- (de + m(P$count) + chm - 1L) %/% chm
+  sk <- m(P$src_offset) %/% chm - lo          # source key = global key + sk
+  ## candidates: placements whose start on axis `a` is in (q - span, q]
+  a <- which.max(apply(lo, 2L, function(v) length(unique(v))))
+  o <- order(lo[, a]); los <- lo[o, a]; span <- max(hi[, a] - lo[, a])
+  up <- findInterval(idx[, a], los)
+  dn <- findInterval(idx[, a] - span, los)
+  n <- pmax(up - dn, 0L)
+  kk <- rep(seq_len(nrow(idx)), n)
+  pp <- o[unlist(lapply(which(n > 0L), function(r) (dn[r] + 1L):up[r]))]
+  if (!length(kk)) pp <- integer()
+  inside <- rowSums(idx[kk, , drop = FALSE] >= lo[pp, , drop = FALSE] &
+                    idx[kk, , drop = FALSE] <  hi[pp, , drop = FALSE]) == rank
+  kk <- kk[inside]; pp <- pp[inside]
+  empty <- dbGetQuery(con, sprintf("%s LIMIT 0", mr_view_sql(con, array, target)))
+  empty <- cbind(k = integer(), empty)
+  if (!length(kk)) return(empty)
+  src <- idx[kk, , drop = FALSE] + sk[pp, , drop = FALSE]
+  rows <- apply(cbind(kk, P$source_id[pp], idx[kk, , drop = FALSE], src), 1L,
+                paste, collapse = ", ")
+  q <- sprintf('WITH q(k, source_id, %s, %s) AS (VALUES (%s))
+SELECT q.k, %s, c.present, CASE WHEN c."offset" IS NULL THEN NULL ELSE %s END AS path,
+       c."offset", c.size, c.info, c.data
+  FROM q JOIN %s c ON c.source_id = q.source_id AND %s
+         JOIN sources s ON s.source_id = c.source_id
+  ORDER BY q.k',
+    paste0("dim_", i, collapse = ", "), paste0("s_", i, collapse = ", "),
+    paste(rows, collapse = "), ("), paste0("q.dim_", i, collapse = ", "),
+    .path_sql(con, target), .q(con, array),
+    paste(sprintf("c.dim_%d = q.s_%d", i, i), collapse = " AND "))
+  r <- dbGetQuery(con, q)
+  ## RSQLite types an all-NULL column as logical (one absent chunk)
+  r$path <- as.character(r$path)
+  r
+}
+
+## one chunk by global key (the per-chunk read path), through mr_chunk_sql()
 mr_chunk <- function(con, array, idx, target = NULL) {
-  w <- paste(sprintf("dim_%d = %d", seq_along(idx) - 1L, as.integer(idx)), collapse = " AND ")
-  dbGetQuery(con, sprintf("SELECT * FROM (%s) WHERE %s", mr_view_sql(con, array, target), w))
+  i <- seq_along(idx) - 1L
+  cte <- sprintf("WITH keys(k, %s) AS (VALUES (1, %s))\n", paste0("dim_", i, collapse = ", "),
+                 paste(as.integer(idx), collapse = ", "))
+  r <- dbGetQuery(con, paste0(cte, mr_chunk_sql(con, array, target)))
+  r$k <- NULL
+  r$path <- as.character(r$path)
+  r
 }
 
 ## ---- Zarr v2 metadata synthesised from arrays rows ---------------------------
