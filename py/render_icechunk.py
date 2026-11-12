@@ -9,6 +9,7 @@ left unwritten (they read as the fill value).
 Usage:
   python render_icechunk.py FLAT_DIR REPO_DIR [--target public] [--batch 200000]
                             [--commit-every 1000000] [--split 365]
+                            [--cache-refs 2000000]
 
 --target picks the remap rules in arrays.json that turn the verbatim
 sources into URLs Icechunk can fetch (https://, s3://, or file:// for a
@@ -27,6 +28,16 @@ one append unit at a time (a day along time) should be rendered with --split
 set to that unit. Over one year of daily commits on the GHRSST MUR COGs,
 manifests measured 22 MB with a 1-day split, 116 MB with 30 days and 1.84 GB
 with 365 days (wxylib/design m16).
+
+While writing, the repository is reopened with an ingest-only cache
+(--cache-refs chunk refs, two snapshots) so memory stays flat across many
+commits; it is not saved to the repository config, so readers keep the
+defaults. The split and cache choices follow the GOES-16 ingest in
+Earthmover's icechunk-datacube-ingestion agent skill
+(https://github.com/earth-mover/agent-skills/tree/main/icechunk-datacube-ingestion,
+notebook https://gist.github.com/TomNicholas/6e908090583c3c4bbed1a305ac8c3bfd).
+That skill calls kerchunk deprecated; here it stays an output, because GDAL
+and other non-Python readers need it.
 
 Zarr v2 codec ids map to Zarr v3: imagecodecs_delta (array to array, TIFF
 PREDICTOR=2; needs imagecodecs, and so does every reader), then bytes (dtype
@@ -150,6 +161,8 @@ def main():
     p.add_argument("--commit-every", type=int, default=1_000_000)
     p.add_argument("--split", type=int, default=365,
                    help="chunks along the first axis per manifest (0: no splitting)")
+    p.add_argument("--cache-refs", type=int, default=2_000_000,
+                   help="chunk refs held in the write-time manifest cache (0: icechunk default)")
     a = p.parse_args()
 
     doc = json.load(open(os.path.join(a.flat, "arrays.json")))
@@ -179,6 +192,12 @@ def main():
     shutil.rmtree(a.repo, ignore_errors=True)
     storage = icechunk.local_filesystem_storage(a.repo)
     repo = icechunk.Repository.create(storage, config=cfg, authorize_virtual_chunk_access=auth)
+    if a.cache_refs > 0:
+        # write-time only: keep the current and previous snapshot and about
+        # two commits of refs, so cached manifests do not pile up across
+        # commits; reopen does not save it to the repository config
+        cfg.caching = icechunk.CachingConfig(num_snapshot_nodes=2, num_chunk_refs=a.cache_refs)
+        repo = repo.reopen(config=cfg, authorize_virtual_chunk_access=auth)
     session = repo.writable_session("main")
     store = session.store
     root = zarr.open_group(store, mode="w", attributes=dict(doc.get("meta") or {}))

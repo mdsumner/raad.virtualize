@@ -364,10 +364,29 @@ def h5_open(source):
         import fsspec
         bs = int(os.environ.get("HARVEST_BLOCK_SIZE", 65536))
         f = fsspec.open(source, "rb", block_size=bs, cache_type="blockcache").open()
-        return h5py.File(f, "r")
+        return _H5Remote(h5py.File(f, "r"), f)
     if source.startswith("/vsi"):
         sys.exit(f"{source}: the h5py engine takes local paths and http(s) URLs only")
     return h5py.File(source, "r")
+
+
+class _H5Remote:
+    """h5py.File over an fsspec file: h5py does not close a file object it is
+    given, so its block cache and connection would outlive the scan in a
+    worker that scans many sources. Closes both on exit."""
+
+    def __init__(self, h5, fobj):
+        self.h5, self.fobj = h5, fobj
+
+    def __enter__(self):
+        return self.h5
+
+    def __exit__(self, *exc):
+        try:
+            self.h5.close()
+        finally:
+            self.fobj.close()
+        return False
 
 
 def walk_h5py(source, arr):
