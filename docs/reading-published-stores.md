@@ -43,6 +43,31 @@ into the BRAN netCDF files on `https://thredds.nci.org.au/`.
 5. `xarray.open_zarr(session.store, consolidated=False, chunks=None)`, then
    `.sel()` / `.isel()`, then `.load()` or `.values` on the selection only.
 
+### Reading in place (relocatable stores)
+
+A store rendered with `py/render_icechunk.py --relocatable` writes refs as
+`vcc://<root>/<rest>` against named virtual chunk containers, one per remap
+root, instead of absolute URLs. The root group attribute `byterefs_roots`
+lists each root's name, its verbatim prefix (for BRAN, `/g/data/gb6/`) and
+its prefix under every target. On NCI, read the bytes in place by giving
+the root's name a local container:
+
+```python
+import icechunk as ic
+c = ic.RepositoryConfig.default()
+c.set_virtual_chunk_container(ic.VirtualChunkContainer(
+    "file:///g/data/gb6/", ic.local_filesystem_store("/g/data/gb6/"), name="g-data-gb6"))
+repo = ic.Repository.open(storage, config=c,
+    authorize_virtual_chunk_access={"file:///g/data/gb6/": ic.credentials.LocalFileSystemAccess})
+```
+
+Nothing is rewritten; elsewhere the stored container (THREDDS) applies. A
+store rendered without `--relocatable` holds absolute URLs, which Icechunk
+cannot repoint (a container's store must match the URL scheme); render it
+again from the table with the target you want instead. Named containers
+need a recent icechunk (tested 2.3.1); readers that ignore container names
+cannot resolve `vcc://` refs.
+
 ### Request counts
 
 `salt` is chunked `(Time=1, st_ocean=1, yt_ocean=300, xt_ocean=300)`:
