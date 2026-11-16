@@ -9,7 +9,7 @@ left unwritten (they read as the fill value).
 Usage:
   python render_icechunk.py FLAT_DIR REPO_DIR [--target public] [--batch 200000]
                             [--commit-every 1000000] [--split 365]
-                            [--cache-refs 2000000]
+                            [--cache-refs 2000000] [--relocatable]
 
 --target picks the remap rules in arrays.json that turn the verbatim
 sources into URLs Icechunk can fetch (https://, s3://, or file:// for a
@@ -38,6 +38,20 @@ Earthmover's icechunk-datacube-ingestion agent skill
 notebook https://gist.github.com/TomNicholas/6e908090583c3c4bbed1a305ac8c3bfd).
 That skill calls kerchunk deprecated; here it stays an output, because GDAL
 and other non-Python readers need it.
+
+--relocatable writes every ref under a remap root as a relative
+vcc://<root>/<rest> location against a named virtual chunk container
+(Icechunk named containers), instead of an absolute URL. The roots are the
+distinct verbatim `prefix` values of the remap rules in arrays.json, across
+all targets; a rule's optional `root` field names one, else the name is a
+slug of the prefix (/g/data/gb6/ -> g-data-gb6). For the chosen --target a
+root's container prefix is that target's replacement (or the root itself
+when the target has no rule for it). A reader elsewhere reopens the
+repository with a container of the same name and its own prefix and store,
+for example file:///g/data/gb6/ on NCI, and reads in place with no rewrite.
+The root group attribute `byterefs_roots` lists, per root, its verbatim
+prefix and its prefix under every target. Sources under no root stay
+absolute. Readers that ignore container names cannot resolve vcc:// refs.
 
 Zarr v2 codec ids map to Zarr v3: imagecodecs_delta (array to array, TIFF
 PREDICTOR=2; needs imagecodecs, and so does every reader), then bytes (dtype
@@ -82,6 +96,42 @@ def resolve(path, rules):
     if path.startswith("/"):
         path = "file://" + path
     return path
+
+
+def root_name(rule_prefix, given=None):
+    if given:
+        return given
+    slug = "".join(c if c.isalnum() else "-" for c in rule_prefix.split("://")[-1]).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug or "root"
+
+
+def remap_roots(doc, target):
+    """Named roots for --relocatable: {name: (verbatim_prefix, url_prefix)}
+    for `target`, plus the per-target table written to `byterefs_roots`."""
+    rules = doc.get("remap", [])
+    roots, table = {}, {}
+    for pre in sorted({r["prefix"] for r in rules}, key=len, reverse=True):
+        given = next((r.get("root") for r in rules if r["prefix"] == pre and r.get("root")), None)
+        name = root_name(pre, given)
+        if name in roots:
+            sys.exit(f"remap root name {name!r} used by two prefixes; name them with `root`")
+        by_target = {r["target"]: r["replacement"] for r in rules if r["prefix"] == pre}
+        url = resolve(by_target.get(target, pre), [])
+        if not url.endswith("/"):
+            sys.exit(f"remap root {pre!r}: prefix for target {target!r} ({url}) must end in '/'")
+        roots[name] = (pre, url)
+        table[name] = {"prefix": pre, "targets": by_target}  # as written in arrays.json
+    return roots, table
+
+
+def relative_location(source, roots):
+    """vcc://<name>/<rest> for a verbatim source under a root, else None."""
+    for name, (pre, _) in roots.items():  # longest prefix first
+        if source.startswith(pre):
+            return f"vcc://{name}/{source[len(pre):]}"
+    return None
 
 
 def container_for(url):
@@ -161,6 +211,8 @@ def main():
     p.add_argument("--commit-every", type=int, default=1_000_000)
     p.add_argument("--split", type=int, default=365,
                    help="chunks along the first axis per manifest (0: no splitting)")
+    p.add_argument("--relocatable", action="store_true",
+                   help="write refs under remap roots as vcc://<root>/... against named containers")
     p.add_argument("--cache-refs", type=int, default=2_000_000,
                    help="chunk refs held in the write-time manifest cache (0: icechunk default)")
     a = p.parse_args()
@@ -173,6 +225,18 @@ def main():
     rules = remap_rules(doc, a.target)
     rows = doc["arrays"]
 
+    roots, roots_table = remap_roots(doc, a.target) if a.relocatable else ({}, {})
+    names = {}  # url_prefix -> container name
+    for name, (_, url) in roots.items():
+        names[url] = name
+
+    def location(path):
+        if roots:
+            rel = relative_location(path, roots)
+            if rel:
+                return rel
+        return resolve(path, rules)
+
     # containers from the distinct source prefixes of every referenced array
     containers, auth = {}, {}
     for r in rows:
@@ -180,15 +244,22 @@ def main():
             continue
         t = pq.read_table(os.path.join(a.flat, f"refs_{r['array']}.parquet"), columns=["path"])
         for path in set(x for x in t.column("path").to_pylist() if x):
-            prefix, store, cred = container_for(resolve(path, rules))
-            containers[prefix] = store
-            auth[prefix] = cred
+            rel = relative_location(path, roots) if roots else None
+            if rel:
+                name = rel[len("vcc://"):].split("/", 1)[0]
+                url = roots[name][1]
+                _, store, cred = container_for(url + "x")
+                containers[url] = store
+            else:
+                url, store, cred = container_for(resolve(path, rules))
+                containers[url] = store
+            auth[url] = cred
     cfg = icechunk.RepositoryConfig.default()
     if a.split > 0:
         cfg.manifest = icechunk.ManifestConfig(splitting=icechunk.ManifestSplittingConfig.from_dict(
             {icechunk.ManifestSplitCondition.AnyArray(): {icechunk.ManifestSplitDimCondition.Axis(0): a.split}}))
     for prefix, store in containers.items():
-        cfg.set_virtual_chunk_container(icechunk.VirtualChunkContainer(prefix, store))
+        cfg.set_virtual_chunk_container(icechunk.VirtualChunkContainer(prefix, store, name=names.get(prefix)))
     shutil.rmtree(a.repo, ignore_errors=True)
     storage = icechunk.local_filesystem_storage(a.repo)
     repo = icechunk.Repository.create(storage, config=cfg, authorize_virtual_chunk_access=auth)
@@ -200,7 +271,10 @@ def main():
         repo = repo.reopen(config=cfg, authorize_virtual_chunk_access=auth)
     session = repo.writable_session("main")
     store = session.store
-    root = zarr.open_group(store, mode="w", attributes=dict(doc.get("meta") or {}))
+    attrs0 = dict(doc.get("meta") or {})
+    if roots_table:
+        attrs0["byterefs_roots"] = roots_table
+    root = zarr.open_group(store, mode="w", attributes=attrs0)
 
     t0 = time.time()
     coords = [r for r in rows if r["storage"] != "referenced"]
@@ -235,7 +309,7 @@ def main():
         for b in pf.iter_batches(batch_size=a.batch, columns=cols):
             d = b.to_pydict()
             specs = [icechunk.VirtualChunkSpec(index=[d[f"dim_{i}"][j] for i in range(n)],
-                                               location=resolve(d["path"][j], rules),
+                                               location=location(d["path"][j]),
                                                offset=d["offset"][j], length=d["size"][j])
                      for j in range(b.num_rows) if d["present"][j] == 1 and d["path"][j]]
             failed = store.set_virtual_refs(r["array"], specs, validate_containers=True)

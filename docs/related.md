@@ -25,7 +25,10 @@ largest worked example (7.1 billion refs). Its practices hold here too:
 commit in batches, split manifests past about a million refs (along the
 append axis about as often as you commit), load only coordinate variables,
 and keep the write-time cache small. `py/render_icechunk.py` follows them,
-rendering Icechunk from the table rather than from the files. One
+rendering Icechunk from the table rather than from the files, and with
+`--relocatable` it writes remap roots as Icechunk named containers, so one
+store reads from THREDDS or in place on `/g/data`
+([reading in place](reading-published-stores.md#reading-in-place-relocatable-stores)). One
 exception: the skill calls kerchunk deprecated and steers away from it. We
 keep writing kerchunk (JSON and Parquet), because GDAL and other readers
 outside Python need it today; Icechunk is one output among several.
