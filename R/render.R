@@ -20,7 +20,10 @@ tm <- function(label, expr) {
   t0 <- Sys.time(); force(expr)
   message(sprintf("%s: %.1f s", label, as.numeric(Sys.time() - t0, units = "secs")))
 }
-tm("flat refs store", mr_write_flat(con, file.path(out, "flat")))
+## FLAT_ROW_GROUP_ROWS: target rows a row group of the refs files (whole
+## steps of the leading dimension; 0 = writer default, about 1M rows)
+rg <- as.numeric(Sys.getenv("FLAT_ROW_GROUP_ROWS", "20000"))
+tm("flat refs store", mr_write_flat(con, file.path(out, "flat"), row_group_rows = rg))
 tm("mdim VRT", mr_write_mdim_vrt(con, file.path(out, "mdim.vrt"), target = vt))
 tm("kerchunk Parquet", mr_write_kerchunk_parquet(con, file.path(out, "kerchunk"), target = kt))
 DBI::dbDisconnect(con)
