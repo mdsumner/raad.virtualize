@@ -113,7 +113,22 @@ mr_array_list <- function(con) {
 ## ---- the flat refs store ----------------------------------------------------------
 ## Paths are written verbatim (as scanned) and the remap rules travel in
 ## arrays.json; a reader applies the target it wants (wxy-refs does).
-mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6) {
+##
+## Row groups: each refs file is written in row groups of whole steps of the
+## leading dimension, about `row_group_rows` rows each (default 20000, or
+## FLAT_ROW_GROUP_ROWS in render.R). A lookup by chunk key reads the footer
+## and then every row group whose dim_* statistics can hold its keys, so the
+## row-group size is the floor on what one lookup moves: for the GHRSST MUR
+## series (2556 chunks a day) the writer default of about 1M rows a group
+## costs 10.3 MB for one chunk, groups of 8 days (20448 rows) 0.18 MB.
+## steps a group = max(1, round(row_group_rows / chunks a step)), and a row's
+## group is dim_0 %/% steps, so groups start at fixed multiples of global
+## dim_0 whatever the number of rows. Statistics are written for dim_* and
+## present only (min/max of path, info and data serve no lookup and double
+## the footer). row_group_rows = 0 writes as before (writer default groups,
+## statistics on every column).
+mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6,
+                          row_group_rows = 2e4) {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
   arrays <- mr_array_list(con)
   for (k in seq_along(arrays)) {
@@ -144,9 +159,17 @@ mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6) {
       info    = ch(r$info, utf8),
       data    = ch(unclass(r$data), function(x) arrow::Array$create(
         lapply(x, function(v) if (is.null(v)) NULL else as.raw(v)), type = arrow::binary())))))
-    arrow::write_parquet(tbl, file.path(dir, sprintf("refs_%s.parquet", a$array)),
-                         compression = .pq_codec())
-    if (verbose) message(sprintf("  refs_%s.parquet: %d rows in %.1f s", a$array, nrow(r),
+    f <- file.path(dir, sprintf("refs_%s.parquet", a$array))
+    if (row_group_rows > 0) {
+      per <- if (n > 1L) prod(ceiling(a$shape[-1L] / a$chunks[-1L])) else 1
+      steps <- max(1, round(row_group_rows / per))
+      ng <- .write_row_groups(tbl, f, r$dim_0, steps, stats_cols = c(.dims(n), "present"))
+    } else {
+      arrow::write_parquet(tbl, f, compression = .pq_codec())
+      steps <- NA; ng <- NA
+    }
+    if (verbose) message(sprintf("  refs_%s.parquet: %d rows, %s steps a row group, %s row groups, %.1f s",
+                                 a$array, nrow(r), steps, ng,
                                  as.numeric(Sys.time() - t0, units = "secs")))
   }
   s <- dbReadTable(con, "sources")
@@ -189,6 +212,24 @@ mr_remap <- function(con, path, target = NULL) {
 .num <- function(x) sprintf("%.17g", as.numeric(x))
 ## zstd where this arrow build has it (some builds lack it), else snappy
 .pq_codec <- function() if (arrow::codec_is_available("zstd")) "zstd" else "snappy"
+
+## Write tbl to path as one row group per run of dim_0 %/% steps (rows are in
+## dim_0 order, so each run is a contiguous slice); statistics only for the
+## columns named in `stats_cols`. Returns the number of row groups written (a run
+## longer than the writer's maximum row-group length is split by the writer).
+.write_row_groups <- function(tbl, path, dim_0, steps, stats_cols) {
+  g <- rle(as.numeric(dim_0) %/% steps)
+  len <- g$lengths; off <- c(0, cumsum(len)[-length(len)])
+  nm <- names(tbl)
+  props <- arrow::ParquetWriterProperties$create(nm, version = "2.4", compression = .pq_codec(),
+                                                 write_statistics = stats::setNames(nm %in% stats_cols, nm))
+  sink <- arrow::FileOutputStream$create(path)
+  on.exit(sink$close())
+  w <- arrow::ParquetFileWriter$create(tbl$schema, sink, properties = props)
+  for (i in seq_along(len)) w$WriteTable(tbl$Slice(off[i], len[i]), chunk_size = len[i])
+  w$Close()
+  length(len)
+}
 
 .lifted <- c("units", "_FillValue", "scale_factor", "add_offset", "missing_value")
 

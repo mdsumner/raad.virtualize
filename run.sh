@@ -18,6 +18,8 @@
 #      HARVEST_ENGINE (auto | gdal | h5py; see py/harvest.py),
 #      R_LIB (default ./r-lib: R packages installed by the deps step),
 #      ICECHUNK_ARGS (extra py/render_icechunk.py options, e.g. "--split 0"),
+#      FLAT_ROW_GROUP_ROWS (rows a row group of flat/refs_*.parquet, whole
+#      leading steps; default 20000, 0 = writer default of about 1M),
 #      PUBLISH (a /vsis3/ prefix; set by config/aadc-transfer.sh),
 #      PUBLISH_WITH (gdal, or obstore for py/s3_sync.py),
 #      S3_SYNC_ARGS (extra py/s3_sync.py options, e.g. --skip-same-size to
