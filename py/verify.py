@@ -215,7 +215,8 @@ def refs_protocol(path):
     import glob
     import fsspec
     import pyarrow.parquet as pq
-    for f in sorted(glob.glob(os.path.join(path, "*", "refs.*.parq"))):
+    # an array of a subgroup keeps its refs under the group (g/TEMP/refs.0.parq)
+    for f in sorted(glob.glob(os.path.join(path, "**", "refs.*.parq"), recursive=True)):
         col = pq.read_table(f, columns=["path"]).column("path")
         for v in col.drop_null().to_pylist():
             if v:
