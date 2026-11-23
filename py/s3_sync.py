@@ -8,10 +8,13 @@ SignedHeaders"). LOCAL is a directory (synced under PREFIX) or a file
 (written to PREFIX itself). Every local file is uploaded; files larger than
 the multipart threshold go up in parts. --delete removes objects under
 PREFIX that have no local counterpart (directory mode only).
---skip-same-size leaves out files whose object under PREFIX already has the
-same size: for resuming an upload that stopped part way (an expired
-one-hour source.coop token), not for a rebuilt dataset, where a rewritten
-file can keep its size.
+--skip-same-size leaves out files whose object under PREFIX already holds
+the same bytes: the same size and an ETag equal to the file's (its MD5, or
+for a multipart upload the MD5 of the MD5s of its PART-byte parts). For
+resuming an upload that stopped part way (an expired one-hour source.coop
+token). Size alone is not enough after a rebuild: a rewritten store.sqlite
+keeps its size (SQLite allocates whole pages), and so can a Parquet file.
+An object whose ETag is not of that form is uploaded again.
 
 Connection settings come from the same environment as GDAL: AWS_S3_ENDPOINT,
 AWS_HTTPS, AWS_VIRTUAL_HOSTING, AWS_REGION, and the credentials
@@ -21,6 +24,7 @@ Needs obstore (pip install obstore).
 """
 import argparse
 import datetime
+import hashlib
 import os
 import sys
 import time
@@ -31,6 +35,7 @@ from concurrent.futures import ThreadPoolExecutor
 import obstore
 from obstore.store import S3Store
 
+PART = 5 * 1024 * 1024  # obstore.put's chunk_size: the part size of a multipart upload
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
                ".svg": "image/svg+xml", ".webp": "image/webp"}
 
@@ -88,7 +93,40 @@ def local_files(src):
 
 
 def remote_files(store):
-    return {o["path"]: o["size"] for batch in obstore.list(store) for o in batch}
+    """Object metadata (size, e_tag, last_modified) under the store's prefix, by path."""
+    return {o["path"]: o for batch in obstore.list(store) for o in batch}
+
+
+def remote_file(store, key):
+    """{key: metadata} of one object, or {} where there is none."""
+    try:
+        return {key: obstore.head(store, key)}
+    except FileNotFoundError:
+        return {}
+
+
+def etag(f, parts):
+    """The S3 ETag of the file uploaded in `parts` parts (1: a single put)."""
+    md5s, whole = [], hashlib.md5()
+    with open(f, "rb") as fh:
+        for b in iter(lambda: fh.read(PART), b""):
+            (whole.update(b) if parts == 1 else md5s.append(hashlib.md5(b).digest()))
+    return whole.hexdigest() if parts == 1 else f"{hashlib.md5(b''.join(md5s)).hexdigest()}-{len(md5s)}"
+
+
+def uploaded(meta, f):
+    """The object holds this file's bytes: the same size and ETag."""
+    size = os.path.getsize(f)
+    if meta is None or meta["size"] != size:
+        return False
+    tag = (meta.get("e_tag") or "").strip('"')
+    _, dash, n = tag.partition("-")
+    if dash and not n.isdigit():
+        return False
+    parts = int(n) if dash else 1
+    if parts > 1 and parts != -(-size // PART):
+        return False
+    return etag(f, parts) == tag
 
 
 def main():
@@ -97,7 +135,7 @@ def main():
     p.add_argument("dest", help="/vsis3/BUCKET/PREFIX")
     p.add_argument("--delete", action="store_true", help="remove remote objects with no local file")
     p.add_argument("--skip-same-size", action="store_true",
-                   help="skip files already uploaded with the same size (resume)")
+                   help="skip files already uploaded with the same size and ETag (resume)")
     p.add_argument("--workers", type=int, default=8)
     a = p.parse_args()
 
@@ -109,12 +147,16 @@ def main():
     else:
         store, _ = store_for(a.dest)
         files = local_files(a.src)
+    keep = {k for _, k in files}  # every local file, uploaded now or skipped
 
     if a.skip_same_size:
-        have = remote_files(store)
+        have = remote_file(store, files[0][1]) if single else remote_files(store)
         n0 = len(files)
-        files = [(f, k) for f, k in files if have.get(k) != os.path.getsize(f)]
-        print(f"s3_sync: {n0 - len(files)} of {n0} files already uploaded with the same size, skipped")
+        with ThreadPoolExecutor(a.workers) as ex:
+            done = list(ex.map(lambda fk: uploaded(have.get(fk[1]), fk[0]), files))
+        files = [fk for fk, d in zip(files, done) if not d]
+        print(f"s3_sync: {n0 - len(files)} of {n0} files already uploaded"
+              " (same size and ETag), skipped")
 
     t0 = time.time()
     nbytes = sum(os.path.getsize(f) for f, _ in files)
@@ -135,7 +177,6 @@ def main():
     print(f"s3_sync: {len(files)} files, {nbytes / 1e6:.1f} MB to {a.dest} in {time.time() - t0:.1f} s")
 
     if a.delete and not single:
-        keep = {k for _, k in files}
         stale = [k for k in remote_files(store) if k not in keep]
         # one object per request: the source.coop proxy has no batch
         # DeleteObjects (POST /<account>?delete answers NoSuchBucket)
