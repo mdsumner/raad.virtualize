@@ -14,9 +14,21 @@ Engines (--engine):
         with unwritten chunks (see walk()); such files are rescanned with h5py.
   h5py  one pass over the HDF5 chunk index (H5Dchunk_iter), for netCDF4 and
         HDF5 sources: local paths, or /vsicurl/ and https URLs through fsspec.
-  auto  (default) h5py for local netCDF4/HDF5 sources when h5py is
-        installed, gdal otherwise (remote: GDAL fetched far fewer bytes from
-        THREDDS). GDAL still supplies the metadata and codec info.
+  cdf   classic netCDF (CDF-1, CDF-2, CDF-5) from its header alone
+        (py/cdf.py): every variable is uncompressed and contiguous (a record
+        variable one slab a record), so a chunk of k whole rows of the
+        leading axis is a byte range by arithmetic. k is the first entry of
+        the plan's <BlockSize> for the array (whose other entries must be
+        the whole extent), else 1 for an array of rank 2 or more and the
+        whole array for rank 1; a record variable is one record a chunk.
+        GDAL's netCDF driver has no GetRawBlockInfo for classic files, and
+        the source is not opened with GDAL. Attributes come from the
+        header, and the source's ETag (remote) is recorded with its size
+        and mtime.
+  auto  (default) cdf for classic netCDF (by its first four bytes), h5py
+        for local netCDF4/HDF5 sources when h5py is installed, gdal
+        otherwise (remote: GDAL fetched far fewer bytes from THREDDS). GDAL
+        still supplies the metadata and codec info.
 
 A source that GDAL cannot open as multidimensional (a GeoTIFF or COG placed
 by a <SourceBand> plan, as vrtstack writes) is scanned from its TIFF tile
@@ -71,6 +83,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from osgeo import gdal
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cdf  # noqa: E402
+
 gdal.UseExceptions()
 gdal.SetConfigOption("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
 
@@ -103,13 +118,27 @@ def source_file(f, base):
     return k, f
 
 
+def plan_arrays(root):
+    """(name, <Array>) of every array of a plan: a root-group array by its
+    name, an array of a subgroup by its path without the leading slash
+    (g/a), as the store names it (a plan of one group per source file,
+    py/plan_groups.py)."""
+    def walk(g, prefix):
+        for a in g.findall("Array"):
+            yield prefix + a.get("name"), a
+        for sg in g.findall("Group"):
+            yield from walk(sg, prefix + sg.get("name") + "/")
+    for g in root.findall("Group"):
+        yield from walk(g, "")
+
+
 def plan_sources(vrt, arrays):
     """Distinct source files of `arrays` in plan order, as GDAL opens them."""
     root = ET.parse(vrt).getroot()
     base = os.path.dirname(os.path.abspath(vrt))
     out = []
-    for arr in root.findall("Group/Array"):
-        if arr.get("name") not in arrays:
+    for nm, arr in plan_arrays(root):
+        if nm not in arrays:
             continue
         for s in arr.findall("Source/SourceFilename"):
             _, f = source_file(s.text, base)
@@ -125,12 +154,12 @@ def plan_placed(vrt, arrays):
     root = ET.parse(vrt).getroot()
     base = os.path.dirname(os.path.abspath(vrt))
     out = {}
-    for arr in root.findall("Group/Array"):
-        if arr.get("name") not in arrays:
+    for nm, arr in plan_arrays(root):
+        if nm not in arrays:
             continue
         for s in arr.findall("Source/SourceFilename"):
             _, f = source_file(s.text, base)
-            out.setdefault(f, set()).add(arr.get("name"))
+            out.setdefault(f, set()).add(nm)
     return {f: [nm for nm in arrays if nm in got] for f, got in out.items()}
 
 
@@ -140,8 +169,8 @@ def plan_attrs(vrt, arrays):
     {array: {name: value}}, a String as text, numbers as a list."""
     root = ET.parse(vrt).getroot()
     out = {}
-    for arr in root.findall("Group/Array"):
-        if arr.get("name") not in arrays:
+    for nm, arr in plan_arrays(root):
+        if nm not in arrays:
             continue
         at = {}
         for a in arr.findall("Attribute"):
@@ -151,7 +180,7 @@ def plan_attrs(vrt, arrays):
             else:
                 at[a.get("name")] = [float(v) for v in vals]
         if at:
-            out[arr.get("name")] = at
+            out[nm] = at
     return out
 
 
@@ -160,18 +189,18 @@ def plan_overviews(vrt, arrays):
     order: harvested with them, so a plan with levels needs no list."""
     root = ET.parse(vrt).getroot()
     out = []
-    for arr in root.findall("Group/Array"):
+    for nm, arr in plan_arrays(root):
         of = [a.findtext("Value") for a in arr.findall("Attribute") if a.get("name") == "overview_of"]
-        if of and of[0] in arrays and arr.get("name") not in arrays:
-            out.append(arr.get("name"))
+        if of and of[0] in arrays and nm not in arrays:
+            out.append(nm)
     return out
 
 
 def plan_dims(vrt, arrays):
     """Dimension names of each requested array in the plan."""
     root = ET.parse(vrt).getroot()
-    return {a.get("name"): [d.get("ref") for d in a.findall("DimensionRef")]
-            for a in root.findall("Group/Array") if a.get("name") in arrays}
+    return {nm: [d.get("ref") for d in a.findall("DimensionRef")]
+            for nm, a in plan_arrays(root) if nm in arrays}
 
 
 def plan_bands(vrt, arrays):
@@ -180,16 +209,40 @@ def plan_bands(vrt, arrays):
     root = ET.parse(vrt).getroot()
     base = os.path.dirname(os.path.abspath(vrt))
     out = {}
-    for arr in root.findall("Group/Array"):
-        if arr.get("name") not in arrays:
+    for nm, arr in plan_arrays(root):
+        if nm not in arrays:
             continue
         for src in arr.findall("Source"):
             b = src.find("SourceBand")
             if b is None:
                 continue
             k, f = source_file(src.find("SourceFilename").text, base)
-            out[(arr.get("name"), f)] = (int(b.text), k)
+            out[(nm, f)] = (int(b.text), k)
     return out
+
+
+def plan_source_arrays(vrt, arrays):
+    """{(array, source file): the <SourceArray> it is read from, without the
+    leading slash}: an array of a subgroup (g/TEMP) is TEMP in its source."""
+    root = ET.parse(vrt).getroot()
+    base = os.path.dirname(os.path.abspath(vrt))
+    out = {}
+    for nm, arr in plan_arrays(root):
+        if nm not in arrays:
+            continue
+        for src in arr.findall("Source"):
+            sa = src.findtext("SourceArray")
+            if sa:
+                _, f = source_file(src.find("SourceFilename").text, base)
+                out[(nm, f)] = sa.lstrip("/")
+    return out
+
+
+def plan_blocks(vrt, arrays):
+    """{array: <BlockSize> of the plan}, where the plan states one."""
+    root = ET.parse(vrt).getroot()
+    return {nm: [int(x) for x in a.findtext("BlockSize").split(",")]
+            for nm, a in plan_arrays(root) if nm in arrays and a.findtext("BlockSize")}
 
 
 def plan_lifts(vrt, arrays):
@@ -200,8 +253,8 @@ def plan_lifts(vrt, arrays):
     source axes in order (0, 1, ...)."""
     root = ET.parse(vrt).getroot()
     out = {}
-    for arr in root.findall("Group/Array"):
-        if arr.get("name") not in arrays:
+    for nm, arr in plan_arrays(root):
+        if nm not in arrays:
             continue
         src = arr.find("Source")
         if src is None or src.find("SourceArray") is None or src.find("SourceTranspose") is None:
@@ -210,8 +263,8 @@ def plan_lifts(vrt, arrays):
         if -1 not in t:
             continue
         if [x for x in t if x >= 0] != list(range(len(t) - t.count(-1))):
-            sys.exit(f"harvest: array {arr.get('name')}: SourceTranspose {t} reorders source axes")
-        out[arr.get("name")] = (t, [d.get("ref") for d in arr.findall("DimensionRef")])
+            sys.exit(f"harvest: array {nm}: SourceTranspose {t} reorders source axes")
+        out[nm] = (t, [d.get("ref") for d in arr.findall("DimensionRef")])
     return out
 
 
@@ -465,16 +518,21 @@ def write_atomic(path, writer):
     os.replace(tmp, path)
 
 
-def scan_source(source, arrays, out, want_meta, engine="auto", tries=4, tiff=None, lifts=None):
+def scan_source(source, arrays, out, want_meta, engine="auto", tries=4, tiff=None, lifts=None,
+                classic=None):
     """scan_source_once() with retries: remote opens fail now and then.
     tiff: {"dims": {array: dims}, "bands": {(array, source): band}} for
-    <SourceBand> plans; lifts: plan_lifts() of the plan."""
+    <SourceBand> plans; lifts: plan_lifts() of the plan; classic:
+    {"arrays": plan_source_arrays(), "blocks": plan_blocks(), "dims":
+    plan_dims()} for the cdf engine."""
     for i in range(tries):
         try:
             if tiff and any((nm, source) in tiff["bands"] for nm in arrays):
                 return scan_tiff_once(source, arrays, out, want_meta, tiff)
+            if engine == "cdf" or (engine == "auto" and is_classic(source)):
+                return scan_cdf_once(source, arrays, out, want_meta, classic or {})
             return scan_source_once(source, arrays, out, want_meta, engine, lifts)
-        except RuntimeError as e:
+        except (RuntimeError, OSError) as e:
             if i == tries - 1:
                 raise
             print(f"  {source}: {e}; retry in {2 ** (i + 1)} s", file=sys.stderr)
@@ -515,12 +573,99 @@ def changed(source, out):
     return st is None or st.size != rec.get("size") or st.mtime != rec.get("mtime")
 
 
-def write_source(source, out, k, driver, packing):
+def write_source(source, out, k, driver, packing, etag=False):
+    """sources/<key>.json; etag: also record the HTTP ETag and S3 version id
+    of a remote source (GDAL's cached response headers)."""
     st = gdal.VSIStatL(source)
-    write_atomic(os.path.join(out, "sources", f"{k}.json"), lambda p: json.dump(strict(
-        {"source": source, "size": st.size if st else None,
-         "mtime": st.mtime if st else None, "driver": driver,
-         "packing": packing}), open(p, "w"), allow_nan=False))
+    rec = {"source": source, "size": st.size if st else None,
+           "mtime": st.mtime if st else None, "driver": driver, "packing": packing}
+    if etag:
+        h = gdal.GetFileMetadata(source, "HEADERS") or {}
+        h = {k.split("\n")[-1].strip().lower(): v for k, v in h.items()}
+        rec["etag"] = (h.get("etag") or "").strip('"') or None
+        rec["version_id"] = h.get("x-amz-version-id")
+    write_atomic(os.path.join(out, "sources", f"{k}.json"), lambda p: json.dump(strict(rec), open(p, "w"),
+                                                                              allow_nan=False))
+
+
+def is_classic(source):
+    """True when the source starts with a classic netCDF magic number."""
+    if source.startswith(("GTIFF_DIR:", "NETCDF:", "HDF5:")):
+        return False
+    f = gdal.VSIFOpenL(source, "rb")
+    if f is None:
+        return False
+    try:
+        m = gdal.VSIFReadL(1, 4, f) or b""
+    finally:
+        gdal.VSIFCloseL(f)
+    return m[:3] == b"CDF" and len(m) == 4 and m[3] in (1, 2, 5)
+
+
+def cdf_packing(v):
+    at = v["attrs"]
+    num = lambda x: x if isinstance(x, (int, float)) else None
+    return {"scale": num(at.get("scale_factor")), "offset": num(at.get("add_offset")),
+            "nodata": num(at.get("_FillValue"))}
+
+
+def describe_cdf(v, chunks, info, dims=None):
+    """arrays.json entry of a classic netCDF variable: the CF attributes
+    that GDAL lifts (units, _FillValue, scale_factor, add_offset) as the
+    gdal engine's describe() states them; a text _FillValue (a char
+    variable) is no nodata."""
+    pk = cdf_packing(v)
+    at = {k: x for k, x in v["attrs"].items() if k not in ("units", "_FillValue", "scale_factor", "add_offset")}
+    u = v["attrs"].get("units")
+    return {"dims": dims or v["dims"], "shape": v["shape"], "chunks": chunks, "dtype": v["dtype"],
+            "nodata": pk["nodata"], "scale": pk["scale"], "offset": pk["offset"],
+            "unit": u if isinstance(u, str) and u else None, "attrs": at, "info": info}
+
+
+def scan_cdf_once(source, arrays, out, want_meta, plan):
+    """Scan the variables of one classic netCDF file that the plan places
+    (engine cdf): rows of k leading-axis rows at begin + i * k * rowbytes,
+    or one record at begin + r * recsize."""
+    t0 = time.time()
+    k = key_of(source)
+    h = cdf.read_header(source)
+    meta, n, packing = {}, 0, {}
+    for nm in arrays:
+        vn = plan.get("arrays", {}).get((nm, source), nm)
+        v = h["vars"].get(vn)
+        if v is None:
+            sys.exit(f"{source}: no variable {vn} (plan array {nm})")
+        rank = len(v["shape"])
+        if rank == 0:
+            sys.exit(f"{source}: {vn} is a scalar; the store takes arrays of rank 1 or more")
+        bs = plan.get("blocks", {}).get(nm)
+        if bs:
+            if len(bs) != rank or list(bs[1:]) != v["shape"][1:]:
+                sys.exit(f"{source}: {nm}: BlockSize {bs} is not k rows of {v['shape']}")
+            lead = bs[0]
+        else:
+            lead = v["shape"][0] if rank == 1 and not v["record"] else 1
+        chunks = [lead] + v["shape"][1:]
+        info = ["COMPRESSION=NONE"] + (["ENDIANNESS=BIG"] if cdf.SIZE[v["nc_type"]] > 1 else [])
+        rows = [((i,) + (0,) * (rank - 1), 1, off, size, info, None)
+                for i, (off, size) in enumerate(cdf.rows(v, h["recsize"], lead))]
+        packing[nm] = cdf_packing(v)
+        nrow, _ = write_rows(rows, source, rank, nm, k, out)
+        n += nrow
+        if want_meta:
+            meta[nm] = describe_cdf(v, chunks, info, plan.get("dims", {}).get(nm))
+            meta[nm]["scanned"] = True
+    if want_meta:
+        # the source's other variables, as coordinates' attributes; not those
+        # scanned under another name (a group path, g/TEMP)
+        used = {plan.get("arrays", {}).get((nm, source), nm) for nm in arrays}
+        for vn, v in h["vars"].items():
+            if vn not in meta and vn not in used and v["shape"]:
+                meta[vn] = describe_cdf(v, v["shape"], [])
+                meta[vn]["scanned"] = False
+    write_source(source, out, k, "netCDF-classic", packing, etag="://" in source)
+    print(f"  {os.path.basename(source)}: engine cdf", file=sys.stderr)
+    return source, n, time.time() - t0, meta if want_meta else None
 
 
 def scan_tiff_once(source, arrays, out, want_meta, tiff):
@@ -609,16 +754,23 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--plan", required=True, help="gdal mdim mosaic VRT")
     p.add_argument("--out", required=True)
-    p.add_argument("--array", action="append", required=True)
+    p.add_argument("--array", action="append", required=True,
+                   help="array of the plan (repeatable); @plan for every array the plan places")
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--limit", type=int, default=0, help="scan only the first N sources")
-    p.add_argument("--engine", choices=["auto", "gdal", "h5py"], default="auto",
-                   help="auto: h5py chunk_iter for netCDF4/HDF5 when h5py is installed, "
-                        "else GDAL GetRawBlockInfo (with an h5py rescan of sparse files)")
+    p.add_argument("--engine", choices=["auto", "gdal", "h5py", "cdf"], default="auto",
+                   help="auto: the header of a classic netCDF file, h5py chunk_iter for "
+                        "netCDF4/HDF5 when h5py is installed, else GDAL GetRawBlockInfo "
+                        "(with an h5py rescan of sparse files)")
     p.add_argument("--recheck", type=int, default=0,
                    help="stat the last N sources again and rescan those changed since "
                         "their scan (0 none, -1 all)")
     a = p.parse_args()
+    # @plan: every array the plan places from a source (a plan of one group
+    # per source names thousands, py/plan_groups.py)
+    if a.array == ["@plan"]:
+        a.array = [nm for nm, arr in plan_arrays(ET.parse(a.plan).getroot()) if arr.find("Source") is not None]
+        print(f"harvest: {len(a.array)} arrays in the plan", file=sys.stderr)
     # overview levels the plan declares (plan_cog.py --overviews) go with
     # their array
     levels = plan_overviews(a.plan, a.array)
@@ -644,6 +796,18 @@ def main():
     tiff = ({"dims": plan_dims(a.plan, a.array), "bands": bands,
              "attrs": plan_attrs(a.plan, a.array)} if bands else None)
     lifts = plan_lifts(a.plan, a.array) or None
+    classic = {"arrays": plan_source_arrays(a.plan, a.array), "blocks": plan_blocks(a.plan, a.array),
+               "dims": plan_dims(a.plan, a.array)}
+    # each task gets the plan entries of its own source only: the whole map
+    # is pickled per task, and a plan of one group per source has ~27,000
+    by_src = {}
+    for (nm, f), sa in classic["arrays"].items():
+        by_src.setdefault(f, {})[(nm, f)] = sa
+
+    def classic_for(s):
+        return {"arrays": by_src.get(s, {}),
+                "blocks": {nm: classic["blocks"][nm] for nm in placed[s] if nm in classic["blocks"]},
+                "dims": {nm: classic["dims"][nm] for nm in placed[s] if nm in classic["dims"]}}
 
     def done(s):
         k = key_of(s)
@@ -662,22 +826,32 @@ def main():
         todo += stale
     print(f"{len(srcs)} sources in plan, {len(srcs) - len(todo)} already scanned, "
           f"{len(todo)} to scan with {a.workers} workers", file=sys.stderr)
+    need_meta = set()
     if not have_meta:
         # arrays.json from the first source, scanned in this process, and
         # from the first source of any array that one does not hold (one
         # array per file: py/plan_static.py)
         meta = dict(old_meta)
+        rounds = 0
         while True:
             want = [nm for nm in a.array if nm not in meta]
             if meta and not want:
                 break
+            if rounds >= 8:
+                # many sources, each with arrays of its own (one group per
+                # source, py/plan_groups.py): the pool describes the rest
+                ws = set(want)
+                need_meta = {s for s in todo if any(nm in ws for nm in placed[s])}
+                break
+            rounds += 1
             first = next((s for s in (todo or srcs) if not meta or
                           any(nm in placed[s] for nm in want)), None)
             if first is None:
                 break
             if first in todo:
                 todo.remove(first)
-            _, n, dt, m = scan_source(first, placed[first], a.out, True, a.engine, tiff=tiff, lifts=lifts)
+            _, n, dt, m = scan_source(first, placed[first], a.out, True, a.engine, tiff=tiff, lifts=lifts,
+                                      classic=classic_for(first))
             # the arrays this source was scanned for, and any not yet
             # described: a joined file's own axes (a time of 1) do not
             # replace those of the first source
@@ -688,12 +862,21 @@ def main():
 
     t0, total = time.time(), 0
     with ProcessPoolExecutor(a.workers) as ex:
-        futs = [ex.submit(scan_source, s, placed[s], a.out, False, a.engine, tiff=tiff, lifts=lifts) for s in todo]
+        futs = [ex.submit(scan_source, s, placed[s], a.out, s in need_meta, a.engine, tiff=tiff, lifts=lifts,
+                          classic=classic_for(s)) for s in todo]
         for i, f in enumerate(as_completed(futs), 1):
-            s, n, dt, _ = f.result()
+            s, n, dt, m = f.result()
             total += n
-            print(f"  [{i}/{len(todo)}] {os.path.basename(s)}: {n} chunks in {dt:.1f} s",
-                  file=sys.stderr)
+            if m:
+                meta.update({nm: v for nm, v in m.items() if nm not in meta})
+            if len(todo) <= 2000 or i % 1000 == 0 or i == len(todo):
+                print(f"  [{i}/{len(todo)}] {os.path.basename(s)}: {n} chunks in {dt:.1f} s",
+                      file=sys.stderr)
+    if need_meta:
+        with open(meta_path, "w") as f:
+            json.dump(strict(meta), f, indent=1, default=str, allow_nan=False)
+        print(f"harvest: arrays.json describes {sum(1 for v in meta.values() if v.get('scanned'))} "
+              f"scanned arrays", file=sys.stderr)
     print(f"harvest: {total} chunk rows from {len(todo)} sources in {time.time() - t0:.1f} s",
           file=sys.stderr)
 

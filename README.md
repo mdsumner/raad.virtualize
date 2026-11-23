@@ -143,6 +143,8 @@ GHRSST_ROOT=/path/to/MUR/v4.1 GHRSST_YEARS=2024 bash run.sh config/ghrsst.sh   #
 GHRSST_YEARS=2024 bash run.sh config/ghrsst-cog.sh   # MUR COGs on source.coop, one year
 SEAICE_FIRST=20241225 SEAICE_LAST=20250105 bash run.sh config/seaice-g02202.sh   # G02202 v6 south, F17 to AMSR2
 SEAICE_FIRST=20120801 SEAICE_LAST=20120814 bash run.sh config/seaice-asi-amsr2.sh   # Bremen ASI AMSR2 3.125 km south
+bash run.sh config/imos-meop.sh                  # IMOS seal CTD profiles, 2024 release as one cube, about 4 min
+MEOP_CANON=tags bash run.sh config/imos-meop.sh  # every tag of both releases as a group of its own
 ```
 
 Every leading `*.sh` argument is sourced in order (a dataset, then
@@ -154,13 +156,17 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | Variable | Meaning |
 |---|---|
 | `WORKERS` | parallel harvest workers |
-| `HARVEST_ENGINE` | `auto` (h5py for local netCDF4/HDF5, GDAL for remote), `gdal`, `h5py` |
+| `HARVEST_ENGINE` | `auto` (the header for classic netCDF, h5py for local netCDF4/HDF5, GDAL for remote), `gdal`, `h5py`, `cdf` |
 | `HARVEST_LIMIT` | scan only the first N sources |
 | `ICECHUNK_ARGS` | extra `py/render_icechunk.py` options: `--split N` chunks along the first axis per manifest (default 365, 0 for none; set it to the append unit, such as 1 for daily, for a repository that later takes incremental commits), `--commit-every N` refs (default 1M) |
 | `BRAN_YEARS`, `BRAN_MONTHS`, `BRAN_VAR`, `BRAN_ROOT` | BRAN selection; a month subset gets its own dataset name |
 | `GHRSST_VAR`, `GHRSST_YEARS`, `GHRSST_COG_ROOT` | GHRSST COG selection (`config/ghrsst-cog.sh`) |
 | `SEAICE_HEM`, `SEAICE_FREQ`, `SEAICE_FIRST`, `SEAICE_LAST`, `SEAICE_ARRAYS`, `SEAICE_MIRROR` | G02202 v6 selection (`config/seaice-g02202.sh`); the source list is source `cdr_sic_G02202_V6` of the aad-filelist listing corpus, read by `py/corpus.py` (`SEAICE_LISTING` for another listing, `CORPUS_BASE` for another corpus) |
 | `SEAICE_HEM`, `SEAICE_FIRST`, `SEAICE_LAST`, `SEAICE_ARRAYS`, `SEAICE_MIRROR`, `SEAICE_OFFLINE`, `SEAICE_SRS` | Bremen ASI AMSR2 3.125 km selection (`config/seaice-asi-amsr2.sh`); sources listed from the Bremen server by `py/bremen_sources.py` (mirror files used only when their size matches), plan by `py/plan_lift.py` (2D files stacked on a new time axis) |
+| `MEOP_CANON`, `MEOP_MATCH`, `MEOP_INLINE`, `MEOP_LAT_MAX` | IMOS MEOP CTD selection (`config/imos-meop.sh`): `cube` (the 2024 release, py/plan_concat.py) or `tags` (one group per file, py/plan_groups.py), a regex on the S3 key, the per-profile variables inlined in the cube, the latitude at and north of which positions are left out of the STAC extents; the source list is an anonymous listing of imos-data, read by `py/s3_sources.py` |
+| `KERCHUNK_RECORD_SIZE` | refs per kerchunk Parquet file (default 100000); a store of many one-chunk arrays takes 1 |
+| `STAC_EXTENTS` | per-source bbox and time range (TSV from the planners' `--extents`), for sources that are not grids |
+| `STAC_THUMB_SOURCE`, `STAC_THUMB_TRANSPOSE` | the thumbnail's source (regex on its path; default the last placement) and `1` to draw the last dimension down |
 | `OISST_MONTHS`, `OISST_PRELIMINARY`, `OISST_MIRROR`, `OISST_MD5` | OISST v2.1 selection (`config/oisst.sh`); the source list is an anonymous listing of the NOAA bucket, read by `py/oisst_sources.py` |
 | `VERIFY_WINDOWS` | explicit `--window ARRAY:START:COUNT` checks |
 | `STAC_TARGET` | remap target for STAC item hrefs (default `KERCHUNK_TARGET`) |
@@ -338,7 +344,12 @@ float32 type of `scale_factor`. Results and findings are in
 - `run.sh`: driver. `config/*.sh`: datasets (sources, arrays, remap rules,
   render targets) and publish targets.
 - `py/harvest.py`: harvest engines (GDAL `GetRawBlockInfo`, h5py
-  `chunk_iter`, and the TIFF tile index for GeoTIFF sources).
+  `chunk_iter`, the TIFF tile index for GeoTIFF sources, and the header of a
+  classic netCDF file, `py/cdf.py`). `py/plan_concat.py`: the plan that
+  joins classic netCDF files along a dimension with no coordinate (Argo-style
+  profile files), 1D variables inlined; `py/plan_groups.py`: the plan of one
+  group per file, each variable whole. `py/s3_sources.py`: source list,
+  build record and stale check from an anonymous S3 listing.
   `py/plan_cog.py`: the plan for a daily GeoTIFF series, in the
   hypertidy/vrtstack form (`gdal mdim mosaic` does not take GeoTIFF). `py/probe_harvest.py`: request and byte counts for one
   source. `R/stac.R`: the STAC render. `py/render_icechunk.py`, `py/verify.py`: Icechunk render and
@@ -371,6 +382,19 @@ float32 type of `scale_factor`. Results and findings are in
   `config/oisst.sh` reharvests the full series through the current pipeline
   (plan from `py/plan_daily.py`), to the `oisst/` group of the scratch
   product.
+
+- **IMOS MEOP seal CTD profiles** (classic netCDF on the IMOS public
+  bucket): the 2024 release as one cube (265 files, 126,518 profiles by
+  1000 levels, 1.55M refs; plan 16 s, harvest 8 s from the header alone,
+  collate 23 s) and both releases as one group per tag (564 groups, 27,432
+  one-chunk arrays; 54 min, of which collate 30 and render 19), verified
+  locally; group `imos-tracking/` of the scratch product. A plan of nested
+  groups is a store whose arrays and dimensions are named by path
+  (`g/TEMP`), rendered as nested groups in every form. One chunk table and
+  one view per array does not scale to tens of thousands of arrays: SQLite
+  reads `sqlite_master` again after every CREATE (about 57 ms each at
+  27,000 arrays), and the flat, kerchunk and Icechunk forms are one object
+  per array each (82,000 objects for the per-tag store).
 
 ## Roadmap
 

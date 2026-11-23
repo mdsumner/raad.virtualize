@@ -2,6 +2,7 @@
 
   python py/thumbnail.py STORE OUT.png [--array A] [--width 512]
                          [--palette viridis|topo|ice] [--log10]
+                         [--source REGEX] [--transpose]
 
 Reads the source that holds the last placement of ARRAY (default the first
 referenced data array) at its verbatim path, as the build sees it, and draws
@@ -14,6 +15,11 @@ percentiles of the valid cells (log10 first with --log10) onto the palette;
 nodata, NaN and values outside the CF valid range are transparent. A south-up grid is flipped and a 0..360
 longitude grid is rotated to -180..180.
 
+--source REGEX takes the last placement among the sources whose path
+matches, rather than the last of all (a source with data, where the last
+file holds only fill); --transpose draws the last dimension down the image
+and the one before it across (profiles by level: levels down).
+
 Prints one line describing the field (array, source, element), which run.sh
 passes to the STAC thumbnail asset.
 
@@ -24,6 +30,7 @@ white, for concentration).
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
 
@@ -49,7 +56,7 @@ def ramp(hexes, n=256):
     return np.stack([np.interp(u, t, rgb[:, k]) for k in range(3)], 1).round().astype(np.uint8)
 
 
-def pick(store, array):
+def pick(store, array, source_rx=None):
     con = sqlite3.connect(f"file:{store}?mode=ro", uri=True)
     if array is None:
         row = con.execute("SELECT array FROM arrays WHERE kind = 'data' AND storage = 'referenced' "
@@ -62,6 +69,10 @@ def pick(store, array):
     con.close()
     if not rows:
         sys.exit(f"thumbnail: array {array} has no placements")
+    if source_rx:
+        rows = [r for r in rows if re.search(source_rx, r[0])]
+        if not rows:
+            sys.exit(f"thumbnail: no source of {array} matches {source_rx!r}")
     src, src_array, off, _ = max(rows, key=lambda r: json.loads(r[3]))
     return array, src, src_array, json.loads(off)
 
@@ -167,9 +178,11 @@ def main():
     ap.add_argument("--width", type=int, default=512)
     ap.add_argument("--palette", default="viridis", choices=["viridis", "topo", "ice"])
     ap.add_argument("--log10", action="store_true")
+    ap.add_argument("--source", help="regex: draw the last placement among matching sources")
+    ap.add_argument("--transpose", action="store_true", help="last dimension down the image")
     a = ap.parse_args()
 
-    array, src, src_array, off = pick(a.store, a.array)
+    array, src, src_array, off = pick(a.store, a.array, a.source)
     got = read_classic(src, src_array, a.width)
     if got is None:
         got = read_mdim(src, src_array, off, a.width)
@@ -187,6 +200,8 @@ def main():
         east = xs > 180
         v = np.concatenate([v[:, east], v[:, ~east]], 1)
         valid = np.concatenate([valid[:, east], valid[:, ~east]], 1)
+    if a.transpose:
+        v, valid = v.T, valid.T
     rgba, (lo, hi) = colour(v, valid, a.palette, a.log10)
 
     mem = gdal.GetDriverByName("MEM").Create("", v.shape[1], v.shape[0], 4, gdal.GDT_Byte)

@@ -23,6 +23,11 @@
 ##
 ## The plan VRT beside the store (meta key `plan`) supplies what the store
 ## does not keep: dimension types, the SRS and coordinate units.
+## STAC_EXTENTS: a TSV with one row per source (source, west, south, east,
+##   north, start, end; py/plan_concat.py --extents), for sources whose
+##   extent is not a grid (profiles, tracks): it gives each item its bbox
+##   and time range, and the collection its extent where STAC_BBOX and
+##   STAC_INTERVAL are unset. Empty fields leave the item's default.
 if (sys.nframe() == 0L) {
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 2L) stop("usage: stac.R STORE OUT_DIR [TARGET] [BASE]")
@@ -227,6 +232,15 @@ STAC_EXT <- c(
   lapply(a, function(x) Filter(Negate(is.null), x))
 }
 
+## per-source extents (STAC_EXTENTS), or NULL
+.stac_extents <- function(file) {
+  if (!nzchar(file)) return(NULL)
+  if (!file.exists(file)) stop("STAC_EXTENTS: no file ", file)
+  x <- utils::read.delim(file, colClasses = "character", na.strings = character(0))
+  for (k in c("west", "south", "east", "north")) x[[k]] <- suppressWarnings(as.numeric(x[[k]]))
+  x
+}
+
 ## ---- the render --------------------------------------------------------------------
 mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL,
                           items_dir = TRUE, verbose = TRUE) {
@@ -241,9 +255,18 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
   ## other resolutions of a variable, not variables: left out of the cube
   data <- Filter(function(a) a$storage == "referenced" && is.null(a$attrs$overview_of), arrays)
   if (!length(data)) stop("stac: no referenced arrays in the store")
+  ## a store of subgroups (one per source file, py/plan_groups.py): the cube
+  ## lists each variable and dimension once, by its name within a group
+  grouped <- any(grepl("/", names(data), fixed = TRUE))
+  cube_data <- data
+  if (grouped) {
+    lv <- .leaf(names(data))
+    cube_data <- lapply(data[!duplicated(lv)], function(a) { a$dims <- .leaf(a$dims); a })
+    names(cube_data) <- lv[!duplicated(lv)]
+  }
 
   ## dimensions of the data arrays, with values, role and decoded time
-  dnames <- unique(unlist(lapply(data, `[[`, "dims")))
+  dnames <- unique(unlist(lapply(cube_data, `[[`, "dims")))
   dims <- lapply(stats::setNames(dnames, dnames), function(d) {
     co <- arrays[[d]]; at <- co$attrs %||% list()
     if (is.null(at$units) && !is.null(plan$units[[d]])) at$units <- plan$units[[d]]
@@ -278,11 +301,23 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     cbbox <- pbox
   } else {
     cbbox <- c(-180, -90, 180, 90)
-    warning("stac: no geographic x/y found and no STAC_BBOX; spatial extent written as the globe")
+    if (!nzchar(Sys.getenv("STAC_EXTENTS")))
+      warning("stac: no geographic x/y found and no STAC_BBOX; spatial extent written as the globe")
   }
   ttime <- if (!is.na(dt)) dims[[dt]]$time
   ## STAC_INTERVAL=start,end: temporal coverage of a dataset with no time axis
   interval <- if (nzchar(Sys.getenv("STAC_INTERVAL"))) strsplit(Sys.getenv("STAC_INTERVAL"), ",")[[1]]
+  ## STAC_EXTENTS: per-source boxes and times (see the header)
+  ext <- .stac_extents(Sys.getenv("STAC_EXTENTS"))
+  if (!is.null(ext)) {
+    eb <- ext[is.finite(ext$west) & is.finite(ext$south), , drop = FALSE]
+    if (!geographic && !(length(pbox) == 4L && all(is.finite(pbox))) && nrow(eb)) {
+      we <- if (any(eb$west > eb$east)) c(-180, 180) else c(min(eb$west), max(eb$east))
+      cbbox <- c(we[1], min(eb$south), we[2], max(eb$north))
+    }
+    tv <- c(ext$start[nzchar(ext$start)], ext$end[nzchar(ext$end)])
+    if (is.null(ttime) && !length(interval) && length(tv)) interval <- c(min(tv), max(tv))
+  }
 
   ## datacube
   cube_dims <- lapply(dims, function(d) {
@@ -303,10 +338,10 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     if (!is.null(d$attrs$long_name)) x$description <- d$attrs$long_name
     Filter(Negate(is.null), x)
   })
-  cube_vars <- lapply(data, function(a) Filter(Negate(is.null), list(
+  cube_vars <- lapply(cube_data, function(a) Filter(Negate(is.null), list(
     dimensions = I(a$dims), type = "data",
     description = a$attrs$long_name, unit = a$attrs$units,
-    `rv:dtype` = a$dtype, `rv:chunks` = I(a$chunks))))
+    `rv:dtype` = a$dtype, `rv:chunks` = if (!grouped) I(a$chunks))))
 
   js <- function(x, pretty = FALSE) jsonlite::toJSON(x, auto_unbox = TRUE, digits = I(15),
                                                      null = "null", na = "null", pretty = pretty)
@@ -346,6 +381,15 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
       if (length(interval)) props[c("datetime", "start_datetime", "end_datetime")] <- list(NULL, interval[1], interval[2])
       else props$datetime <- .created_iso(meta$created)
     }
+    e <- if (!is.null(ext)) ext[match(p$source[1], ext$source), , drop = FALSE]
+    if (!is.null(e) && nrow(e) && !is.na(e$source)) {
+      if (is.finite(e$west) && is.finite(e$south)) bb <- c(e$west, e$south, e$east, e$north)
+      if (nzchar(e$start)) {
+        props <- props[setdiff(names(props), c("datetime", "start_datetime", "end_datetime"))]
+        if (e$start == e$end) props$datetime <- e$start
+        else props[c("datetime", "start_datetime", "end_datetime")] <- list(NULL, e$start, e$end)
+      }
+    }
     if (is.null(props$datetime)) props["datetime"] <- list(NULL)
     if (!is.na(epsg) && !is.na(dx) && !is.na(dy) && !is.null(arrays[[dx]]$affine) &&
         !is.null(arrays[[dy]]$affine)) {
@@ -356,8 +400,11 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
       props[["proj:transform"]] <- I(c(ax$step, 0, ax$start + ax$step * (ix[1] - 1.5),
                                        0, ay$step, ay$start + ay$step * (iy[1] - 1.5)))
     }
-    ## where each array of this source lands in the cube
-    placement <- lapply(stats::setNames(seq_len(nrow(p)), p$array), function(i)
+    ## where each array of this source lands in the cube; in a store of
+    ## subgroups, the group and each array's shape by its name there
+    grp <- if (grouped) unique(sub("/[^/]*$", "", p$array))
+    if (length(grp) == 1L) props[["rv:group"]] <- grp
+    placement <- lapply(stats::setNames(seq_len(nrow(p)), if (grouped) .leaf(p$array) else p$array), function(i)
       list(dest = I(.fj(p$dest[i])), count = I(.fj(p$count[i]))))
     asset <- Filter(Negate(is.null), list(href = p$path[1], type = .media_type(p$source[1]),
       roles = list("data"), `file:size` = if (!is.na(p$size[1])) as.numeric(p$size[1]),
@@ -413,7 +460,7 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
       "of byte references. Collection assets are the virtual forms of the whole cube;",
       "items (%d) are the source granules, one per time step and footprint, listed in",
       "stac/items.ndjson and, where present, the geoparquet-items asset."),
-      nrow(S), paste(names(data), collapse = ", "), length(items)),
+      nrow(S), paste(names(cube_data), collapse = ", "), length(items)),
     license = if (nzchar(Sys.getenv("STAC_LICENSE"))) Sys.getenv("STAC_LICENSE") else "other",
     extent = list(spatial = list(bbox = I(list(I(cbbox)))), temporal = list(interval = textent)),
     `cube:dimensions` = cube_dims, `cube:variables` = cube_vars,

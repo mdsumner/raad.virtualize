@@ -39,11 +39,14 @@ scale_factor and fill value against GDAL on the plan. Exit status 1 on any
 mismatch.
 """
 import argparse
+import base64
 import copy
+import functools
 import hashlib
 import json
 import math
 import os
+import struct
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -59,9 +62,59 @@ def gdal_reader(path):
     ds = gdal.OpenEx(path, gdal.OF_MULTIDIM_RASTER)
     rg = ds.GetRootGroup()
 
+    def array(name):
+        # an array of a subgroup is named by its path (g/TEMP)
+        return rg.OpenMDArrayFromFullname("/" + name) if "/" in name else rg.OpenMDArray(name)
+
     def read(name, start, count):
-        return rg.OpenMDArray(name).ReadAsArray(array_start_idx=start, count=count)
+        return array(name).ReadAsArray(array_start_idx=start, count=count)
     read.group = rg
+    read.array = array
+    read.ds = ds
+    return read
+
+
+def plan_arrays(group, prefix=""):
+    """(name, <Array>) of every array of a VRT group and its subgroups, an
+    array of a subgroup by its path (g/TEMP)."""
+    for a in group.findall("Array"):
+        yield prefix + a.get("name"), a
+    for g in group.findall("Group"):
+        yield from plan_arrays(g, prefix + g.get("name") + "/")
+
+
+def is_char(r):
+    return r["dtype"].endswith("S1")
+
+
+def as_bytes(v):
+    """A char array (numpy S1) as its byte codes, so every reader compares."""
+    v = np.asarray(v)
+    return v.view("u1") if v.dtype.kind == "S" and v.dtype.itemsize == 1 else v
+
+
+def char_reader(plan):
+    """The oracle for char arrays (classic netCDF NC_CHAR), which GDAL's
+    netCDF driver reads as strings at rank 2 and its Zarr driver at any
+    rank: the variable's bytes as the source's header places them
+    (py/cdf.py), for arrays placed whole from one source."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import cdf
+    root = ET.parse(plan).getroot()
+    where = {}
+    for nm, arr in plan_arrays(root.find("Group")):
+        src = arr.findall("Source")
+        if len(src) == 1:
+            where[nm] = (src[0].findtext("SourceFilename"), src[0].findtext("SourceArray").lstrip("/"))
+    heads = {}
+
+    def read(name, start, count):
+        f, var = where[name]
+        if f not in heads:
+            heads[f] = cdf.read_header(f)
+        h = heads[f]
+        v = cdf.read_var(f, h["vars"][var], h["recsize"])
+        return v[tuple(slice(s, s + c) for s, c in zip(start, count))]
     return read
 
 
@@ -109,22 +162,25 @@ def windowed_vrt_reader(path, many=64):
             del fn.attrib["relativeToVRT"]
     group = root.find("Group")
     dims = {d.get("name"): int(d.get("size")) for d in group.findall("Dimension")}
-    arrays = {a.get("name"): a for a in group.findall("Array")}
+    arrays = dict(plan_arrays(group))
     tag = f"/vsimem/verify_{os.getpid()}_{abs(hash(path))}"
 
     # a sourceless copy for the attribute checks (scale, nodata)
     bare = ET.fromstring(ET.tostring(root))
-    for a in bare.find("Group").findall("Array"):
+    for a in bare.iter("Array"):
         for s in a.findall("Source"):
             a.remove(s)
     gdal.FileFromMemBuffer(tag + "_bare.vrt", ET.tostring(bare))
     header = gdal_reader(tag + "_bare.vrt")
+    whole = []  # the VRT opened once, for arrays read through it as is
 
     def read(name, start, count):
         arr = arrays[name]
         srcs = arr.findall("Source")
         if len(srcs) < many:
-            return gdal_reader(path)(name, start, count)
+            if not whole:
+                whole.append(gdal_reader(path))
+            return whole[0](name, start, count)
         shape = [dims[d.get("ref")] for d in arr.findall("DimensionRef")]
         drop = set()
         for i, src in enumerate(srcs):
@@ -143,6 +199,7 @@ def windowed_vrt_reader(path, many=64):
         finally:
             gdal.Unlink(tag + ".vrt")
     read.group = header.group
+    read.array = header.array
     return read
 
 
@@ -153,9 +210,12 @@ def uses_imagecodecs(doc):
 
 def kerchunk_py_reader(path):
     import fsspec
-    import imagecodecs.numcodecs
     import zarr
-    imagecodecs.numcodecs.register_codecs(verbose=False)
+    try:  # imagecodecs_delta (TIFF PREDICTOR=2), when an array needs it
+        import imagecodecs.numcodecs
+        imagecodecs.numcodecs.register_codecs(verbose=False)
+    except ImportError:
+        pass
     # asynchronous throughout, as zarr-python 3 stores expect: the reference
     # filesystem and its target (inferred from the first ref, https or a local
     # path) must agree, or fsspec refuses the pair
@@ -222,7 +282,15 @@ def icechunk_reader(repo):
                     raise
                 print(f"  icechunk: {str(e).splitlines()[0][:70]}; concurrency -> {4 if n is None else n // 2}")
                 time.sleep(1)
-    read.attrs = lambda name: dict(g[name].attrs)
+    def attrs(name):
+        # a float _FillValue is written as xarray reads it (base64 of the
+        # little-endian float64; py/render_icechunk.py): decoded to compare
+        at = dict(g[name].attrs)
+        fv = at.get("_FillValue")
+        if isinstance(fv, str) and np.dtype(g[name].dtype).kind == "f":
+            at["_FillValue"] = struct.unpack("<d", base64.standard_b64decode(fv))[0]
+        return at
+    read.attrs = attrs
     # the array's fill_value metadata, for arrays whose _FillValue attribute
     # is left out (a NaN fill; py/render_icechunk.py)
     read.fill = lambda name: g[name].metadata.fill_value
@@ -240,8 +308,11 @@ def default_windows(doc, flat, nsample):
             continue
         sh, ch = r["shape"], r["chunks"]
         out.append((r["array"], [0] * len(sh), [min(c, s) for c, s in zip(ch, sh)]))
-        start = [sh[0] - 1] + [s // 2 for s in sh[1:-1]] + [0]
-        out.append((r["array"], start, [1] * (len(sh) - 1) + [sh[-1]]))
+        if len(sh) == 1:  # the whole of a 1D array
+            out.append((r["array"], [0], [sh[0]]))
+        else:
+            start = [sh[0] - 1] + [s // 2 for s in sh[1:-1]] + [0]
+            out.append((r["array"], start, [1] * (len(sh) - 1) + [sh[-1]]))
         t = pq.read_table(os.path.join(flat, f"refs_{r['array']}.parquet"),
                           columns=[f"dim_{i}" for i in range(len(sh))] + ["present"]).to_pandas()
         picks = []
@@ -256,8 +327,11 @@ def default_windows(doc, flat, nsample):
     return out
 
 
-def absent_chunks(doc, flat):
-    """Per array, the set of chunk index tuples the table marks absent."""
+def absent_chunks(doc, flat, max_grid=5_000_000):
+    """Per array, the set of chunk index tuples the table marks absent, and
+    those it has no row for (a source that lacks the array places nothing
+    there: py/plan_concat.py) where the grid has at most `max_grid` chunks."""
+    import itertools
     import pyarrow.parquet as pq
     out = {}
     for r in doc["arrays"]:
@@ -267,6 +341,10 @@ def absent_chunks(doc, flat):
         t = pq.read_table(os.path.join(flat, f"refs_{r['array']}.parquet"),
                           columns=cols + ["present"]).to_pandas()
         out[r["array"]] = set(map(tuple, t.loc[t.present == 0, cols].to_numpy().tolist()))
+        counts = [math.ceil(s / c) for s, c in zip(r["shape"], r["chunks"])]
+        if len(t) < math.prod(counts) <= max_grid:
+            have = set(map(tuple, t[cols].to_numpy().tolist()))
+            out[r["array"]].update(ix for ix in itertools.product(*map(range, counts)) if ix not in have)
     return out
 
 
@@ -276,11 +354,16 @@ def touches_absent(absent, chunks, start, count):
     return any(all(l <= i <= h for i, l, h in zip(ix, lo, hi)) for ix in absent)
 
 
+@functools.lru_cache(maxsize=4)
+def plan_index(plan):
+    """{array name (a subgroup's by path): <Array>} of a plan, parsed once."""
+    return dict(plan_arrays(ET.parse(plan).getroot().find("Group")))
+
+
 def source_scale(plan, name):
     """scale_factor of NAME in the first source listed beside the plan, or for
     a raster band source (GeoTIFF) in the first source the plan gives NAME."""
-    arr = next(x for x in ET.parse(plan).getroot().find("Group").findall("Array")
-               if x.get("name") == name)
+    arr = plan_index(plan)[name]
     src = arr.find("Source")
     if src is not None and src.find("SourceBand") is not None:
         ds = gdal.Open(src.find("SourceFilename").text)
@@ -294,7 +377,9 @@ def source_scale(plan, name):
         src = fn if fn.startswith("/") or "://" in fn else os.path.join(base, fn)
     else:
         src = open(os.path.join(base, "sources.txt")).readline().strip()
-    m = gdal.OpenEx(src, gdal.OF_MULTIDIM_RASTER).GetRootGroup().OpenMDArray(name)
+    # the array's name in its source (a subgroup's g/TEMP is TEMP there)
+    sa = arr.findtext("Source/SourceArray")
+    m = gdal.OpenEx(src, gdal.OF_MULTIDIM_RASTER).GetRootGroup().OpenMDArray(sa.lstrip("/") if sa else name)
     if m.GetScale() is not None:
         return m.GetScale()
     try:
@@ -323,9 +408,21 @@ def main():
     p.add_argument("--skip", action="append", default=[], help="reader to skip")
     p.add_argument("--sample", type=int, default=4, help="random chunks per array")
     p.add_argument("--published", help="read the forms from this /vsis3/ copy of OUT_DIR")
+    p.add_argument("--groups", type=int, default=8,
+                   help="for a store of subgroups (g/TEMP): check the arrays of this many "
+                        "groups, the first, the last and the rest at random (0: all)")
     a = p.parse_args()
 
     doc = json.load(open(os.path.join(a.out, "flat", "arrays.json")))
+    groups = sorted({r["array"].rsplit("/", 1)[0] for r in doc["arrays"] if "/" in r["array"]})
+    if groups and a.groups and len(groups) > a.groups:
+        rng = np.random.default_rng(42)
+        mid = groups[1:-1]
+        keep = {groups[0], groups[-1]} | set(rng.choice(mid, a.groups - 2, replace=False).tolist())
+        doc = dict(doc, arrays=[r for r in doc["arrays"] if "/" not in r["array"]
+                                or r["array"].rsplit("/", 1)[0] in keep])
+        print(f"groups: checking {len(keep)} of {len(groups)} ({', '.join(sorted(keep))})")
+    char = {r["array"] for r in doc["arrays"] if is_char(r)}
     windows = default_windows(doc, os.path.join(a.out, "flat"), a.sample) if not a.window else [
         (w.split(":")[0], [int(x) for x in w.split(":")[1].split(",")],
          [int(x) for x in w.split(":")[2].split(",")]) for w in a.window]
@@ -336,8 +433,10 @@ def main():
                "kerchunk": lambda: gdal_reader('ZARR:"/vsikerchunk_parquet_ref/{' + base + '/kerchunk}"'),
                "icechunk": lambda: icechunk_reader(base + "/icechunk")}
     predictor = uses_imagecodecs(doc)
-    if predictor and not a.published:
+    if (predictor or char) and not a.published:
         readers["kerchunk-py"] = lambda: kerchunk_py_reader(base + "/kerchunk")
+    if char:
+        readers["bytes"] = lambda: char_reader(a.plan)
     if a.published:
         print("reading vrt, kerchunk, icechunk from", base)
     opened = {}
@@ -357,20 +456,30 @@ def main():
     for name, start, count in windows:
         res = {}
         for k, read in opened.items():
+            if (k == "bytes") != (name in char) and k in ("bytes", "plan") or \
+                    (k == "kerchunk-py" and name not in char and not predictor):
+                continue  # char arrays: the bytes oracle; others: GDAL on the plan
             t0 = time.time()
             try:
-                v = np.asarray(read(name, start, count))
+                v = as_bytes(read(name, start, count))
                 res[k] = (hashlib.sha256(np.ascontiguousarray(v).astype(v.dtype.newbyteorder("<")).tobytes())
                           .hexdigest()[:16], v.dtype.str, time.time() - t0, v)
             except Exception as e:
                 res[k] = (f"ERROR {e}"[:60], "", time.time() - t0, None)
                 errors.append(f"{k} {name} {start} {count}: {e}")
-        ref = res.get("plan")
+        oracle = "bytes" if name in char else "plan"
+        ref = res.get(oracle)
         print(f"\n{name} start={start} count={count}")
         for k, (h, dt, sec, v) in res.items():
             same = ref is not None and v is not None and ref[3] is not None and \
                 v.shape == ref[3].shape and np.array_equal(v.astype("f8"), ref[3].astype("f8"), equal_nan=True)
-            flag = "oracle" if k == "plan" else ("SAME" if same else "DIFFERENT")
+            flag = "oracle" if k == oracle else ("SAME" if same else "DIFFERENT")
+            if name in char and v is None and k in ("plan", "vrt", "kerchunk"):
+                # GDAL reads a 2D char variable (netCDF) and any char array
+                # (Zarr) as strings; the VRT leaves 2D ones out
+                flag = "n/a (GDAL reads char as strings)"
+                pre = f"{k} {name} {start} {count}:"
+                errors[:] = [e for e in errors if not e.startswith(pre)]
             if k == "kerchunk" and v is None and predictor:
                 # imagecodecs_delta (TIFF PREDICTOR=2) is not a GDAL Zarr filter
                 flag = "KNOWN GDAL LIMIT (imagecodecs filter)"
@@ -388,9 +497,9 @@ def main():
     if "plan" in opened:
         print("\nscale_factor and fill (GDAL on the plan vs the store and each form)")
         for r in doc["arrays"]:
-            if r["storage"] != "referenced":
+            if r["storage"] != "referenced" or is_char(r):
                 continue
-            g = opened["plan"].group.OpenMDArray(r["array"])
+            g = opened["plan"].array(r["array"])
             sf = g.GetScale()
             if sf is None:
                 # The HDF5 driver does not lift scale_factor to GetScale (the
@@ -404,9 +513,11 @@ def main():
             for k, rd in opened.items():
                 if k == "plan":
                     continue
+                if k == "bytes":
+                    continue
                 if hasattr(rd, "group"):
                     try:
-                        m = rd.group.OpenMDArray(r["array"])
+                        m = rd.array(r["array"])
                     except RuntimeError as e:
                         print(f"    {k:11s} cannot open: {e}")
                         continue
