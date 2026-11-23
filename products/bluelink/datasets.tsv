@@ -9,15 +9,19 @@
 # in place at any time); upstream_cadence, how often the publisher adds
 # files; bytes_owner, project (COGs the project writes) or publisher;
 # bytes_at, where the referenced files are. Build parameters (corpus
-# source, hold-back) stay in the dataset config.
-dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at
-bluelink-daily-temp	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=temp	Potential temperature, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
-bluelink-daily-salt	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=salt	Salinity, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
-bluelink-daily-eta_t	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=eta_t	Sea surface height, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
-bluelink-daily-mld	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=mld	Mixed layer depth, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
-bluelink-daily-u	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=u	Zonal velocity, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
-bluelink-daily-v	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=v	Meridional velocity, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
-bluelink-daily-w	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=w,BLUELINK_FIRST=1998	Vertical velocity (from 1998), daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
-bluelink-daily-tx_trans_int_z	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=tx_trans_int_z	Depth-integrated zonal mass transport, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
-bluelink-daily-ty_trans_int_z	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=ty_trans_int_z	Depth-integrated meridional mass transport, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
-# bluelink-month-temp	config/bluelink.sh	BLUELINK_FREQ=month,BRAN_VAR=temp	Potential temperature, monthly	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/
+# source, hold-back) stay in the dataset config. owner is research (the
+# research team builds and publishes the store), production (the production
+# team does, from its product repo), or designated (research today, decided on
+# 2026-11-22 to move to production once the store passes the four criteria:
+# metadata declared, codecs read everywhere, shape settled, backlog frozen).
+dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at	owner
+bluelink-daily-temp	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=temp	Potential temperature, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
+bluelink-daily-salt	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=salt	Salinity, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
+bluelink-daily-eta_t	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=eta_t	Sea surface height, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
+bluelink-daily-mld	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=mld	Mixed layer depth, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
+bluelink-daily-u	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=u	Zonal velocity, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
+bluelink-daily-v	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=v	Meridional velocity, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
+bluelink-daily-w	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=w,BLUELINK_FIRST=1998	Vertical velocity (from 1998), daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
+bluelink-daily-tx_trans_int_z	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=tx_trans_int_z	Depth-integrated zonal mass transport, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
+bluelink-daily-ty_trans_int_z	config/bluelink.sh	BLUELINK_FREQ=daily,BRAN_VAR=ty_trans_int_z	Depth-integrated meridional mass transport, daily	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
+# bluelink-month-temp	config/bluelink.sh	BLUELINK_FREQ=month,BRAN_VAR=temp	Potential temperature, monthly	append	monthly files, extended irregularly	publisher	https://thredds.nci.org.au/thredds/fileServer/gb6/BRAN/	research
