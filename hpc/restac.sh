@@ -43,7 +43,7 @@ if [ "${ROOT_README:-0}" = 1 ]; then
   cat > work/restac-readme.sh <<INNER
 set -euo pipefail
 DATASET=; PRODUCT_GROUP=; source config/source-coop.sh
-python py/s3_sync.py work/$GROUP/catalog/README.md "\$PUBLISH_ROOT/README.md"
+"\$(command -v python || command -v python3)" py/s3_sync.py work/$GROUP/catalog/README.md "\$PUBLISH_ROOT/README.md"
 INNER
   $RUNNER work/restac-readme.sh
 fi

@@ -49,7 +49,8 @@ REV=$(git -c safe.directory="$HERE" -C "$HERE" describe --always --dirty 2>/dev/
 REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#")
 export E2E_GENERATOR="${E2E_REPO:-${REPO:-local}} $REV" E2E_CONFIG="${CONFIGS[*]}"
 STEPS=${*:-${DEFAULT_STEPS:-plan harvest collate render icechunk grist stac verify}}
-PYTHON=${PYTHON:-python}; RSCRIPT=${RSCRIPT:-Rscript}; GDAL=${GDAL:-gdal}
+# python, or python3 where there is no python (the image has python only)
+PYTHON=${PYTHON:-$(command -v python || command -v python3 || echo python)}; RSCRIPT=${RSCRIPT:-Rscript}; GDAL=${GDAL:-gdal}
 WORK=${E2E_WORK:-$HERE/work/$DATASET}
 mkdir -p "$WORK"
 R_LIB=${R_LIB:-$HERE/r-lib}

@@ -181,7 +181,7 @@ Harvest is restartable: a source whose fragments exist is skipped.
 | `GRIST_VERIFY_BOUNDARIES` | source changes checked per array and level by `py/verify_grist.py` (default 8, plus every change of source directory; `all` for every one) |
 | `GRIST_VERIFY_WINDOW` | side of the window `py/verify_grist.py` reads from each checked field (default 0, the whole field; 2048 in `config/ghrsst-cog.sh`) |
 | `S3_SYNC_ARGS` | extra `py/s3_sync.py` options for an obstore publish, e.g. `--skip-same-size` to resume after an expired token |
-| `PYTHON`, `RSCRIPT`, `GDAL` | executables |
+| `PYTHON`, `RSCRIPT`, `GDAL` | executables (`PYTHON` defaults to `python`, or `python3` where there is no `python`) |
 | `R_LIB` | R library used ahead of the system one (default `./r-lib`) |
 | `PUBLISH`, `AADC_PREFIX` | publish prefix (`/vsis3/...`), set by a publish config |
 | `SOURCECOOP_REPO`, `SOURCECOOP_PREFIX`, `SOURCECOOP_PRODUCTION` | source.coop publish target (`config/source-coop.sh`) |
