@@ -10,7 +10,8 @@
 # Every leading *.sh argument is sourced, in order (dataset, then a publish
 # target). Steps: deps plan harvest collate render icechunk grist stac verify, and
 # prepare publish publish-stac verify-published stale (not run by default).
-# stale compares the build record (sources.meta.tsv) with the listing corpus.
+# stale compares the build record (sources.meta.tsv) with the listing corpus
+# (or the config's stale_check, for a source the corpus does not list).
 # verify records a pass in out/verify.json (py/verify_record.py); publish
 # refuses without one for the store as it is, and any step that changes the
 # store or a verified form removes it.
@@ -225,8 +226,13 @@ for s in $STEPS; do
       # source files that changed or went away since the build, against the
       # listing corpus now (py/stale.py); STALE_ARGS e.g. --warn
       [ -f "$WORK/sources.meta.tsv" ] || { echo "stale: no $WORK/sources.meta.tsv (a config whose lister writes no build record)"; exit 1; }
-      step stale "$PYTHON" "$HERE/py/stale.py" --meta "$WORK/sources.meta.tsv" \
-        --out "$WORK/stale.tsv" ${STALE_ARGS:-} ;;
+      # a config whose sources are not in the corpus (its own lister, such
+      # as GHRSST from ghrsst-cogger's bucket) defines stale_check instead
+      if declare -F stale_check > /dev/null; then step stale stale_check
+      else
+        step stale "$PYTHON" "$HERE/py/stale.py" --meta "$WORK/sources.meta.tsv" \
+          --out "$WORK/stale.tsv" ${STALE_ARGS:-}
+      fi ;;
     *) echo "unknown step $s"; exit 1 ;;
   esac
 done

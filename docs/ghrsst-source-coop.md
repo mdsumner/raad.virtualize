@@ -177,15 +177,17 @@ python py/sourcecoop_check.py ausantarctic/ausantarctic-scratch
 
 On a docker host (the Nectar VM), `hpc/vm/docker-run.sh` runs `run.sh` and
 `catalog.sh` in the `gdal-r-python-extras` image and installs obstore,
-imagecodecs and fastparquet into the container. The file list is source
-`ausantarctic-ghrsst-mur-v2` of the aad-filelist listing corpus, so a
-rebuild picks up every day cogger had written when the corpus last ran,
-less the hold-back (`GHRSST_HOLD_BACK`, default 17 days): cogger rewrites a
-day's COGs at the same key about 5 days after the date and MUR revises a
-day for up to 16 days, so a store built from newer days points at bytes
-that later move (the 3 Nov 2026 build had 7 such days; kerchunk and
-Icechunk failed on them, the VRT did not). The build writes
-`sources.meta.tsv` beside `plan.vrt`, published with the store, and
+imagecodecs and fastparquet into the container. The file list is
+ghrsst-cogger's own output (`py/ghrsst_sources.py`: a listing of the bucket
+and each recent day's STAC item), not the aad-filelist corpus, since cogger
+makes this dataset on its own schedule. A day is indexed once its STAC item
+says `ghrsst:status` final and cogger has not written its COG for
+`GHRSST_QUIET_DAYS` (default 3); later days are held back with it. Cogger
+first writes a day from the interim MUR file and rewrites the same keys
+from the final one a few days later, so a store built from the interim
+bytes points at bytes that later move (the 3 Nov 2026 build had 7 such
+days; kerchunk and Icechunk failed on them, the VRT did not). The build
+writes `sources.meta.tsv` beside `plan.vrt`, published with the store, and
 `run.sh ... stale` reports any indexed COG that changed since.
 
 The plan step lists the days with no COG and stops when there are more
