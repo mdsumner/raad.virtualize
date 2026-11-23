@@ -34,6 +34,13 @@ record a later staleness check compares against the corpus `changes`.
   --meta FILE  write the build record (write_meta): one row per selected
                file, with what the corpus knew of it; py/stale.py compares
                it with the corpus later
+  --hold-back DAYS
+               leave out files dated less than DAYS days before the listing
+               was taken (the latest last_seen in the listing, else today,
+               UTC): for sources rewritten at the same URL for some days
+               after first publication, so a store never references bytes
+               that will still change. Needs an 8-digit (YYYYMMDD) --date
+               capture; the cut goes to stderr. 0 (default) keeps all
 
 Usage:
   python corpus.py --source cdr_sic_G02202_V6 \
@@ -43,6 +50,7 @@ Usage:
 import argparse
 import collections
 import csv
+import datetime
 import io
 import os
 import re
@@ -53,7 +61,7 @@ import urllib.request
 import pyarrow.parquet as pq
 
 CORPUS = "https://github.com/mdsumner/aad-filelist/releases/download/corpus"
-COLS = ["url", "size", "mtime", "etag", "last_changed"]
+COLS = ["url", "size", "mtime", "etag", "last_changed", "last_seen"]
 
 
 def _is_url(s):
@@ -136,6 +144,23 @@ def _fmt(v):
     return str(v)
 
 
+def hold_back_cut(rows, days):
+    """The last file date (YYYYMMDD) kept by a hold-back of `days`: the
+    listing time (latest last_seen, else now, UTC) less `days`; "" for 0."""
+    if not days:
+        return ""
+    seen = [r.get("last_seen") for r in rows if r.get("last_seen")]
+    when = None
+    if seen:
+        try:
+            when = datetime.datetime.strptime(max(seen)[:8], "%Y%m%d")
+        except ValueError:
+            when = None
+    if when is None:
+        when = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    return (when - datetime.timedelta(days=days)).strftime("%Y%m%d")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--source", default="")
@@ -149,13 +174,17 @@ def main():
     ap.add_argument("--prefix", nargs=2, metavar=("OLD", "NEW"))
     ap.add_argument("--exists", action="store_true")
     ap.add_argument("--meta", default="")
+    ap.add_argument("--hold-back", type=int, default=0)
     a = ap.parse_args()
 
     loc = listing_location(a)
     pats = [re.compile(m) for m in a.match]
     date = re.compile(a.date)
+    rows = read_listing(loc, a.cache)
+    held = hold_back_cut(rows, a.hold_back)
     out = []
-    for row in read_listing(loc, a.cache):
+    nheld = 0
+    for row in rows:
         u = row["url"]
         if not u or not all(p.search(u) for p in pats):
             continue
@@ -165,10 +194,19 @@ def main():
         d = m.group(1)
         if (a.first and d < a.first) or (a.last and d > a.last):
             continue
+        if held:
+            if not re.fullmatch(r"[0-9]{8}", d):
+                sys.exit(f"corpus: --hold-back needs a YYYYMMDD --date capture, got {d!r}")
+            if d > held:
+                nheld += 1
+                continue
         s = u
         if a.prefix and s.startswith(a.prefix[0]):
             s = a.prefix[1] + s[len(a.prefix[0]):]
         out.append((d, s, row))
+    if held:
+        sys.stderr.write(f"corpus: hold-back {a.hold_back} days: last date kept {held}, "
+                         f"{nheld} newer files left out\n")
     if a.exists:
         n = len(out)
         out = [x for x in out if os.path.isfile(x[1])]
