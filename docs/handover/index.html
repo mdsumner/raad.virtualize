@@ -147,14 +147,51 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <div class="wrap">
 
 <header style="display:flex;flex-direction:column;gap:14px">
-  <div class="eyebrow">Australian Antarctic Division &middot; source.coop ausantarctic &middot; handover 2026-11-06</div>
+  <div class="eyebrow">Australian Antarctic Division &middot; source.coop ausantarctic &middot; handover 2026-11-06, brief 2026-11-23</div>
   <h1>Production handover</h1>
-  <p class="lede">We index Southern Ocean and Antarctic array data and publish them in cloud-readable form on source.coop. This page shows how the pieces sit now, the proposed production shape, and what is open. Anything marked <span class="chip prop">proposal</span> is not done.</p>
+  <p class="lede">The research team indexes Southern Ocean and Antarctic array data and publishes it in cloud-readable form on source.coop. This page opens with the brief of 2026-11-23: which products production can take first, what is in place for them, and what to weigh. Then it shows how the pieces sit, the proposed production shape, and what is open. Anything marked <span class="chip prop">proposal</span> is not done.</p>
   <div class="links">
     <span class="muted">Project site:</span>
     <a href="../">Overview</a><a href="../published.html">Datasets</a><a href="../how-it-works.html">How it works</a><a href="../readers.html">Readers</a>
   </div>
 </header>
+
+<section id="brief-2026-11-23">
+  <div class="eyebrow">Brief, 2026-11-23</div>
+  <h2>First products for production</h2>
+  <p>Ownership is decided product by product (2026-11-22). Three products are ready for production to consider first. Everything else stays with the research team for now. This brief sets priorities and considerations; how and when to run each product is production's call.</p>
+  <div class="repos">
+    <div class="repo"><div class="role">fixed releases</div><h3>IBCSO</h3>
+      <dl><dt>product</dt><dd><code>ausantarctic/ibcso</code>: v1, v2 and the archived annual releases, one store per release</dd>
+      <dt>repo</dt><dd><a href="https://github.com/AustralianAntarcticDivision/ibcso">AustralianAntarcticDivision/ibcso</a> holds the v1, background and chart byte makers. <code>config/ibcso.sh</code>, <code>py/ibcso_cog.py</code>, <code>products/ibcso/</code> and <code>hpc/vm/ibcso-publish.sh</code> are still in raad.virtualize.</dd>
+      <dt>open</dt><dd class="change">No CRS in the index (every store; see below). <code>ibcso/virtual/ibcso-v1/</code> is published but not catalogued. No rebuild since 2026-11-03, so no <code>verify.json</code>.</dd></dl></div>
+    <div class="repo"><div class="role">fixed release</div><h3>Bedmap3</h3>
+      <dl><dt>product</dt><dd><code>ausantarctic/bedmap</code>: one store of seven grids at 500 m</dd>
+      <dt>repo</dt><dd>None yet. The COG script (<code>py/bedmap3_cog.py</code>), config and product files are in raad.virtualize.</dd>
+      <dt>open</dt><dd class="change">As IBCSO: no CRS in the index, no product repo, and no rebuild since 2026-11-03.</dd></dl></div>
+    <div class="repo"><div class="role">daily, at production's discretion</div><h3>GHRSST MUR</h3>
+      <dl><dt>product</dt><dd>Bytes: <code>ausantarctic/ghrsst-mur-v2</code>, from ghrsst-cogger, already in production. Index: scratch <code>ghrsst/</code>.</dd>
+      <dt>today</dt><dd>Rebuilt 2026-11-23 (8,934 days to 2026-11-15, 0 stale, <code>verify.json</code> published). It lists cogger's own output and indexes a day once its STAC item says <code>ghrsst:status: final</code> and cogger has not written it for 3 days.</dd>
+      <dt>open</dt><dd class="change">Owning the index establishes the emitted projection indexes beside cogger's VRT and Parquet. The index has 1 of 5 variables (the production VRT has 5). Placement beside the bytes (<code>ghrsst-mur-v2/virtual/</code>) is undecided. GDAL's Zarr readers do not read the TIFF predictor codec.</dd></dl></div>
+  </div>
+  <h3>What is in place</h3>
+  <ul class="qs">
+    <li><strong>Engine tag.</strong> raad.virtualize <code>v0.1.0</code>, the version a product repo pins. Its <a href="https://github.com/mdsumner/raad.virtualize/releases">release notes</a> state the byte-reference table, the published layout, the catalog columns, the config interface and the runtime image by digest.</li>
+    <li><strong>Publish gate.</strong> <code>verify</code> writes <code>verify.json</code>, which is published with the store, and <code>publish</code> refuses without a pass that matches the store as built. A failed verify blocks a publish run on its own, and no override exists.</li>
+    <li><strong>Freshness.</strong> The <a href="../published.html#freshness">Datasets page</a> gives each store's owner, update model, upstream cadence and where its bytes are. It also shows how far each store is behind its sources and its stale files, from a table bowerbird-byterefs computes weekly.</li>
+    <li><strong>Build records.</strong> A config can write <code>sources.meta.tsv</code>, which the <code>stale</code> step compares with a listing. The aad-filelist corpus is a resource a product repo can start from, not a required input. A product whose bytes the project makes can take its signal from its own byte maker, as GHRSST does from cogger. When a store counts as stale is production's decision.</li>
+  </ul>
+  <h3>Considerations</h3>
+  <ul class="qs">
+    <li><strong>Keys are immutable to a byte reference.</strong> A COG rewritten at the same key invalidates every reference into it: cogger's preliminary-to-final rewrite, a re-encode, a correction. Write each key once, or index only what is final.</li>
+    <li><strong>CRS in the index, not only in the bytes.</strong> No published index declares a CRS: there is no <code>&lt;SRS&gt;</code> and no <code>grid_mapping</code>, and the COGs carry theirs. The fix is one re-render, after spec decision 0015 (<code>srs</code> per array) is written.</li>
+    <li><strong>Encoding sets the readers.</strong> zstd or DEFLATE without filters reads everywhere. TIFF <code>PREDICTOR=2</code> and netCDF <code>shuffle</code> are not yet read by GDAL's Zarr readers. Readers of the kerchunk forms through fsspec pass <code>remote_protocol="https"</code>.</li>
+    <li><strong>URLs are embedded.</strong> grist <code>dsn</code>, STAC hrefs and Icechunk virtual chunk containers name the store's location, so a move rewrites them. Leave pointers behind.</li>
+    <li><strong>source.coop.</strong> Production writes need cloud-team Lambda authorization. Temporary keys last an hour and cannot delete, and re-uploads leave Icechunk objects only the dashboard removes.</li>
+  </ul>
+  <h3>Not for production yet</h3>
+  <p>Bluelink and ACCESS-ESM1.6 stay with the research team, with production help. So do the publisher-bytes stores (OISST, G02202, AMSR2, ESA CCI ocean colour) and IMOS MEOP. GEBCO is designated for production, but first needs decisions on which grids and releases to carry and on one COG encoding (<a href="https://github.com/AustralianAntarcticDivision/gebco/issues/2">gebco#2</a>, <a href="https://github.com/AustralianAntarcticDivision/gebco/issues/4">gebco#4</a>).</p>
+</section>
 
 <section id="picture">
   <div class="eyebrow">Now</div>
@@ -220,11 +257,11 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
         <text x="1006" y="68" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--scr)">NOT PERMANENT</text>
         <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--ink)">
           <text x="814" y="90">ausantarctic-scratch/</text>
-          <text x="826" y="108">bluelink/  ghrsst/</text>
-          <text x="826" y="126">oisst/  seaice/</text>
-          <text x="826" y="144">oceancolour/</text>
+          <text x="826" y="108">bluelink/  ghrsst/  oisst/</text>
+          <text x="826" y="126">seaice/  oceancolour/</text>
+          <text x="826" y="144">access-esm/  imos-tracking/</text>
         </g>
-        <text x="814" y="164" fill="var(--scr)">20 datasets, drafts</text>
+        <text x="814" y="164" fill="var(--scr)">23 datasets, drafts</text>
         <rect x="800" y="194" width="220" height="100" rx="5" fill="var(--surface)" stroke="var(--rule)"/>
         <text x="814" y="218" font-weight="700" fill="var(--ink)">production</text>
         <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--ink)">
@@ -301,7 +338,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
   <p>Bytes, file lists and readers are shared. Build and index split into two lanes with a gate between them. The research team owns the lane above the gate, including cleaning up the Nectar, NCI, Pawsey and scratch side. The production team owns the lane below it and sets what a dataset must meet to cross.</p>
   <figure>
     <div class="scroll">
-    <svg class="svg-wide" viewBox="0 0 1040 606" role="img" aria-label="Proposal: bytes and the aad-filelist corpus feed two byte harvest lanes. The research lane builds on Nectar, Gadi or Setonix and publishes unlisted scratch drafts. A production-ready gate, with requirements set by production, separates it from the production lane: a per-product repo and scheduled runner publishing production indexes and collecting tables in central refs, whose stale check compares against the latest listing. Readers read both.">
+    <svg class="svg-wide" viewBox="0 0 1040 606" role="img" aria-label="Proposal: bytes, with the aad-filelist corpus as a resource, feed two byte harvest lanes. The research lane builds on Nectar, Gadi or Setonix and publishes unlisted scratch drafts. A production-ready gate, with requirements set by production, separates it from the production lane: a per-product repo and scheduled runner publishing production indexes and collecting tables in central refs, whose stale check compares against the latest listing. Readers read both.">
       <defs>
         <marker id="bho" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ours)"/></marker>
         <marker id="bhm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker>
@@ -337,8 +374,8 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
         <text x="244" y="126" fill="var(--ink)">every run kept</text>
         <text x="244" y="152" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">current__&lt;id&gt;</text>
         <text x="244" y="168" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">.parquet</text>
-        <text x="244" y="196" fill="var(--muted)">one input for</text>
-        <text x="244" y="214" fill="var(--muted)">both lanes</text>
+        <text x="244" y="196" fill="var(--muted)">a resource</text>
+        <text x="244" y="214" fill="var(--muted)">to lean on</text>
         <!-- lane A -->
         <rect x="410" y="44" width="440" height="192" rx="6" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/>
         <text x="840" y="62" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">RESEARCH: RESEARCH TEAM</text>
@@ -359,8 +396,8 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
         <!-- gate -->
         <rect x="410" y="246" width="440" height="58" rx="5" fill="var(--prop-soft)" stroke="var(--prop)" stroke-dasharray="5 3"/>
         <text x="540" y="264" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="500" fill="var(--prop)">PRODUCTION-READY GATE, SET BY PRODUCTION</text>
-        <text x="540" y="282" font-size="12" fill="var(--ink)">config in a product repo, file list from corpus,</text>
-        <text x="540" y="298" font-size="12" fill="var(--ink)">build record, verify passes, byte layout rule</text>
+        <text x="540" y="282" font-size="12" fill="var(--ink)">four criteria: metadata, codecs, shape, backlog;</text>
+        <text x="540" y="298" font-size="12" fill="var(--ink)">product repo, verify.json, byte layout rule</text>
         <!-- lane B -->
         <rect x="410" y="310" width="440" height="192" rx="6" fill="none" stroke="var(--ink)" stroke-width="1.4"/>
         <text x="840" y="328" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink)">PRODUCTION: PRODUCTION TEAM</text>
@@ -399,7 +436,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
         <path d="M470 222 V342" stroke="var(--prop)" stroke-width="2" marker-end="url(#bhp)"/>
         <text x="478" y="280" fill="var(--prop)" stroke="none" font-weight="700">promote</text>
         <path d="M740 488 V528 H310 V502" stroke="var(--prop)" stroke-dasharray="5 3" marker-end="url(#bhp)"/>
-        <text x="324" y="544" fill="var(--prop)" stroke="none">stale check: compare tables with the latest listing, rebuild what changed</text>
+        <text x="324" y="544" fill="var(--prop)" stroke="none">stale: production decides, from a listing or the byte maker's own signal</text>
       </g>
       <!-- key -->
       <g font-family="Source Sans 3, sans-serif" font-size="12">
@@ -427,14 +464,15 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="gate-ibcso">
   <div class="eyebrow">Proposed gate, one dataset</div>
   <h2>IBCSO v2 against the gate</h2>
-  <p>The gate items applied to one production pilot, with the file or check behind each. One item passes, one is partial and three are gaps; the gaps and the partial item are the work for its first rebuild through the gate.</p>
+  <p>The gate items applied to one production pilot, with the file or check behind each, as of 2026-11-23. One item passes, one is partial and four are gaps. The gaps and the partial item are the work for its first rebuild through the gate.</p>
   <div class="tbl"><table>
     <thead><tr><th>Gate item</th><th>IBCSO v2 today</th><th></th></tr></thead>
     <tbody>
       <tr><td>Config in a product repo</td><td>Config <a href="https://github.com/mdsumner/raad.virtualize/blob/main/config/ibcso.sh"><code>config/ibcso.sh</code></a> and product files <a href="https://github.com/mdsumner/raad.virtualize/blob/main/products/ibcso"><code>products/ibcso/</code></a> live in raad.virtualize, not in a product repo.</td><td><span class="chip gap">gap</span></td></tr>
-      <tr><td>File list from corpus</td><td>The build lists its own local COG directory (<code>sources()</code> in the config). The corpus lists the published COGs, but this build does not read it.</td><td><span class="chip gap">gap</span></td></tr>
-      <tr><td>Build record</td><td>No <code>sources.meta.tsv</code>, so <a href="https://github.com/mdsumner/raad.virtualize/blob/main/py/stale.py"><code>py/stale.py</code></a> has nothing to compare. The store records the repo commit and config used (<a href="https://github.com/mdsumner/raad.virtualize/blob/main/R/collate.R"><code>R/collate.R</code></a>), not which file versions it read. Only the OISST, G02202 and AMSR2 configs write a build record today.</td><td><span class="chip gap">gap</span></td></tr>
-      <tr><td>Verify passes</td><td><code>verify</code> and <code>verify-published</code> run in <a href="https://github.com/mdsumner/raad.virtualize/blob/main/hpc/vm/ibcso-publish.sh"><code>hpc/vm/ibcso-publish.sh</code></a>, which stops at the first failure. The log stays on the VM (<code>work/ibcso-v2/log.txt</code>); nothing published records the result, so production cannot audit it. Recording the outcome in the build record closes this.</td><td><span class="chip partial">partial</span></td></tr>
+      <tr><td>File list and staleness signal</td><td>The build lists its own local COG directory (<code>sources()</code> in the config). Which signal tells production that a store needs a rebuild is production's choice. The aad-filelist corpus lists the published COGs and is one option.</td><td><span class="chip gap">gap</span></td></tr>
+      <tr><td>Build record</td><td>No <code>sources.meta.tsv</code>, so <a href="https://github.com/mdsumner/raad.virtualize/blob/main/py/stale.py"><code>py/stale.py</code></a> has nothing to compare. The store records the repo commit and config used (<a href="https://github.com/mdsumner/raad.virtualize/blob/main/R/collate.R"><code>R/collate.R</code></a>), not which file versions it read. The OISST, G02202, AMSR2, GHRSST, ACCESS-ESM1.6 and IMOS MEOP configs write one today.</td><td><span class="chip gap">gap</span></td></tr>
+      <tr><td>Verify passes</td><td>From v0.1.0, <code>verify</code> writes <code>verify.json</code>, published with the store, and <code>publish</code> refuses without a matching pass (raad.virtualize#103). IBCSO v2 was published on 2026-11-03, before the gate, and its log stays on the VM. The next rebuild publishes the record.</td><td><span class="chip partial">partial</span></td></tr>
+      <tr><td>CRS declared in the index</td><td>The COGs carry EPSG:9354. The <code>mdim.vrt</code> has no <code>&lt;SRS&gt;</code>, and the Zarr forms have no <code>grid_mapping</code> or <code>proj:</code> attribute.</td><td><span class="chip gap">gap</span></td></tr>
       <tr><td>Byte layout rule</td><td>COGs at <code>ibcso/v2/cog/</code>, the candidate rule itself.</td><td><span class="chip pass">pass</span></td></tr>
     </tbody>
   </table></div>
@@ -443,7 +481,7 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
     <li><a href="https://github.com/mdsumner/raad.virtualize/blob/main/py/verify.py"><code>verify</code></a> reads the same windows through every rendered form (multidim VRT, kerchunk Parquet through GDAL and, for TIFF predictors, fsspec and zarr, and Icechunk) and compares them with GDAL reading the source files through <code>plan.vrt</code>. Windows per array: the first chunk, one row across every chunk of the last dimension, four random present chunks and one absent chunk. It also checks scale factor and fill value against the sources, and that pyarrow and fastparquet read the same kerchunk paths.</li>
     <li><code>verify-published</code> runs the same check on the published copy, read anonymously from source.coop, as a public reader would.</li>
     <li><a href="https://github.com/mdsumner/raad.virtualize/blob/main/py/verify_grist.py"><code>verify_grist.py</code></a> checks grist catalog rows against their source fields, for datasets with a date axis; IBCSO has no grist catalog.</li>
-    <li>A failure is any value that differs (raw values, no tolerance; NaN equals NaN), a wrong scale factor or fill value, or a read error. The script exits 1 and <code>run.sh</code> stops before the next step, so nothing later in that run is published.</li>
+    <li>A failure is any value that differs (raw values, no tolerance; NaN equals NaN), a wrong scale factor or fill value, or a read error. The script exits 1 and <code>run.sh</code> stops before the next step, so nothing later in that run is published, and <code>publish</code> run on its own finds no <code>verify.json</code>.</li>
   </ul>
 </section>
 
@@ -453,19 +491,22 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="repos">
     <div class="repo"><div class="role">engine</div><h3>mdsumner/raad.virtualize</h3>
       <dl><dt>does</dt><dd>plan, harvest, collate, render (VRT, kerchunk, Icechunk, flat, STAC, grist), verify, publish</dd>
-      <dt>at prod</dt><dd class="change">pinned by tag (first tag v0.1.0 proposed, <a href="https://github.com/mdsumner/raad.virtualize/blob/main/VERSIONING.md">VERSIONING.md</a>); dataset configs and product READMEs move out to product repos</dd></dl></div>
+      <dt>at prod</dt><dd class="change">pinned by tag (<code>v0.1.0</code>, <a href="https://github.com/mdsumner/raad.virtualize/blob/main/VERSIONING.md">VERSIONING.md</a>); dataset configs and product READMEs move out to product repos</dd></dl></div>
     <div class="repo"><div class="role">file lists</div><h3>mdsumner/aad-filelist</h3>
       <dl><dt>does</dt><dd>listing corpus: every source listed on a schedule, every run kept, <code>current</code> and <code>changes</code> per source</dd>
-      <dt>at prod</dt><dd class="change">stays; publishes to source.coop once Actions has a credential (GitHub releases now)</dd></dl></div>
+      <dt>at prod</dt><dd class="change">a resource a product repo can start from and lean on, not an input production depends on</dd></dl></div>
     <div class="repo"><div class="role">refs collation</div><h3>mdsumner/bowerbird-byterefs</h3>
-      <dl><dt>does</dt><dd>nothing yet: README scaffold for the central refs product and the scheduled stale check</dd>
+      <dl><dt>does</dt><dd>weekly freshness of every published store (<code>freshness.json</code>, for the Datasets page); collects builds for the proposed central refs product</dd>
       <dt>at prod</dt><dd class="change">location of the refs product, Lance or Parquet, keep or drop per-product copies</dd></dl></div>
     <div class="repo"><div class="role">format</div><h3>byterefs/spec</h3>
       <dl><dt>does</dt><dd>byterefs/0.1 table spec and decision records (0004 paths per target)</dd>
       <dt>at prod</dt><dd class="change">nothing to move; production stores stamp the version</dd></dl></div>
     <div class="repo"><div class="role">bytes maker</div><h3>ghrsst-cogger</h3>
-      <dl><dt>does</dt><dd>MUR netCDF to COG, into <code>ausantarctic/ghrsst-mur-v2</code></dd>
-      <dt>at prod</dt><dd class="change">could also own the GHRSST index, beside its bytes</dd></dl></div>
+      <dl><dt>does</dt><dd>MUR netCDF to COG, into <code>ausantarctic/ghrsst-mur-v2</code>; its STAC item's <code>ghrsst:status</code> is the signal the GHRSST index uses</dd>
+      <dt>at prod</dt><dd class="change">could also own the GHRSST index, beside its bytes (production's discretion)</dd></dl></div>
+    <div class="repo"><div class="role">product repo</div><h3>AustralianAntarcticDivision/ibcso</h3>
+      <dl><dt>does</dt><dd>byte makers for IBCSO v1, the v1 background and the release charts</dd>
+      <dt>at prod</dt><dd class="change">the first product repo: takes the IBCSO config, COG script, product files, runner and credential, and pins raad.virtualize <code>v0.1.0</code></dd></dl></div>
     <div class="repo"><div class="role">upstream</div><h3>bowerbird, blueant</h3>
       <dl><dt>does</dt><dd>source definitions and the listing engine (Ben Raymond)</dd>
       <dt>at prod</dt><dd class="change">nothing to move</dd></dl></div>
@@ -478,20 +519,22 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="datasets">
   <div class="eyebrow">Per dataset</div>
   <h2>Where things are today</h2>
-  <p>IBCSO, Bedmap3 and GEBCO are a pilot: they sit in production paths, but were built by hand on the Nectar VM, not through the gate. They are the first to be rebuilt through it (see Moves). The rest are drafts in scratch. Detail per dataset is on the <a href="../published.html">Datasets</a> page.</p>
+  <p>IBCSO, Bedmap3 and GEBCO are a pilot. They sit in production paths, but were built by hand on the Nectar VM, not through the gate. The rest are drafts in scratch. <em>Owner</em> follows the 2026-11-22 decision: <code>designated</code> stores are research-owned until they pass the four criteria. Detail per dataset, with freshness, is on the <a href="../published.html">Datasets</a> page.</p>
   <div class="tbl"><table>
-    <thead><tr><th>Dataset</th><th>Bytes</th><th>Built on</th><th>Index now</th></tr></thead>
+    <thead><tr><th>Dataset</th><th>Owner</th><th>Bytes</th><th>Built on</th><th>Index now</th></tr></thead>
     <tbody>
-      <tr><td>IBCSO v2, 2024, 2025</td><td><span class="chip ours">ours</span> source.coop <code>ibcso/&lt;release&gt;/cog/</code></td><td>Nectar VM</td><td>production (pilot) <code>ibcso/virtual/</code></td></tr>
-      <tr><td>Bedmap3</td><td><span class="chip ours">ours</span> source.coop <code>bedmap/bedmap3/cog/</code></td><td>Nectar VM</td><td>production (pilot) <code>bedmap/virtual/</code></td></tr>
-      <tr><td>GEBCO 2024 to 2026</td><td><span class="chip ours">ours</span> source.coop <code>gebco/</code> root</td><td>Nectar VM</td><td>production (pilot) <code>gebco/virtual/</code></td></tr>
-      <tr><td>GHRSST MUR</td><td><span class="chip ours">ours</span> source.coop <code>ghrsst-mur-v2/YYYY/MM/DD/</code></td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>ghrsst/</code></td></tr>
-      <tr><td>ESA CCI ocean colour (6)</td><td><span class="chip ours">ours</span> Pawsey Acacia <code>aad-derived/esacci-oc</code></td><td>Pawsey Setonix</td><td><span class="chip scr">scratch</span> <code>oceancolour/</code></td></tr>
-      <tr><td>OISST v2.1</td><td><span class="chip theirs">theirs</span> NOAA public S3</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>oisst/</code></td></tr>
-      <tr><td>G02202 sea ice, north and south</td><td><span class="chip theirs">theirs</span> NSIDC</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>seaice/</code></td></tr>
-      <tr><td>AMSR2 ASI sea ice, south</td><td><span class="chip theirs">theirs</span> Uni Bremen</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>seaice/</code></td></tr>
-      <tr><td>BRAN2023, 9 variables</td><td><span class="chip theirs">theirs</span> NCI THREDDS</td><td>NCI Gadi</td><td><span class="chip scr">scratch</span> <code>bluelink/</code></td></tr>
-      <tr><td>REMA v2</td><td><span class="chip theirs">theirs</span> PGC bucket</td><td>not built</td><td>none, listing only</td></tr>
+      <tr><td>IBCSO v2, 2024, 2025</td><td>designated</td><td><span class="chip ours">ours</span> source.coop <code>ibcso/&lt;release&gt;/cog/</code></td><td>Nectar VM</td><td>production (pilot) <code>ibcso/virtual/</code></td></tr>
+      <tr><td>Bedmap3</td><td>designated</td><td><span class="chip ours">ours</span> source.coop <code>bedmap/bedmap3/cog/</code></td><td>Nectar VM</td><td>production (pilot) <code>bedmap/virtual/</code></td></tr>
+      <tr><td>GEBCO 2024 to 2026</td><td>designated</td><td><span class="chip ours">ours</span> source.coop <code>gebco/</code> root</td><td>Nectar VM</td><td>production (pilot) <code>gebco/virtual/</code></td></tr>
+      <tr><td>GHRSST MUR</td><td>designated</td><td><span class="chip ours">ours</span> source.coop <code>ghrsst-mur-v2/YYYY/MM/DD/</code></td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>ghrsst/</code>, rebuilt 2026-11-23, to 2026-11-15</td></tr>
+      <tr><td>ESA CCI ocean colour (6)</td><td>research</td><td><span class="chip ours">ours</span> Pawsey Acacia <code>aad-derived/esacci-oc</code></td><td>Pawsey Setonix</td><td><span class="chip scr">scratch</span> <code>oceancolour/</code></td></tr>
+      <tr><td>OISST v2.1</td><td>research</td><td><span class="chip theirs">theirs</span> NOAA public S3</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>oisst/</code></td></tr>
+      <tr><td>G02202 sea ice, north and south</td><td>research</td><td><span class="chip theirs">theirs</span> NSIDC</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>seaice/</code></td></tr>
+      <tr><td>AMSR2 ASI sea ice, south</td><td>research</td><td><span class="chip theirs">theirs</span> Uni Bremen</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>seaice/</code></td></tr>
+      <tr><td>Bluelink (BRAN2020, BRAN2023), 9 variables</td><td>research</td><td><span class="chip theirs">theirs</span> NCI THREDDS</td><td>NCI Gadi</td><td><span class="chip scr">scratch</span> <code>bluelink/</code></td></tr>
+      <tr><td>ACCESS-ESM1.6 ocean temp</td><td>research</td><td><span class="chip theirs">theirs</span> Pawsey <code>ct-esm1-6</code> pilot bucket</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>access-esm/</code></td></tr>
+      <tr><td>IMOS MEOP CTD profiles (2)</td><td>research</td><td><span class="chip theirs">theirs</span> IMOS public S3</td><td>Nectar VM</td><td><span class="chip scr">scratch</span> <code>imos-tracking/</code>, rebuilt 2026-11-23</td></tr>
+      <tr><td>REMA v2</td><td></td><td><span class="chip theirs">theirs</span> PGC bucket</td><td>not built</td><td>none, listing only</td></tr>
     </tbody>
   </table></div>
 </section>
@@ -499,16 +542,16 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="questions">
   <div class="eyebrow">Open</div>
   <h2>Questions to decide together</h2>
-  <p>None of these is decided.</p>
+  <p>Decided since 2026-11-06: ownership per product, the four criteria for a move, and the first products (see the brief). The rest are open.</p>
   <ol class="qs">
-    <li><strong>Gate.</strong> What a dataset must meet to move to production (proposed list in the diagram, applied to one dataset in <a href="#gate-ibcso">IBCSO v2 against the gate</a>).</li>
-    <li><strong>Product shape.</strong> One production product per scratch group (sea ice as one product), one per source, or one index product with groups.</li>
+    <li><strong>Gate.</strong> The four criteria are decided. The process items (product repo, staleness signal, build record, byte layout) are still a proposal, applied to one dataset in <a href="#gate-ibcso">IBCSO v2 against the gate</a>.</li>
+    <li><strong>Product shape.</strong> One production product per scratch group (sea ice as one product), one per source, one index product with groups, or stores made location-independent first. The GHRSST index beside its bytes would be the second of these.</li>
     <li><strong>Byte layout.</strong> One rule for project COGs (IBCSO's <code>&lt;release&gt;/cog/</code> is the candidate); GEBCO and GHRSST differ today.</li>
     <li><strong>Landing pages.</strong> One fixed "where things are" block at the top of every product README: bytes, index, where it's built, how to open it.</li>
     <li><strong>Runners.</strong> Which machine or service runs scheduled production builds, and with which credential. The research team holds every write key in use today; the production team sets the scope and deployment of production keys.</li>
     <li><strong>Central refs.</strong> Where the collected tables live on source.coop, and whether products keep their own copies.</li>
-    <li><strong>Moves.</strong> Copy the existing indexes or rebuild them; a rebuild gives every dataset the build record the stale check needs. The three pilot datasets go first.</li>
-    <li><strong>After promotion.</strong> Who acts when the stale check fires; how a dataset goes back to the research lane when an upstream format changes; whether a rebuild overwrites the published store or writes a new version beside it (catalog rows embed store URLs, so this decides whether readers' links break); and what to do when "theirs" bytes move or vanish, since their publishers give no availability guarantee.</li>
+    <li><strong>Moves.</strong> Copy the existing indexes or rebuild them; a rebuild gives every dataset the build record the stale check needs. IBCSO and Bedmap3 go first, GHRSST at production's discretion.</li>
+    <li><strong>After promotion.</strong> How production learns that a store is stale, and who acts; how a dataset goes back to the research lane when an upstream format changes; whether a rebuild overwrites the published store or writes a new version beside it (catalog rows embed store URLs, so this decides whether readers' links break); and what to do when "theirs" bytes move or vanish, since their publishers give no availability guarantee.</li>
   </ol>
 </section>
 
@@ -519,14 +562,16 @@ footer { font-size: 0.86rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="brief"><pre>Read mdsumner/raad.virtualize (read-only; do not run builds or publish).
 Explain for an operations team taking over production:
 - what each step of run.sh does and what it reads and writes
-- where a dataset's source files come from (config/&lt;dataset&gt;.sh, py/corpus.py)
+- where a dataset's source files come from (config/&lt;dataset&gt;.sh, py/corpus.py,
+  py/ghrsst_sources.py for GHRSST)
+- what the v0.1.0 release notes promise, and what verify.json records
 - what is published for one dataset (ausantarctic/ibcso/virtual/ibcso-v2/)
   and which files record the store's own URL
 - what needs credentials, and on which machine each config runs (hpc/)
 Answer with file paths. List what you could not work out as questions.</pre></div>
 </section>
 
-<footer>Handover 2026-11-06, from the live source.coop listing of <code>ausantarctic/</code>, raad.virtualize main and aad-filelist main. Scratch is unlisted on source.coop; its URLs still resolve. Project site: <a href="../">raad.virtualize</a>. Research team: Michael Sumner, AAD.</footer>
+<footer>Handover 2026-11-06; brief 2026-11-23, from the live source.coop listing of <code>ausantarctic/</code>, raad.virtualize main (aedab14) and aad-filelist main. Scratch is unlisted on source.coop; its URLs still resolve. Project site: <a href="../">raad.virtualize</a>. Research team: Michael Sumner, AAD.</footer>
 </div>
 
 </body>

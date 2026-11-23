@@ -12,8 +12,8 @@ to make an index.
 
 ```{=html}
 <div class="rv-figs">
-  <div class="rv-num"><b>22,771,404</b><span>byte references in one store: GHRSST MUR, 8,909 COGs, 2002 to 2026</span></div>
-  <div class="rv-num"><b>27</b><span>datasets indexed: 20 drafts, 7 in production</span></div>
+  <div class="rv-num"><b>22,835,304</b><span>byte references in one store: GHRSST MUR, 8,934 COGs, 2002 to 2026</span></div>
+  <div class="rv-num"><b>30</b><span>datasets indexed: 23 drafts, 7 in production</span></div>
   <div class="rv-num"><b>4 forms</b><span>from one table, each verified against GDAL on the sources</span></div>
   <div class="rv-num"><b>3 sites</b><span>Nectar, NCI Gadi and Pawsey build where the bytes are fastest to read</span></div>
 </div>
@@ -76,11 +76,11 @@ to make an index.
         <text x="814" y="68" font-weight="700" fill="var(--ink)">scratch (unlisted)</text>
         <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--ink)">
           <text x="814" y="90">ausantarctic-scratch/</text>
-          <text x="826" y="108">bluelink/  ghrsst/</text>
-          <text x="826" y="126">oisst/  seaice/</text>
-          <text x="826" y="144">oceancolour/</text>
+          <text x="826" y="108">bluelink/  ghrsst/  oisst/</text>
+          <text x="826" y="126">seaice/  oceancolour/</text>
+          <text x="826" y="144">access-esm/  imos-tracking/</text>
         </g>
-        <text x="814" y="164" fill="var(--muted)">20 datasets</text>
+        <text x="814" y="164" fill="var(--muted)">23 datasets</text>
         <rect x="800" y="194" width="220" height="100" rx="5" fill="var(--surface)" stroke="var(--rule)"/>
         <text x="814" y="218" font-weight="700" fill="var(--ink)">production</text>
         <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="var(--ink)">
