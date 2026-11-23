@@ -220,6 +220,17 @@ config's lister wrote one) to `<prefix>/<DATASET>/`.
 `verify-published` reads the VRT, kerchunk and Icechunk forms back from the
 bucket and checks them against GDAL on the sources.
 
+`publish` is gated on `verify`. When every check of the `verify` step passes
+(`py/verify.py`, and `py/verify_grist.py` where there is a grist catalog),
+`py/verify_record.py` writes `out/verify.json`: the result, the checks, the
+time, and the store it checked (size, mtime, and the meta `created`,
+`generator` and `dataset`). The steps `plan`, `harvest`, `collate`, `render`,
+`icechunk` and `grist` remove that record before they run, and `publish`
+stops unless a record matches the store as it is now. A failed verify
+therefore blocks a publish run as a separate invocation. The record is
+published with `out/`, so the product carries the verify outcome of its
+build.
+
 The grist catalog check (`py/verify_grist.py`, in `verify` and
 `verify-published`) takes the first and last row of each array and level and
 the first row after a change of `source`, opens `dsn` with the GDAL
