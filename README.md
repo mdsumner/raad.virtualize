@@ -339,7 +339,12 @@ decodes the first value of every row wrongly. Readers of the kerchunk and
 Icechunk forms then need imagecodecs (`imagecodecs.numcodecs.register_codecs()`
 or `imagecodecs.zarr.register_codecs()`), and GDAL's Zarr driver reads
 neither form; the VRT form reads the TIFFs directly and is unaffected.
-GDAL's Zarr v3 reader has no `numcodecs.shuffle`,
+fsspec's reference filesystem, given no `remote_protocol`, takes the protocol
+of the chunks from the first reference it iterates. In a store with absent
+chunks that can be an empty path, which reads back as NaN, and the open fails
+("argument of type 'float' is not a container or iterable"). Pass
+`remote_protocol="https"` for the published kerchunk forms (`py/verify.py`
+states it). GDAL's Zarr v3 reader has no `numcodecs.shuffle`,
 so GDAL does not read shuffled arrays from the Icechunk store (kerchunk is
 Zarr v2 and is read). xarray decodes packed int16 to float64 from the
 Icechunk and kerchunk stores, because the JSON attributes do not keep the
