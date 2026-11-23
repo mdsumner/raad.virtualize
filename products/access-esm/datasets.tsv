@@ -2,5 +2,13 @@
 # its settings (comma separated, as qsub -v takes them), title. Lines starting
 # with # are skipped. The catalog lists every row; catalog.sh check fails
 # when a row has no published collection.
-dataset	config	env	title
-access-esm1-6.historical.ocean-3d-temp-1mon-mean	config/access-esm1-6.sh	ESM16_STEM=ocean-3d-temp-1mon-mean	Monthly ocean temperature (temp), 50 levels, 1850-2021, with the 2D cell centres geolon_t, geolat_t
+# Declared facts (py/site_published.py shows them on the Datasets page):
+# update_model fixed (sources never change; a new release is a new
+# dataset), append (new files only), append-rewrite (new files, and the
+# newest are rewritten in place for a while) or rewrite (files rewritten
+# in place at any time); upstream_cadence, how often the publisher adds
+# files; bytes_owner, project (COGs the project writes) or publisher;
+# bytes_at, where the referenced files are. Build parameters (corpus
+# source, hold-back) stay in the dataset config.
+dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at
+access-esm1-6.historical.ocean-3d-temp-1mon-mean	config/access-esm1-6.sh	ESM16_STEM=ocean-3d-temp-1mon-mean	Monthly ocean temperature (temp), 50 levels, 1850-2021, with the 2D cell centres geolon_t, geolat_t	fixed	none (completed model run)	publisher	https://projects.pawsey.org.au/ct-esm1-6/

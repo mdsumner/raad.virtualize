@@ -78,6 +78,12 @@ def readme_previews(previews):
     return "\n".join(out)
 
 
+# declared columns of datasets.tsv beside the four required ones, carried
+# into datasets.json: how the dataset changes, how often its publisher adds
+# files, who holds the bytes and where
+DECLARED = ("update_model", "upstream_cadence", "bytes_owner", "bytes_at")
+
+
 def read_rows(path, key="dataset", need=("dataset", "config", "env", "title")):
     with open(path, newline="") as f:
         lines = [ln for ln in f if ln.strip() and not ln.startswith("#")]
@@ -179,6 +185,8 @@ def main():
         link = {"rel": "child", "href": "./" + rel, "type": "application/json",
                 "title": r["title"]}
         st = {k: r[k] for k in cols}
+        # declared facts of a dataset (datasets.tsv), where the row has them
+        st.update({k: r[k] for k in DECLARED if r.get(k)})
         if a.published:
             doc = read_json(vsi_path(a.published, rel))
             if doc is None:

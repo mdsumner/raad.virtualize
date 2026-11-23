@@ -30,7 +30,7 @@ TSV=products/$GROUP/datasets.tsv
 RUNNER=${RUNNER:-bash}
 WORK_ROOT=${WORK_ROOT:-$HERE/work}
 PUBLISH_CONFIG=${PUBLISH_CONFIG:-config/source-coop.sh}
-grep -v '^#' "$TSV" | tail -n +2 | tr '\t' '\037' | while IFS=$'\037' read -r dataset config env title; do
+grep -v '^#' "$TSV" | tail -n +2 | tr '\t' '\037' | while IFS=$'\037' read -r dataset config env title _; do
   [ -n "$dataset" ] || continue
   if [ $# -gt 0 ] && [[ " $* " != *" $dataset "* ]]; then continue; fi
   [ -f "$WORK_ROOT/$dataset/store.sqlite" ] || { echo "restac: $dataset: no $WORK_ROOT/$dataset/store.sqlite" >&2; exit 1; }

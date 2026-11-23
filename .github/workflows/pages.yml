@@ -7,6 +7,9 @@ on:
   pull_request:
     paths: ["docs/**", "products/**", "py/site_published.py", ".github/workflows/pages.yml"]
   workflow_dispatch:
+  # weekly, after bowerbird-byterefs replaces freshness.json (Monday 06:00 UTC)
+  schedule:
+    - cron: "0 8 * * 1"
 
 permissions:
   contents: read
@@ -28,6 +31,13 @@ jobs:
         with:
           python-version: "3.12"
       - uses: quarto-dev/quarto-actions/setup@v2
+      # computed freshness of the published stores, for the Datasets page
+      # (py/site_published.py); the page renders without it
+      - name: Freshness
+        run: |
+          curl -fsSL -o docs/_freshness.json \
+            https://github.com/mdsumner/bowerbird-byterefs/releases/download/freshness/freshness.json ||
+            { echo "no freshness.json; the Datasets page renders without computed values"; rm -f docs/_freshness.json; }
       - name: Render
         run: quarto render docs
       - uses: actions/upload-pages-artifact@v3

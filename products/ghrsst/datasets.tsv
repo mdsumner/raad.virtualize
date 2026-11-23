@@ -2,5 +2,13 @@
 # its settings (comma separated, as qsub -v takes them), title. Lines starting
 # with # are skipped. The catalog lists every row; catalog.sh check fails
 # when a row has no published collection.
-dataset	config	env	title
-ghrsst-mur-cog-analysed_sst	config/ghrsst-cog.sh	GHRSST_VAR=analysed_sst	Analysed sea surface temperature, daily
+# Declared facts (py/site_published.py shows them on the Datasets page):
+# update_model fixed (sources never change; a new release is a new
+# dataset), append (new files only), append-rewrite (new files, and the
+# newest are rewritten in place for a while) or rewrite (files rewritten
+# in place at any time); upstream_cadence, how often the publisher adds
+# files; bytes_owner, project (COGs the project writes) or publisher;
+# bytes_at, where the referenced files are. Build parameters (corpus
+# source, hold-back) stay in the dataset config.
+dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at
+ghrsst-mur-cog-analysed_sst	config/ghrsst-cog.sh	GHRSST_VAR=analysed_sst	Analysed sea surface temperature, daily	append-rewrite	daily	project	https://data.source.coop/ausantarctic/ghrsst-mur-v2/
