@@ -10,10 +10,14 @@
 # in place at any time); upstream_cadence, how often the publisher adds
 # files; bytes_owner, project (COGs the project writes) or publisher;
 # bytes_at, where the referenced files are. Build parameters (corpus
-# source, hold-back) stay in the dataset config.
-dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at
-g02202-v6-daily-south	config/seaice-g02202.sh	SEAICE_HEM=south,SEAICE_FREQ=daily	NOAA/NSIDC CDR sea ice concentration G02202 v6, daily, south	append	daily, about a week after the date	publisher	https://noaadata.apps.nsidc.org/NOAA/G02202_V6/south/daily/
-g02202-v6-daily-north	config/seaice-g02202.sh	SEAICE_HEM=north,SEAICE_FREQ=daily	NOAA/NSIDC CDR sea ice concentration G02202 v6, daily, north	append	daily, about a week after the date	publisher	https://noaadata.apps.nsidc.org/NOAA/G02202_V6/north/daily/
-asi-amsr2-v5.4-daily-south	config/seaice-asi-amsr2.sh	SEAICE_HEM=south	University of Bremen ASI AMSR2 sea ice concentration v5.4, 3.125 km, daily, south	append	daily	publisher	https://data.seaice.uni-bremen.de/amsr2/asi_daygrid_swath/s3125/netcdf/
-#g02202-v6-monthly-south	config/seaice-g02202.sh	SEAICE_HEM=south,SEAICE_FREQ=monthly	NOAA/NSIDC CDR sea ice concentration G02202 v6, monthly, south	append	monthly	publisher	https://noaadata.apps.nsidc.org/NOAA/G02202_V6/south/monthly/
-#g02202-v6-monthly-north	config/seaice-g02202.sh	SEAICE_HEM=north,SEAICE_FREQ=monthly	NOAA/NSIDC CDR sea ice concentration G02202 v6, monthly, north	append	monthly	publisher	https://noaadata.apps.nsidc.org/NOAA/G02202_V6/north/monthly/
+# source, hold-back) stay in the dataset config. owner is research (the
+# research team builds and publishes the store), production (the production
+# team does, from its product repo), or designated (research today, decided on
+# 2026-11-22 to move to production once the store passes the four criteria:
+# metadata declared, codecs read everywhere, shape settled, backlog frozen).
+dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at	owner
+g02202-v6-daily-south	config/seaice-g02202.sh	SEAICE_HEM=south,SEAICE_FREQ=daily	NOAA/NSIDC CDR sea ice concentration G02202 v6, daily, south	append	daily, about a week after the date	publisher	https://noaadata.apps.nsidc.org/NOAA/G02202_V6/south/daily/	research
+g02202-v6-daily-north	config/seaice-g02202.sh	SEAICE_HEM=north,SEAICE_FREQ=daily	NOAA/NSIDC CDR sea ice concentration G02202 v6, daily, north	append	daily, about a week after the date	publisher	https://noaadata.apps.nsidc.org/NOAA/G02202_V6/north/daily/	research
+asi-amsr2-v5.4-daily-south	config/seaice-asi-amsr2.sh	SEAICE_HEM=south	University of Bremen ASI AMSR2 sea ice concentration v5.4, 3.125 km, daily, south	append	daily	publisher	https://data.seaice.uni-bremen.de/amsr2/asi_daygrid_swath/s3125/netcdf/	research
+#g02202-v6-monthly-south	config/seaice-g02202.sh	SEAICE_HEM=south,SEAICE_FREQ=monthly	NOAA/NSIDC CDR sea ice concentration G02202 v6, monthly, south	append	monthly	publisher	https://noaadata.apps.nsidc.org/NOAA/G02202_V6/south/monthly/	research
+#g02202-v6-monthly-north	config/seaice-g02202.sh	SEAICE_HEM=north,SEAICE_FREQ=monthly	NOAA/NSIDC CDR sea ice concentration G02202 v6, monthly, north	append	monthly	publisher	https://noaadata.apps.nsidc.org/NOAA/G02202_V6/north/monthly/	research

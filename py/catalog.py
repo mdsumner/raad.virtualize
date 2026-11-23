@@ -80,8 +80,8 @@ def readme_previews(previews):
 
 # declared columns of datasets.tsv beside the four required ones, carried
 # into datasets.json: how the dataset changes, how often its publisher adds
-# files, who holds the bytes and where
-DECLARED = ("update_model", "upstream_cadence", "bytes_owner", "bytes_at")
+# files, who holds the bytes and where, and who owns the store
+DECLARED = ("update_model", "upstream_cadence", "bytes_owner", "bytes_at", "owner")
 
 
 def read_rows(path, key="dataset", need=("dataset", "config", "env", "title")):

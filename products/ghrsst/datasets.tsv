@@ -9,6 +9,10 @@
 # in place at any time); upstream_cadence, how often the publisher adds
 # files; bytes_owner, project (COGs the project writes) or publisher;
 # bytes_at, where the referenced files are. Build parameters (corpus
-# source, hold-back) stay in the dataset config.
-dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at
-ghrsst-mur-cog-analysed_sst	config/ghrsst-cog.sh	GHRSST_VAR=analysed_sst	Analysed sea surface temperature, daily	append-rewrite	daily	project	https://data.source.coop/ausantarctic/ghrsst-mur-v2/
+# source, hold-back) stay in the dataset config. owner is research (the
+# research team builds and publishes the store), production (the production
+# team does, from its product repo), or designated (research today, decided on
+# 2026-11-22 to move to production once the store passes the four criteria:
+# metadata declared, codecs read everywhere, shape settled, backlog frozen).
+dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at	owner
+ghrsst-mur-cog-analysed_sst	config/ghrsst-cog.sh	GHRSST_VAR=analysed_sst	Analysed sea surface temperature, daily	append-rewrite	daily	project	https://data.source.coop/ausantarctic/ghrsst-mur-v2/	designated

@@ -9,11 +9,15 @@
 # in place at any time); upstream_cadence, how often the publisher adds
 # files; bytes_owner, project (COGs the project writes) or publisher;
 # bytes_at, where the referenced files are. Build parameters (corpus
-# source, hold-back) stay in the dataset config.
-dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at
-esacci-oc-v6.0-monthly-chlor_a	config/esacci-oc.sh	ESACCI_VAR=chlor_a	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a, merged sensors, 4 km, from 1997-09	append	monthly	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/monthly/
-esacci-oc-v6.0-monthly-chlor_a_log10_bias	config/esacci-oc.sh	ESACCI_VAR=chlor_a_log10_bias	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a log10 bias, merged sensors, 4 km, from 1997-09	append	monthly	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/monthly/
-esacci-oc-v6.0-monthly-chlor_a_log10_rmsd	config/esacci-oc.sh	ESACCI_VAR=chlor_a_log10_rmsd	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a log10 RMSD, merged sensors, 4 km, from 1997-09	append	monthly	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/monthly/
-esacci-oc-v6.0-5day-chlor_a	config/esacci-oc.sh	ESACCI_CADENCE=5day,ESACCI_VAR=chlor_a	ESA Ocean Colour CCI v6.0 5-day chlorophyll-a, merged sensors, 4 km, from 1997-09	append	5-day	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/5day/
-esacci-oc-v6.0-5day-chlor_a_log10_bias	config/esacci-oc.sh	ESACCI_CADENCE=5day,ESACCI_VAR=chlor_a_log10_bias	ESA Ocean Colour CCI v6.0 5-day chlorophyll-a log10 bias, merged sensors, 4 km, from 1997-09	append	5-day	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/5day/
-esacci-oc-v6.0-5day-chlor_a_log10_rmsd	config/esacci-oc.sh	ESACCI_CADENCE=5day,ESACCI_VAR=chlor_a_log10_rmsd	ESA Ocean Colour CCI v6.0 5-day chlorophyll-a log10 RMSD, merged sensors, 4 km, from 1997-09	append	5-day	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/5day/
+# source, hold-back) stay in the dataset config. owner is research (the
+# research team builds and publishes the store), production (the production
+# team does, from its product repo), or designated (research today, decided on
+# 2026-11-22 to move to production once the store passes the four criteria:
+# metadata declared, codecs read everywhere, shape settled, backlog frozen).
+dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at	owner
+esacci-oc-v6.0-monthly-chlor_a	config/esacci-oc.sh	ESACCI_VAR=chlor_a	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a, merged sensors, 4 km, from 1997-09	append	monthly	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/monthly/	research
+esacci-oc-v6.0-monthly-chlor_a_log10_bias	config/esacci-oc.sh	ESACCI_VAR=chlor_a_log10_bias	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a log10 bias, merged sensors, 4 km, from 1997-09	append	monthly	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/monthly/	research
+esacci-oc-v6.0-monthly-chlor_a_log10_rmsd	config/esacci-oc.sh	ESACCI_VAR=chlor_a_log10_rmsd	ESA Ocean Colour CCI v6.0 monthly chlorophyll-a log10 RMSD, merged sensors, 4 km, from 1997-09	append	monthly	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/monthly/	research
+esacci-oc-v6.0-5day-chlor_a	config/esacci-oc.sh	ESACCI_CADENCE=5day,ESACCI_VAR=chlor_a	ESA Ocean Colour CCI v6.0 5-day chlorophyll-a, merged sensors, 4 km, from 1997-09	append	5-day	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/5day/	research
+esacci-oc-v6.0-5day-chlor_a_log10_bias	config/esacci-oc.sh	ESACCI_CADENCE=5day,ESACCI_VAR=chlor_a_log10_bias	ESA Ocean Colour CCI v6.0 5-day chlorophyll-a log10 bias, merged sensors, 4 km, from 1997-09	append	5-day	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/5day/	research
+esacci-oc-v6.0-5day-chlor_a_log10_rmsd	config/esacci-oc.sh	ESACCI_CADENCE=5day,ESACCI_VAR=chlor_a_log10_rmsd	ESA Ocean Colour CCI v6.0 5-day chlorophyll-a log10 RMSD, merged sensors, 4 km, from 1997-09	append	5-day	project	https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/5day/	research
