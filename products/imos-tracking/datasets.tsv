@@ -2,6 +2,18 @@
 # its settings (comma separated, as qsub -v takes them), title. Lines starting
 # with # are skipped. The catalog lists every row; catalog.sh check fails
 # when a row has no published collection.
-dataset	config	env	title
-meop-ctd-2024	config/imos-meop.sh	MEOP_CANON=cube	IMOS satellite-relay tag CTD profiles (MEOP quality control), IMOS-CTD_2024 release: one cube of 126,518 profiles by 1000 levels
-meop-ctd-tags	config/imos-meop.sh	MEOP_CANON=tags	IMOS satellite-relay tag CTD profiles (MEOP quality control), both releases: one group per tag (564 tags)
+# Declared facts (py/site_published.py shows them on the Datasets page):
+# update_model fixed (sources never change; a new release is a new
+# dataset), append (new files only), append-rewrite (new files, and the
+# newest are rewritten in place for a while) or rewrite (files rewritten
+# in place at any time); upstream_cadence, how often the publisher adds
+# files; bytes_owner, project (COGs the project writes) or publisher;
+# bytes_at, where the referenced files are. Build parameters (corpus
+# source, hold-back) stay in the dataset config. owner is research (the
+# research team builds and publishes the store), production (the production
+# team does, from its product repo), or designated (research today, decided on
+# 2026-11-22 to move to production once the store passes the four criteria:
+# metadata declared, codecs read everywhere, shape settled, backlog frozen).
+dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at	owner
+meop-ctd-2024	config/imos-meop.sh	MEOP_CANON=cube	IMOS satellite-relay tag CTD profiles (MEOP quality control), IMOS-CTD_2024 release: one cube of 126,518 profiles by 1000 levels	rewrite	irregular releases; files rewritten in place	publisher	https://imos-data.s3.ap-southeast-2.amazonaws.com/IMOS/AATAMS/satellite_tagging/MEOP_QC_CTD/	research
+meop-ctd-tags	config/imos-meop.sh	MEOP_CANON=tags	IMOS satellite-relay tag CTD profiles (MEOP quality control), both releases: one group per tag (564 tags)	rewrite	irregular releases; files rewritten in place	publisher	https://imos-data.s3.ap-southeast-2.amazonaws.com/IMOS/AATAMS/satellite_tagging/MEOP_QC_CTD/	research
