@@ -177,8 +177,16 @@ python py/sourcecoop_check.py ausantarctic/ausantarctic-scratch
 
 On a docker host (the Nectar VM), `hpc/vm/docker-run.sh` runs `run.sh` and
 `catalog.sh` in the `gdal-r-python-extras` image and installs obstore,
-imagecodecs and fastparquet into the container. The listing is of the
-whole bucket, so a rebuild picks up every day cogger has written.
+imagecodecs and fastparquet into the container. The file list is source
+`ausantarctic-ghrsst-mur-v2` of the aad-filelist listing corpus, so a
+rebuild picks up every day cogger had written when the corpus last ran,
+less the hold-back (`GHRSST_HOLD_BACK`, default 17 days): cogger rewrites a
+day's COGs at the same key about 5 days after the date and MUR revises a
+day for up to 16 days, so a store built from newer days points at bytes
+that later move (the 3 Nov 2026 build had 7 such days; kerchunk and
+Icechunk failed on them, the VRT did not). The build writes
+`sources.meta.tsv` beside `plan.vrt`, published with the store, and
+`run.sh ... stale` reports any indexed COG that changed since.
 
 The plan step lists the days with no COG and stops when there are more
 than `GHRSST_MAX_MISSING` (default 0): a listing cut short by HTTP 503
@@ -192,8 +200,12 @@ Build and local verify (no keys; about 40 minutes, most of it the harvest):
 cd ~/Git/raad.virtualize && git pull
 nohup bash hpc/vm/docker-run.sh run.sh config/ghrsst-cog.sh config/source-coop.sh \
   deps plan harvest collate render icechunk grist stac verify > ghrsst-build.log 2>&1 < /dev/null &
-grep -E '^== |missing|FAIL|DIFFERENT|Error' ghrsst-build.log
+grep -E '^== |missing|FAIL|DIFFERENT|MISMATCH|hold-back|Error' ghrsst-build.log
 ```
+
+A work directory harvested before the hold-back holds scans of days that
+have since been rewritten: move it aside (or add `HARVEST_RECHECK=60`, which
+rescans the last 60 sources whose size or mtime changed) before a rebuild.
 
 The `stac` and `grist` steps must run with `config/source-coop.sh` sourced,
 so that the collection and the catalog `dsn` carry the public URL.
