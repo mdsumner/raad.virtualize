@@ -1,0 +1,9 @@
+# Datasets of the standing /g/data job (hpc/nci/standing.pbs), one row each.
+# source_id  listing of py/gdata_listing.py (current__<source_id>.parquet)
+# roots      directories to walk, colon separated
+# match      regular expression a listed path must match
+# config     dataset config built when the listing changes
+# env        settings for the build, KEY=VALUE comma separated (qsub -v form)
+# Rows that share a source_id share one listing (listed once per run).
+dataset	source_id	roots	match	config	env
+bluelink-daily-temp	gdata_gb6_bran	/g/data/gb6/BRAN/BRAN2020/daily:/g/data/gb6/BRAN/BRAN2023/daily	/ocean_[a-z_]+_[0-9]{4}_[0-9]{2}\.nc$	config/bluelink.sh	BRAN_ROOT=gdata,BRAN_VAR=temp

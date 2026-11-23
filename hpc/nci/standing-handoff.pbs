@@ -1,0 +1,64 @@
+#!/bin/bash
+#PBS -q copyq
+#PBS -l ncpus=1
+#PBS -l mem=32GB
+#PBS -l walltime=10:00:00
+#PBS -l wd
+#PBS -j oe
+#PBS -N rv-handoff
+## After a standing build (hpc/nci/standing.pbs submits this held on the
+## build): verify every form against GDAL on the sources (copyq: the forms
+## point at THREDDS), then record the verified build in bowerbird-byterefs:
+## the release <dataset>@<build_id> and a pull request with the git record
+## (collect/collect.py). Merging the pull request adopts the build. Nothing
+## is published to source.coop here: its keys last one hour, so the publish
+## stays a separate submit of bran-publish.pbs with fresh keys (README.md,
+## "Standing job").
+##
+## Needs, once, on Gadi:
+##   a clean bowerbird-byterefs checkout at BBR (default
+##   /g/data/$PROJECT/$USER/bowerbird-byterefs) that can push to origin;
+##   gh on PATH on the host, signed in (gh auth login), for the release and
+##   the pull request.
+## Settings (qsub -v, as the build): CONFIG, the dataset settings,
+## GDATA_LISTINGS, SIF; BBR; HANDOFF_PR=0 to stop after the release files
+## are staged.
+set -euo pipefail
+module load singularity
+export SINGULARITYENV_R_LIBS_USER=/nonexistent SINGULARITYENV_R_LIBS= \
+       SINGULARITYENV_PYTHONNOUSERSITE=1
+SIF=${SIF:-/g/data/$PROJECT/$USER/sif_lib/gdal-r-python-extras_latest.sif}
+: "${CONFIG:?pass CONFIG in -v}"
+BBR=${BBR:-/g/data/$PROJECT/$USER/bowerbird-byterefs}
+[ -d "$BBR/.git" ] || { echo "no bowerbird-byterefs checkout at $BBR" >&2; exit 1; }
+DATASET=$(source "$CONFIG"; echo "$DATASET")
+export E2E_WORK=${E2E_WORK:-/scratch/$PROJECT/$USER/raad.virtualize/$DATASET}
+sx() { singularity exec -B /g/data,/scratch "$SIF" "$@"; }
+
+sx bash run.sh "$CONFIG" verify
+
+## the record: release files staged by collect.py in the container (python
+## and pyarrow there), release and pull request with the host's gh and git
+## (singularity exec resets PATH)
+git -C "$BBR" fetch -q origin main
+git -C "$BBR" checkout -q --detach origin/main
+[ -z "$(git -C "$BBR" status --porcelain --untracked-files=no)" ] || { echo "$BBR has local changes" >&2; exit 1; }
+log=$E2E_WORK/handoff.log
+sx python "$BBR/collect/collect.py" "$E2E_WORK" --upload none | tee "$log"
+stage=$(sed -n 's/^collect: release files in \(.*\); upload with:$/\1/p' "$log")
+[ -n "$stage" ] || { echo "collect staged no release" >&2; exit 1; }
+tag=$(basename "$stage")
+[ "${HANDOFF_PR:-1}" = 1 ] || { echo "release files staged in $stage"; exit 0; }
+command -v gh > /dev/null || { echo "no gh on PATH; release files staged in $stage" >&2; exit 1; }
+repo=$(git -C "$BBR" remote get-url origin | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##')
+gh release create "$tag" --repo "$repo" --title "$tag" --latest=false \
+  --notes "Standing /g/data build, verified on Gadi ($PBS_JOBID)." "$stage"/*
+branch="standing/${tag//@/-}"
+cd "$BBR"
+git checkout -q -b "$branch"
+git add -A -- . ':!release'
+git commit -q -m "collect $tag" -m "Standing /g/data build, verified on Gadi ($PBS_JOBID)."
+git push -q -u origin "$branch"
+gh pr create --repo "$repo" --base main --head "$branch" --title "collect $tag" \
+  --body "Standing /g/data build of $DATASET, verified on Gadi (job $PBS_JOBID). Release: https://github.com/$repo/releases/tag/${tag//@/%40}. Merge to adopt; publish to source.coop with hpc/nci/bran-publish.pbs and fresh keys."
+git checkout -q --detach origin/main

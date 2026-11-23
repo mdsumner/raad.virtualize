@@ -1,0 +1,116 @@
+#!/bin/bash
+#PBS -q copyq
+#PBS -l ncpus=1
+#PBS -l mem=8GB
+#PBS -l walltime=02:00:00
+#PBS -l wd
+#PBS -j oe
+#PBS -N rv-standing
+## The standing /g/data job: list every source of hpc/nci/standing.tsv in
+## situ (py/gdata_listing.py), check each built store against its listing
+## (run.sh stale), submit a build (bran-build.pbs) and a hand-off
+## (standing-handoff.pbs) for each dataset whose listing changed, then
+## submit itself again for the next run (qsub -a). The filesystem is the
+## listing: no THREDDS crawl and no aad-filelist source.
+##
+## Start it once from the repository root on a Gadi login node:
+##   qsub -P jk72 -l storage=gdata/gb6+gdata/jk72+scratch/jk72 \
+##     -v STANDING_STORAGE=gdata/gb6+gdata/jk72+scratch/jk72 hpc/nci/standing.pbs
+## Each run submits the next with the same -P, -l storage and settings.
+##
+## Settings (qsub -v):
+##   STANDING_STORAGE  the -l storage list, required (the next run and the
+##                     builds it submits need it; PBS does not pass it in)
+##   STANDING_AT       local time of the next run, hhmm (default 0300)
+##   STANDING_EVERY    days to the next run (default 1)
+##   STANDING_ONCE=1   do not submit the next run
+##   STANDING_DRY=1    list and check, submit no builds
+##   STANDING_TSV      default hpc/nci/standing.tsv
+##   LISTINGS          listing directory, default /g/data/$PROJECT/$USER/listings
+##   SIF               as in bran-build.pbs
+## State per dataset goes to $LISTINGS/standing/<dataset>.{json,build,handoff}.
+## Stop the chain: qdel the queued rv-standing job (qselect -N rv-standing -u $USER).
+set -euo pipefail
+module load singularity
+export SINGULARITYENV_R_LIBS_USER=/nonexistent SINGULARITYENV_R_LIBS= \
+       SINGULARITYENV_PYTHONNOUSERSITE=1
+: "${STANDING_STORAGE:?pass STANDING_STORAGE (the -l storage list) in -v}"
+SIF=${SIF:-/g/data/$PROJECT/$USER/sif_lib/gdal-r-python-extras_latest.sif}
+[ -f "$SIF" ] || { echo "no image at $SIF" >&2; exit 1; }
+TSV=${STANDING_TSV:-hpc/nci/standing.tsv}
+LISTINGS=${LISTINGS:-/g/data/$PROJECT/$USER/listings}
+STATE=$LISTINGS/standing
+mkdir -p "$STATE"
+sx() { singularity exec -B /g/data,/scratch "$SIF" "$@"; }
+now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+## a job still queued, held or running (qstat -x keeps finished jobs: F)
+live() {
+  local id; id=$(cat "$1" 2>/dev/null) || return 1
+  [ -n "$id" ] || return 1
+  local s; s=$(qstat -x -f "$id" 2>/dev/null | sed -n 's/^ *job_state = //p')
+  [ -n "$s" ] && [ "$s" != F ]
+}
+
+rows=$(grep -v '^#' "$TSV" | tail -n +2)
+
+## 1. list each source once
+declare -A RC
+while IFS=$'\t' read -r dataset sid roots match config env; do
+  [ -n "$dataset" ] || continue
+  [ -z "${RC[$sid]:-}" ] || continue
+  args=(); IFS=: read -ra rs <<< "$roots"; for r in "${rs[@]}"; do args+=(--root "$r"); done
+  rc=0
+  sx python py/gdata_listing.py "${args[@]}" --source "$sid" --corpus "$LISTINGS" \
+    --match "$match" || rc=$?
+  case $rc in 0|3) RC[$sid]=$rc ;; *) echo "listing $sid failed ($rc)" >&2; RC[$sid]=err ;; esac
+done <<< "$rows"
+
+## 2. per dataset: stale check of the last build, then build if changed
+while IFS=$'\t' read -r dataset sid roots match config env; do
+  [ -n "$dataset" ] || continue
+  work=/scratch/$PROJECT/$USER/raad.virtualize/$dataset
+  stale=unknown
+  if [ -f "$work/sources.meta.tsv" ]; then
+    rm -f "$work/stale.tsv"
+    if env ${env//,/ } CORPUS_BASE="$LISTINGS" E2E_WORK="$work" \
+         singularity exec -B /g/data,/scratch "$SIF" bash run.sh "$config" stale > "$STATE/$dataset.stale.log" 2>&1
+    then stale=0
+    elif [ -s "$work/stale.tsv" ]; then stale=$(($(wc -l < "$work/stale.tsv") - 1))
+    else stale=check-failed; fi
+  fi
+  action=none
+  if [ "${RC[$sid]}" = err ]; then action=listing-failed
+  elif live "$STATE/$dataset.build" || live "$STATE/$dataset.handoff"; then action=in-flight
+  elif [ "${RC[$sid]}" = 3 ] || [ "$stale" != 0 ]; then
+    if [ "${STANDING_DRY:-0}" = 1 ]; then action=would-build
+    else
+      v="CONFIG=$config,$env,GDATA_LISTINGS=$LISTINGS,SIF=$SIF"
+      b=$(qsub -P "$PROJECT" -l storage="$STANDING_STORAGE" -v "$v" hpc/nci/bran-build.pbs)
+      h=$(qsub -P "$PROJECT" -l storage="$STANDING_STORAGE" -W depend=afterok:"$b" \
+            -v "$v" hpc/nci/standing-handoff.pbs)
+      echo "$b" > "$STATE/$dataset.build"; echo "$h" > "$STATE/$dataset.handoff"
+      action="build $b handoff $h"
+    fi
+  fi
+  hb=$LISTINGS/heartbeat__$sid.json
+  printf '{"dataset": "%s", "source_id": "%s", "checked_at": "%s", "heartbeat": %s, "stale_refs_files": "%s", "action": "%s"}\n' \
+    "$dataset" "$sid" "$(now)" "$(cat "$hb" 2>/dev/null || echo null)" "$stale" "$action" \
+    > "$STATE/$dataset.json"
+  echo "$dataset: listing ${RC[$sid]}, stale $stale, $action"
+done <<< "$rows"
+
+## 3. the next run (one queued at a time)
+if [ "${STANDING_ONCE:-0}" != 1 ]; then
+  mine=$PBS_JOBID
+  others=$(qselect -N rv-standing -u "$USER" -s QHW 2>/dev/null | grep -v "^${mine%%.*}" || true)
+  if [ -n "$others" ]; then echo "next run already queued: $others"
+  else
+    hhmm=${STANDING_AT:-0300}
+    at=$(date -d "$(date -d "+${STANDING_EVERY:-1} day" +%F) ${hhmm:0:2}:${hhmm:2:2}" +%Y%m%d%H%M)
+    pass="STANDING_STORAGE=$STANDING_STORAGE,STANDING_AT=${STANDING_AT:-0300},STANDING_EVERY=${STANDING_EVERY:-1},STANDING_TSV=$TSV,LISTINGS=$LISTINGS,SIF=$SIF"
+    [ "${STANDING_DRY:-0}" = 1 ] && pass="$pass,STANDING_DRY=1"
+    n=$(qsub -a "$at" -P "$PROJECT" -l storage="$STANDING_STORAGE" -v "$pass" hpc/nci/standing.pbs)
+    echo "next run $n at $at"
+  fi
+fi

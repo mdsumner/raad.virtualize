@@ -14,6 +14,12 @@
 #   BLUELINK_LAST=2026_07     last month, YYYY_MM; with BRAN_ROOT=gdata the
 #                             default is the last BRAN2023 file on disk
 #   BRAN_ROOT=thredds|gdata   as in config/bran.sh
+#   GDATA_LISTINGS=DIR        with BRAN_ROOT=gdata: select the files from the
+#                             /g/data listing of source gdata_gb6_bran in DIR
+#                             (py/gdata_listing.py, kept by the standing job,
+#                             hpc/nci/standing.pbs) instead of ls, and write
+#                             the build record $WORK/sources.meta.tsv, so the
+#                             store can be stale-checked and collected
 case "${BLUELINK_FREQ:-daily}" in
   daily) FREQ_DIR=daily; FREQ_TAG= ;;
   month) FREQ_DIR=month; FREQ_TAG=_mth ;;
@@ -32,6 +38,21 @@ esac
 sources() {
   local v=${BRAN_VAR:-temp} first=${BLUELINK_FIRST:-1993} switch=${BLUELINK_SWITCH:-2010}
   local last=${BLUELINK_LAST:-}
+  if [ -n "${GDATA_LISTINGS:-}" ]; then
+    [ "${BRAN_ROOT:-thredds}" = gdata ] || { echo "GDATA_LISTINGS needs BRAN_ROOT=gdata" >&2; return 1; }
+    # one corpus.py call per reanalysis version: both hold 2010-2023, so a
+    # single call would see two files for one month
+    local re="_([0-9]{4}_[0-9]{2})\\.nc\$" m20="$WORK/sources.meta.bran2020.tsv" m23="$WORK/sources.meta.bran2023.tsv"
+    "$PYTHON" "$HERE/py/corpus.py" --corpus "$GDATA_LISTINGS" --source gdata_gb6_bran \
+      --match "/BRAN2020/$FREQ_DIR/ocean_${v}${FREQ_TAG}_[0-9]{4}_[0-9]{2}\\.nc\$" --date "$re" \
+      --first "${first}_01" --last "$((switch - 1))_12" --meta "$m20" || return 1
+    "$PYTHON" "$HERE/py/corpus.py" --corpus "$GDATA_LISTINGS" --source gdata_gb6_bran \
+      --match "/BRAN2023/$FREQ_DIR/ocean_${v}${FREQ_TAG}_[0-9]{4}_[0-9]{2}\\.nc\$" --date "$re" \
+      --first "${switch}_01" ${last:+--last "$last"} --meta "$m23" || return 1
+    { cat "$m20"; tail -n +2 "$m23"; } > "$WORK/sources.meta.tsv"
+    rm -f "$m20" "$m23"
+    return 0
+  fi
   if [ -z "$last" ] && [ -d "$BASE/BRAN2023/$FREQ_DIR" ]; then
     last=$(ls "$BASE/BRAN2023/$FREQ_DIR" | grep -E "^ocean_${v}${FREQ_TAG}_[0-9]{4}_[0-9]{2}\.nc$" | sort | tail -1 |
            sed -E "s/^ocean_${v}${FREQ_TAG}_([0-9]{4}_[0-9]{2})\.nc$/\1/")
