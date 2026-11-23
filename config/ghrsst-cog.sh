@@ -14,14 +14,28 @@
 #                    resampling recorded as unknown, it is cogger's); about
 #                    a third more refs (30.5M rows against 22.77M). 0: IFD 0
 #                    only, as the first scratch stores
+#   GHRSST_HOLD_BACK_DAYS  index only days at least this many days old, by
+#                    the date in the file name against today (UTC); default
+#                    17. ghrsst-cogger rewrites a day's COGs at the same key
+#                    about 5 days after the date, and upstream MUR granules
+#                    were seen to change up to 16 days after it (aad-filelist
+#                    corpus, podaac_mur_sst_v41, November 2026). A byte
+#                    reference to a rewritten COG reads the wrong bytes, so
+#                    days inside the window stay out of the store. 0: no
+#                    hold-back
+#   GHRSST_LAST      last day to index, YYYYMMDD (default none); the earlier
+#                    of this and the hold-back date applies
 #   GHRSST_MAX_MISSING  days between the first and last file allowed to have
 #                    no file (default 0): the plan step stops on more, so a
 #                    listing cut short by server errors is not published
 #   GRIST_VERIFY_WINDOW  side of the window py/verify_grist.py reads from each
 #                    checked field (default 2048; a whole field is 1.3 GB)
 #
-# MUR rewrites its newest days for several days after first publication:
-# rerun with HARVEST_RECHECK=30 to rescan any of the last 30 days that changed.
+# Harvest skips a source whose fragments exist, so a work directory that
+# scanned days inside the window (before GHRSST_HOLD_BACK_DAYS) holds scans of
+# COGs since rewritten: remove those fragments (scan/sources/<key>.json and
+# scan/chunks_*/<key>.parquet), or rerun with HARVEST_RECHECK=N to rescan any
+# of the last N sources whose size or mtime changed.
 #
 # gdal mdim mosaic does not take GeoTIFF, so the plan is py/plan_cog.py (the
 # vrtstack form). PREDICTOR=2 maps to the imagecodecs_delta filter: the
@@ -34,6 +48,10 @@ DATASET=ghrsst-mur-cog-$GHRSST_VAR${GHRSST_YEARS:+-$(echo $GHRSST_YEARS | tr ' '
 PRODUCT_GROUP=ghrsst
 ARRAYS=$GHRSST_VAR
 GHRSST_PATTERN="^([0-9]{8})090000-JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02\.0-fv04\.1_${GHRSST_VAR}\.tif\$"
+GHRSST_HOLD_BACK_DAYS=${GHRSST_HOLD_BACK_DAYS:-17}
+# the last day indexed: today less the hold-back, or GHRSST_LAST if earlier
+ghrsst_last=$(date -u -d "-$GHRSST_HOLD_BACK_DAYS days" +%Y%m%d)
+if [ -n "${GHRSST_LAST:-}" ] && [ "$GHRSST_LAST" \< "$ghrsst_last" ]; then ghrsst_last=$GHRSST_LAST; fi
 sources() (
   root=$GHRSST_COG_ROOT; url=$root
   if [[ $root == /vsis3/ausantarctic/* ]]; then
@@ -43,7 +61,8 @@ sources() (
   years=${GHRSST_YEARS:-$("$GDAL" vsi ls "$root" | grep -E '^[0-9]{4}$')}
   for y in $years; do
     "$GDAL" vsi ls -R "$root/$y" | grep -E "(^|/)${GHRSST_PATTERN#^}" | sed "s#^#$url/$y/#"
-  done | awk -F/ '{print $NF "\t" $0}' | sort | cut -f2   # date order, by file name
+  done | awk -F/ -v last="$ghrsst_last" 'substr($NF, 1, 8) <= last {print $NF "\t" $0}' |
+    sort | cut -f2   # date order, by file name; nothing after the last day
 )
 make_plan() {
   "$PYTHON" "$HERE/py/plan_cog.py" --sources "$WORK/sources.txt" --array "$GHRSST_VAR" \
