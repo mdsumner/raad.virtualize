@@ -20,30 +20,33 @@
 #   GRIST_VERIFY_WINDOW  side of the window py/verify_grist.py reads from each
 #                    checked field (default 2048; a whole field is 1.3 GB)
 #
-#   GHRSST_HOLD_BACK days (default 17) between a file's date and the time
-#                    the listing was taken before the file is indexed: see
-#                    below. 0 indexes every listed day
-#   GHRSST_LISTER    corpus (default for the source.coop root) or vsi.
-#                    corpus: the file list is source ausantarctic-ghrsst-mur-v2
-#                    of the aad-filelist listing corpus (py/corpus.py, S3
-#                    ListObjectsV2 with size, mtime, etag), and what it knew
-#                    of each file is written to $WORK/sources.meta.tsv, the
-#                    build record the stale step checks. Run the aad-filelist
-#                    sync first for a recent end date (the corpus is weekly).
-#                    vsi: `gdal vsi ls` of GHRSST_COG_ROOT now (the only
-#                    choice for a local directory); no build record, and the
-#                    hold-back counts from today
-#   CORPUS_BASE      corpus release or local copy (py/corpus.py)
+#   GHRSST_LISTER    cogger (default for the source.coop root) or vsi.
+#                    cogger: ghrsst-cogger's own output is the list
+#                    (py/ghrsst_sources.py: ListObjectsV2 of the bucket plus
+#                    each recent day's STAC item), and its size, mtime and
+#                    etag go to $WORK/sources.meta.tsv, the build record the
+#                    stale step checks against the bucket. The aad-filelist
+#                    corpus is not involved: cogger makes this dataset.
+#                    vsi: `gdal vsi ls` of GHRSST_COG_ROOT (the only choice
+#                    for a local directory); no build record
+#   GHRSST_QUIET_DAYS  (cogger, default 3) days since cogger last wrote a
+#                    day's COG before it is indexed
+#   GHRSST_STATUS_DAYS (cogger, default 60) days back from the newest whose
+#                    STAC item is read for ghrsst:status
+#   GHRSST_HOLD_BACK (vsi, default 17) days between a file's date and today
+#                    before it is indexed (no status is known there)
 #
-# Hold-back: ghrsst-cogger rewrites each day's COGs at the same address
-# about 5 days after the date, and upstream MUR itself revises a day for up
-# to 16 days. A store harvested before the last rewrite holds byte offsets
-# into the old file: the kerchunk and Icechunk forms then read wrong bytes
-# or fail (the VRT form opens the file and is unaffected). The 3 Nov 2026
-# scratch build had 7 such days. So the newest GHRSST_HOLD_BACK days are
-# left out, and the stale step (run.sh ... stale) reports any indexed file
-# that changed since. HARVEST_RECHECK=30 still rescans recent days that
-# changed, for a work directory built without the hold-back.
+# Hold-back: ghrsst-cogger first writes a day from the interim (NRT) MUR
+# file, its STAC item saying ghrsst:status "preliminary", then rewrites the
+# same keys from the final MUR file a few days later ("final"). A store
+# harvested before that rewrite holds byte offsets into the old file: the
+# kerchunk and Icechunk forms then read wrong bytes or fail (the VRT form
+# opens the file and is unaffected). The 3 Nov 2026 scratch build had 7
+# such days. So a day is indexed only when cogger says final and has not
+# written it for GHRSST_QUIET_DAYS, and every later day is held back with
+# it; the stale step (run.sh ... stale) reports any indexed COG that changed
+# since (a cogger reprocessing rewrites old days too). HARVEST_RECHECK=30
+# still rescans recent days that changed, for an older work directory.
 #
 # gdal mdim mosaic does not take GeoTIFF, so the plan is py/plan_cog.py (the
 # vrtstack form). PREDICTOR=2 maps to the imagecodecs_delta filter: the
@@ -58,19 +61,19 @@ ARRAYS=$GHRSST_VAR
 GHRSST_PATTERN="^([0-9]{8})090000-JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02\.0-fv04\.1_${GHRSST_VAR}\.tif\$"
 GHRSST_HOLD_BACK=${GHRSST_HOLD_BACK:-17}
 if [ -z "${GHRSST_LISTER:-}" ]; then
-  if [ "$GHRSST_COG_ROOT" = /vsis3/ausantarctic/ghrsst-mur-v2 ]; then GHRSST_LISTER=corpus; else GHRSST_LISTER=vsi; fi
+  if [ "$GHRSST_COG_ROOT" = /vsis3/ausantarctic/ghrsst-mur-v2 ]; then GHRSST_LISTER=cogger; else GHRSST_LISTER=vsi; fi
 fi
 case "$GHRSST_LISTER" in
-  corpus)
+  cogger)
     [ "$GHRSST_COG_ROOT" = /vsis3/ausantarctic/ghrsst-mur-v2 ] ||
-      { echo "GHRSST_LISTER=corpus lists the source.coop bucket only; use GHRSST_LISTER=vsi for $GHRSST_COG_ROOT" >&2; exit 1; }
-    sources() {
-      local yrs=; [ -z "${GHRSST_YEARS:-}" ] || yrs="/($(echo $GHRSST_YEARS | tr ' ' '|'))/"
-      "$PYTHON" "$HERE/py/corpus.py" --source ausantarctic-ghrsst-mur-v2 \
-        --cache "$WORK/listing.parquet" --meta "$WORK/sources.meta.tsv" \
-        --match "/${GHRSST_PATTERN#^}" ${yrs:+--match "$yrs"} --date "$GHRSST_PATTERN" \
-        --hold-back "$GHRSST_HOLD_BACK" --prefix https:// /vsicurl/https://
-    } ;;
+      { echo "GHRSST_LISTER=cogger lists the source.coop bucket only; use GHRSST_LISTER=vsi for $GHRSST_COG_ROOT" >&2; exit 1; }
+    ghrsst_lister() {
+      "$PYTHON" "$HERE/py/ghrsst_sources.py" --var "$GHRSST_VAR" ${GHRSST_YEARS:+--years "$GHRSST_YEARS"} \
+        --quiet "${GHRSST_QUIET_DAYS:-3}" --status-days "${GHRSST_STATUS_DAYS:-60}" "$@"
+    }
+    sources() { ghrsst_lister --meta "$WORK/sources.meta.tsv"; }
+    # run.sh stale: the build record against the bucket now (not the corpus)
+    stale_check() { ghrsst_lister --stale "$WORK/sources.meta.tsv" | tee "$WORK/stale.tsv"; } ;;
   vsi)
     sources() (
       root=$GHRSST_COG_ROOT; url=$root
