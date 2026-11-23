@@ -44,7 +44,7 @@ website:
       - icon: github
         href: https://github.com/mdsumner/raad.virtualize
   page-footer:
-    left: "AAD virtual stores on source.coop. Status 2026-11-05."
+    left: "AAD virtual stores on source.coop. Status 2026-11-23."
     right: "Built with [Quarto](https://quarto.org)"
 
 format:
