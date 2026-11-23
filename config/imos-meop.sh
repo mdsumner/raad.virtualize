@@ -9,11 +9,13 @@
 #   MEOP-CTD_2017-10-01  the other *_prof.nc, 299 files, N_LEVELS 12 to 28
 #                        (fixed SRDL levels, by tag), 2004-2017
 # The files are rewritten in place (299 last written in 2017, 135 in 2024,
-# 130 in 2025): the build record keeps each file's ETag, and
+# 130 in 2025): the build record keeps each file's ETag under the corpus
+# source imos_aatams_meop_ctd (aad-filelist, s3-list of the same prefix), so
+#   bash run.sh config/imos-meop.sh stale
+# lists those changed since the build against the corpus, and
 #   python py/s3_sources.py --bucket imos-data --region ap-southeast-2 \
 #     --prefix "$MEOP_PREFIX" --stale work/<DATASET>/sources.meta.tsv
-# lists those changed since the build (the `stale` step reads the aad-filelist
-# corpus, which does not list this bucket).
+# does the same against the bucket now.
 #
 #   MEOP_CANON=cube (default)  meop-ctd-2024: the 2024 release as one cube of
 #       (N_PROF, N_LEVELS) = (126518, 1000), every file's profiles in key
@@ -81,7 +83,8 @@ esac
 
 sources() {
   "$PYTHON" "$HERE/py/s3_sources.py" --bucket "$MEOP_BUCKET" --region "$MEOP_REGION" \
-    --prefix "$MEOP_PREFIX" --match "$MEOP_MATCH" --meta "$WORK/sources.meta.tsv"
+    --prefix "$MEOP_PREFIX" --match "$MEOP_MATCH" --meta "$WORK/sources.meta.tsv" \
+    --source-id imos_aatams_meop_ctd
 }
 make_plan() {
   local ext=(--extents "$WORK/extents.tsv" --lat LATITUDE --lon LONGITUDE --time JULD --lat-max "$MEOP_LAT_MAX")
