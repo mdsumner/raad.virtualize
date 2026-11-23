@@ -7,8 +7,8 @@ docs/_freshness.json where it exists; no network access. A product without
 "public_base" in product.json is listed without URLs.
 
 The freshness table joins two kinds of field. Declared facts come from the
-datasets.tsv columns update_model, upstream_cadence, bytes_owner and
-bytes_at. Computed values (index extent, upstream extent, stale files, build
+datasets.tsv columns update_model, upstream_cadence, bytes_owner,
+bytes_at and owner. Computed values (index extent, upstream extent, stale files, build
 record) come from docs/_freshness.json, written weekly by
 mdsumner/bowerbird-byterefs (freshness/freshness.py) and fetched by the
 Pages workflow before the render. Without it the computed columns are empty.
@@ -72,14 +72,21 @@ def freshness(products):
            " time). *Index to* is the last date in the published store, *upstream to*"
            " the last date the corpus lists for the same files, and *stale* the"
            " referenced files the corpus lists with another size or ETag, or no"
-           " longer lists: their byte references are wrong.", ""]
+           " longer lists: their byte references are wrong.", "",
+           "*Owner* is `research` (the research team builds and publishes the"
+           " store), `production` (the production team does, from its product"
+           " repo) or `designated` (research today; decided on 2026-11-22 to move to"
+           " production). A designated store moves when it passes four criteria:"
+           " metadata declared in the store (CRS, units, attributes), codecs that a"
+           " GDAL release, xarray and R all read, a settled shape (grouping), and a"
+           " frozen backlog, so that ongoing work is appends from public URLs.", ""]
     if comp:
         out += [f"Computed {ymd(comp.get('generated'))} from the corpus run"
                 f" `{comp.get('corpus_run')}` ([freshness.json]({FRESHNESS_SRC})).", ""]
     else:
         out += ["Computed values are not available in this build of the site.", ""]
-    out += ["| Dataset | Update model | Upstream cadence | Bytes | Index to | Upstream to | Behind | Stale | Build record |",
-            "|---|---|---|---|---|---|---|---|---|"]
+    out += ["| Dataset | Owner | Update model | Upstream cadence | Bytes | Index to | Upstream to | Behind | Stale | Build record |",
+            "|---|---|---|---|---|---|---|---|---|---|"]
     for prod, rows in products:
         for r in rows:
             c = (comp or {}).get("datasets", {}).get(r["dataset"], {})
@@ -89,7 +96,7 @@ def freshness(products):
             up_to = up.get("newest_date") if r.get("update_model", "").startswith("append") else None
             stale = "" if not c else ("not in corpus" if st is None else str(st["changed"] + st["removed"]))
             rec = "" if not c else ("yes" if ix.get("build_record") else "no")
-            out.append(f"| [`{r['dataset']}`](#{r['dataset']}) | {r.get('update_model', '')} |"
+            out.append(f"| [`{r['dataset']}`](#{r['dataset']}) | {r.get('owner', '')} | {r.get('update_model', '')} |"
                        f" {r.get('upstream_cadence', '')} | {f'[{owner}]({at})' if at else owner} |"
                        f" {ymd(idx_to)} | {ymd(up_to)} | {behind(idx_to, up_to) if up_to else ''} |"
                        f" {stale} | {rec} |")

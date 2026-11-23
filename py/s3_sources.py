@@ -1,6 +1,7 @@
 """s3_sources.py -- source list and build record from an anonymous S3 listing.
 
-For public buckets the aad-filelist corpus does not list (IMOS imos-data).
+For public buckets listed directly rather than through the aad-filelist
+corpus (IMOS imos-data, which the corpus lists as imos_aatams_meop_ctd).
 Lists s3://BUCKET/PREFIX with ListObjectsV2 over https (no credentials, no
 SDK), keeps the keys that match --match (a regex on the key), sorted by
 key, and prints each as a source: URL_BASE + key, where URL_BASE defaults to
@@ -8,7 +9,9 @@ the bucket's virtual-hosted https endpoint with GDAL's /vsicurl/ prefix.
 
   --meta FILE   write the build record (py/corpus.py META_COLS: source_id,
                 source, url, date, size, mtime, etag, last_changed), with
-                source_id "s3:BUCKET"
+                source_id --source-id (default "s3:BUCKET"); give the
+                corpus source id that lists the same objects, and the
+                stale step (py/stale.py) reads the corpus for it
   --stale FILE  compare a build record with the bucket now instead (the
                 py/stale.py rule: etag, then size): print each url that is
                 removed or changed, and exit 1 when any is (0 when none)
@@ -65,6 +68,8 @@ def main():
     ap.add_argument("--match", default="", help="regex the key must match")
     ap.add_argument("--url-base", help="source prefix (default /vsicurl/ + the https endpoint)")
     ap.add_argument("--meta", help="write the build record here")
+    ap.add_argument("--source-id", help="source_id of the build record: the aad-filelist corpus "
+                                        "source that lists these objects (default s3:BUCKET)")
     ap.add_argument("--stale", help="compare this build record with the bucket now")
     a = ap.parse_args()
     https = endpoint(a.bucket, a.region)
@@ -93,7 +98,8 @@ def main():
     for k, *_ in objs:
         print(base + k)
     if a.meta:
-        write_meta(a.meta, ({"source_id": f"s3:{a.bucket}", "source": base + k, "url": https + k,
+        sid = a.source_id or f"s3:{a.bucket}"
+        write_meta(a.meta, ({"source_id": sid, "source": base + k, "url": https + k,
                              "size": size, "mtime": lm, "etag": etag, "last_changed": lm}
                             for k, size, lm, etag in objs))
     print(f"s3_sources: {len(objs)} objects", file=sys.stderr)
