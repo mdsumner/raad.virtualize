@@ -11,6 +11,9 @@
 # target). Steps: deps plan harvest collate render icechunk grist stac verify, and
 # prepare publish publish-stac verify-published stale (not run by default).
 # stale compares the build record (sources.meta.tsv) with the listing corpus.
+# verify records a pass in out/verify.json (py/verify_record.py); publish
+# refuses without one for the store as it is, and any step that changes the
+# store or a verified form removes it.
 # publish-stac republishes only stac/ and thumbnail.png. prepare runs the
 # config's prepare function, for a dataset that writes its sources first.
 # Env: E2E_WORK (default ./work/<DATASET>), PYTHON, RSCRIPT, GDAL, WORKERS,
@@ -67,6 +70,10 @@ step() {
 
 arr_flags=(); for a in $ARRAYS; do arr_flags+=(--array "$a"); done
 for s in $STEPS; do
+  # the publish gate (py/verify_record.py): a step that changes the store or
+  # a form that verify checks removes the record of the last pass, so
+  # publish needs a verify after it
+  case $s in plan|harvest|collate|render|icechunk|grist) rm -f "$WORK/out/verify.json" ;; esac
   case $s in
     deps)
       step deps "$RSCRIPT" "$HERE/R/install-deps.R" "$R_LIB" ;;
@@ -152,16 +159,24 @@ for s in $STEPS; do
         step stac "$PYTHON" "$HERE/py/stac_geoparquet.py" "$WORK/out/stac/items.ndjson" "$WORK/out/stac/items.parquet"
       fi ;;
     verify)
+      rm -f "$WORK/out/verify.json"
       step verify "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
         ${VERIFY_WINDOWS:-}
+      checks=(--check verify.py)
       # the catalog rows against their source granules, through the local VRT
       if [ -f "$WORK/out/grist/catalog.parquet" ]; then
         step verify "$PYTHON" "$HERE/py/verify_grist.py" --catalog "$WORK/out/grist/catalog.parquet" \
           --vrt "$WORK/out/mdim.vrt" --boundaries "${GRIST_VERIFY_BOUNDARIES:-8}" \
           --window "${GRIST_VERIFY_WINDOW:-0}"
-      fi ;;
+        checks+=(--check verify_grist.py)
+      fi
+      # reached only when every check passed (set -o pipefail): the record
+      # publish requires, published with out/
+      "$PYTHON" "$HERE/py/verify_record.py" write "$WORK" "${checks[@]}" | tee -a "$LOG" ;;
     publish)
       [ -n "$PUB" ] || { echo "publish: set PUBLISH or source a publish config"; exit 1; }
+      # the gate: a verify pass recorded for this store (out/verify.json)
+      "$PYTHON" "$HERE/py/verify_record.py" check "$WORK" | tee -a "$LOG"
       # PUBLISH_WITH=obstore (config/source-coop.sh): py/s3_sync.py, for
       # endpoints that reject GDAL's request signing
       if [ "${PUBLISH_WITH:-gdal}" = obstore ]; then
