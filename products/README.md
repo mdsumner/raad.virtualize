@@ -19,7 +19,9 @@ when it is ready, and anything here may change or be removed without notice.
 
 Groups: `bluelink/` (Bluelink ReANalysis), `ghrsst/` (GHRSST MUR),
 `oisst/` (NOAA OISST), `seaice/` (sea ice concentration), `oceancolour/`
-(ESA Ocean Colour CCI chlorophyll-a). Each group's README shows the
+(ESA Ocean Colour CCI chlorophyll-a), `access-esm/` (ACCESS-ESM1.6 model
+output), `imos-tracking/` (IMOS animal tracking: seal and turtle CTD
+profiles). Each group's README shows the
 thumbnail of every dataset.
 
 ## Reading

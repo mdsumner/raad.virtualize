@@ -16,7 +16,8 @@ MR_FORMAT   <- "byterefs/0.1"
 ## readers also accept "mdim-refs/0.2" (same layout) until byterefs/0.2 (byterefs decision 0003)
 MR_RESERVED <- c("meta", "sources", "arrays", "placements", "remap")
 ## meta keys that hold JSON for the renders, not dataset attributes
-MR_META_JSON <- c("coord_attrs", "dimensions")
+## (groups: the attributes of each subgroup of the plan, by path)
+MR_META_JSON <- c("coord_attrs", "dimensions", "groups")
 
 .q   <- function(con, x) as.character(dbQuoteIdentifier(con, x))
 .j   <- function(x) if (is.null(x)) NA_character_ else
@@ -118,7 +119,11 @@ mr_add_array <- function(con, array, dims, chunks, dtype, kind = "data",
                   list(if (is.null(values)) NULL else values)))
   if (storage == "referenced") {
     rank <- length(dims); d <- .dims(rank); tbl <- .q(con, array)
-    if (array %in% dbListTables(con) && mr_rank(con, array) != rank)
+    ## one lookup, not dbListTables(): a store of one group per source has
+    ## tens of thousands of tables, and this runs once per array
+    have <- nrow(dbGetQuery(con, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                            params = list(array))) > 0L
+    if (have && mr_rank(con, array) != rank)
       stop(sprintf("array '%s' exists with rank %d, not %d", array,
                    mr_rank(con, array), rank))
     dbExecute(con, sprintf('CREATE TABLE IF NOT EXISTS %s (
@@ -273,50 +278,95 @@ mr_ingest_scan <- function(con, dir) {
                  Float32 = "<f4", Float64 = "<f8")
 .ints <- function(x) as.integer(strsplit(x, ",", fixed = TRUE)[[1]])
 
+## xml2 finds with no namespaces: by default xml2 collects the namespaces of
+## the whole document (xml_ns()) on every call, which makes reading a plan of
+## thousands of arrays quadratic (a plan VRT declares none)
+.ff <- function(x, xpath) xml2::xml_find_first(x, xpath, ns = character())
+.fa <- function(x, xpath) xml2::xml_find_all(x, xpath, ns = character())
+
+## <Attribute>s of a plan node: strings as text, other types as numbers
+.plan_attrs <- function(node) {
+  pat <- list()
+  for (x in .fa(node, "./Attribute")) {
+    v <- xml2::xml_text(.fa(x, "./Value"))
+    pat[[xml2::xml_attr(x, "name")]] <-
+      if (identical(xml2::xml_text(.ff(x, "./DataType")), "String")) v else as.numeric(v)
+  }
+  pat
+}
+
+## The plan's arrays, coordinates, dimensions and groups. A subgroup's
+## arrays and dimensions are named by their path without the leading slash
+## (g/TEMP, g/N_PROF; py/plan_groups.py, one group per source file), a
+## DimensionRef resolved in its group, then its ancestors (or absolute,
+## "/g/N_PROF"); `groups` holds each subgroup's attributes by path.
 mr_plan_vrt <- function(vrt) {
-  doc <- xml2::read_xml(vrt); g <- xml2::xml_find_first(doc, ".//Group")
-  dm <- xml2::xml_find_all(g, "./Dimension")
-  dim_size <- stats::setNames(as.integer(xml2::xml_attr(dm, "size")), xml2::xml_attr(dm, "name"))
-  ## dimension roles (HORIZONTAL_X, VERTICAL, TEMPORAL, ...) and directions
-  ## (EAST, UP, ...) as the mosaic wrote them, kept so the renders restate them
-  dim_role <- lapply(dm, function(d) {
-    x <- list(type = xml2::xml_attr(d, "type"), direction = xml2::xml_attr(d, "direction"))
-    x[!is.na(unlist(x))]
-  })
-  names(dim_role) <- names(dim_size)
-  out <- list(arrays = list(), coords = list(), dimensions = Filter(length, dim_role))
-  for (a in xml2::xml_find_all(g, "./Array")) {
-    nm   <- xml2::xml_attr(a, "name")
-    refs <- xml2::xml_attr(xml2::xml_find_all(a, "./DimensionRef"), "ref")
-    dt   <- .gdal_numpy[[xml2::xml_text(xml2::xml_find_first(a, "./DataType"))]]
-    srcs <- xml2::xml_find_all(a, "./Source")
+  doc <- xml2::read_xml(vrt)
+  out <- list(arrays = list(), coords = list(), dimensions = list(), groups = list())
+  dim_size <- integer(0)
+  walk <- function(g, prefix) {
+    dm <- .fa(g, "./Dimension")
+    dn <- if (length(dm)) paste0(prefix, xml2::xml_attr(dm, "name")) else character(0)
+    dim_size[dn] <<- as.integer(xml2::xml_attr(dm, "size"))
+    ## dimension roles (HORIZONTAL_X, VERTICAL, TEMPORAL, ...) and directions
+    ## (EAST, UP, ...) as the mosaic wrote them, kept so the renders restate them
+    dim_role <- lapply(dm, function(d) {
+      x <- list(type = xml2::xml_attr(d, "type"), direction = xml2::xml_attr(d, "direction"))
+      x[!is.na(unlist(x))]
+    })
+    names(dim_role) <- dn
+    out$dimensions <<- c(out$dimensions, Filter(length, dim_role))
+    ## the group path and its ancestors, nearest first
+    parts <- strsplit(sub("/$", "", prefix), "/", fixed = TRUE)[[1]]
+    scope <- c(if (length(parts)) rev(vapply(seq_along(parts), function(k)
+      paste0(paste(parts[seq_len(k)], collapse = "/"), "/"), "")), "")
+    qual <- function(ref) vapply(ref, function(r) {
+      if (startsWith(r, "/")) return(sub("^/", "", r))
+      hit <- paste0(scope, r)[paste0(scope, r) %in% names(dim_size)]
+      if (!length(hit)) stop(sprintf("plan: dimension '%s' is not defined in group '/%s' or above", r, prefix))
+      hit[1]
+    }, "", USE.NAMES = FALSE)
+    for (a in .fa(g, "./Array")) arr(a, prefix, qual)
+    for (sg in .fa(g, "./Group")) {
+      p <- paste0(prefix, xml2::xml_attr(sg, "name"))
+      out$groups[[p]] <<- .plan_attrs(sg)
+      walk(sg, paste0(p, "/"))
+    }
+  }
+  arr <- function(a, prefix, qual) {
+    nm   <- paste0(prefix, xml2::xml_attr(a, "name"))
+    refs <- qual(xml2::xml_attr(.fa(a, "./DimensionRef"), "ref"))
+    dt   <- .gdal_numpy[[xml2::xml_text(.ff(a, "./DataType"))]]
+    srcs <- .fa(a, "./Source")
     if (!length(srcs)) {
-      iv <- xml2::xml_find_first(a, "./InlineValues")
-      rs <- xml2::xml_find_first(a, "./RegularlySpacedValues")
-      un <- xml2::xml_text(xml2::xml_find_first(a, "./Unit"))
-      out$coords[[nm]] <- list(dims = refs, shape = unname(dim_size[refs]), dtype = dt,
-        unit = if (!is.na(un)) un,
+      iv <- .ff(a, "./InlineValues")
+      rs <- .ff(a, "./RegularlySpacedValues")
+      un <- xml2::xml_text(.ff(a, "./Unit"))
+      ## <Attribute>s of a coordinate the plan defines (a derived index, a
+      ## calendar)
+      out$coords[[nm]] <<- list(dims = refs, shape = unname(dim_size[refs]), dtype = dt,
+        unit = if (!is.na(un)) un, attrs = .plan_attrs(a),
         values = if (!is.na(iv)) as.numeric(strsplit(trimws(xml2::xml_text(iv)), "\\s+")[[1]]),
         affine = if (!is.na(rs)) list(start = as.numeric(xml2::xml_attr(rs, "start")),
                                       step  = as.numeric(xml2::xml_attr(rs, "increment"))))
-      next
+      return(invisible())
     }
-    fn <- xml2::xml_text(xml2::xml_find_first(srcs, "./SourceFilename"))
+    fn <- xml2::xml_text(.ff(srcs, "./SourceFilename"))
     ## an overview level placed as GTIFF_DIR:<k>:<file> (py/plan_cog.py
     ## --overviews): the source is the file, the directory goes with the band
     gdir <- ifelse(grepl("^GTIFF_DIR:[0-9]+:", fn), sub("^GTIFF_DIR:([0-9]+):.*$", "\\1", fn), NA_character_)
     fn <- sub("^GTIFF_DIR:[0-9]+:", "", fn)
     rel <- !grepl("^(/|[a-zA-Z][a-zA-Z0-9+.-]*://)", fn)
     if (any(rel)) fn[rel] <- normalizePath(file.path(dirname(vrt), fn[rel]), mustWork = FALSE)
-    ss <- xml2::xml_find_first(srcs, "./SourceSlab"); ds <- xml2::xml_find_first(srcs, "./DestSlab")
+    ss <- .ff(srcs, "./SourceSlab"); ds <- .ff(srcs, "./DestSlab")
     rank <- length(refs)
     sl <- function(node, attr, default) lapply(xml2::xml_attr(node, attr),
                                                function(x) if (is.na(x)) default else .ints(x))
     ## a <SourceBand> source (a 2D raster band given a leading length-1 axis
     ## by <SourceTranspose>-1,0,1</SourceTranspose>, the vrtstack form) is
     ## recorded as source_array "band:<n>", placed whole
-    sa <- sub("^/", "", xml2::xml_text(xml2::xml_find_first(srcs, "./SourceArray")))
-    sb <- xml2::xml_text(xml2::xml_find_first(srcs, "./SourceBand"))
+    sa <- sub("^/", "", xml2::xml_text(.ff(srcs, "./SourceArray")))
+    sb <- xml2::xml_text(.ff(srcs, "./SourceBand"))
     band <- is.na(sa) & !is.na(sb)
     sa[band] <- paste0("band:", sb[band])
     ## "band:<n>/dir:<k>": band n of TIFF directory k (an overview level)
@@ -326,7 +376,7 @@ mr_plan_vrt <- function(vrt) {
     ## a multidim source given a leading length-1 axis the same way (the
     ## plan_lift.py form: 2D files stacked on a new time axis) is recorded as
     ## "lift:<array>"; the rendered VRT writes the transpose back
-    tr <- gsub("\\s", "", xml2::xml_text(xml2::xml_find_first(srcs, "./SourceTranspose")))
+    tr <- gsub("\\s", "", xml2::xml_text(.ff(srcs, "./SourceTranspose")))
     lift <- !band & !is.na(sa) & !is.na(tr)
     if (any(lift)) {
       want <- paste(c(-1L, seq_len(rank - 1L) - 1L), collapse = ",")
@@ -336,7 +386,7 @@ mr_plan_vrt <- function(vrt) {
     }
     ## a band fills the array (rank 2) or one step of a leading new axis
     band_count <- .jl(if (rank == 2L) unname(dim_size[refs]) else c(1L, unname(dim_size[refs])[-1L]))
-    out$arrays[[nm]] <- list(
+    out$arrays[[nm]] <<- list(
       dims = refs, shape = unname(dim_size[refs]), dtype = dt,
       sources = data.frame(
         source = fn,
@@ -346,7 +396,9 @@ mr_plan_vrt <- function(vrt) {
         step       = vapply(sl(ss, "step",   rep(1L, rank)), .jl, ""),
         dest       = vapply(sl(ds, "offset", rep(0L, rank)), .jl, ""),
         stringsAsFactors = FALSE))
+    invisible()
   }
+  walk(.ff(doc, "/VRTDataset/Group"), "")
   out
 }
 
@@ -385,6 +437,8 @@ mr_set_plan <- function(con, plan, plan_uri = NA_character_) {
       ## plan for GeoTIFF sources has a time coordinate no source holds)
       at <- coord_attrs[[nm]]
       if (is.null(at$units) && !is.null(C$unit)) at <- c(at, list(units = C$unit))
+      ## and the plan's own attributes, where the harvest has none of that name
+      for (k in setdiff(names(C$attrs), names(at))) at[[k]] <- C$attrs[[k]]
       mr_add_array(con, nm, dims = C$dims, chunks = C$shape, dtype = C$dtype,
                    kind = "coord", storage = if (is.null(vals)) "affine" else "inline",
                    shape = C$shape, attrs = at, affine = C$affine,
@@ -397,9 +451,23 @@ mr_set_plan <- function(con, plan, plan_uri = NA_character_) {
       dbExecute(con, "INSERT INTO meta(key,value) VALUES('dimensions',?)
                       ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 params = list(.j(plan$dimensions)))
+    if (length(plan$groups))
+      dbExecute(con, "INSERT INTO meta(key,value) VALUES('groups',?)
+                      ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                params = list(.j(lapply(plan$groups, .zobj_list))))
   })
   mr_create_views(con)
   invisible(con)
+}
+
+## an empty attribute list as a JSON object, not an array
+.zobj_list <- function(x) if (length(x)) x else stats::setNames(list(), character(0))
+
+## subgroup attributes from the plan, list(<path> = list(<name> = value))
+mr_groups <- function(con) {
+  v <- dbGetQuery(con, "SELECT value FROM meta WHERE key = 'groups'")$value
+  if (!length(v)) return(list())
+  jsonlite::fromJSON(v, simplifyVector = FALSE)
 }
 
 ## dimension type and direction from the plan, list(<dim> = list(type, direction))

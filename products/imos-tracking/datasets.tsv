@@ -1,0 +1,7 @@
+# Datasets of the group. One row per dataset: dataset name, dataset config,
+# its settings (comma separated, as qsub -v takes them), title. Lines starting
+# with # are skipped. The catalog lists every row; catalog.sh check fails
+# when a row has no published collection.
+dataset	config	env	title
+meop-ctd-2024	config/imos-meop.sh	MEOP_CANON=cube	IMOS satellite-relay tag CTD profiles (MEOP quality control), IMOS-CTD_2024 release: one cube of 126,518 profiles by 1000 levels
+meop-ctd-tags	config/imos-meop.sh	MEOP_CANON=tags	IMOS satellite-relay tag CTD profiles (MEOP quality control), both releases: one group per tag (564 tags)

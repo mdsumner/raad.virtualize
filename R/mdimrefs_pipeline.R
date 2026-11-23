@@ -32,27 +32,34 @@ mr_ingest_scan_dir <- function(con, dir, verbose = TRUE, batch = 2000L,
   src <- do.call(rbind, lapply(sj, function(f) {
     x <- jsonlite::fromJSON(f)
     data.frame(source = x$source, size = x$size %||% NA, mtime = x$mtime %||% NA,
-               key = sub("[.]json$", "", basename(f)), stringsAsFactors = FALSE)
+               etag = x$etag %||% NA, key = sub("[.]json$", "", basename(f)), stringsAsFactors = FALSE)
   }))
-  mr_add_sources(con, src$source, src$size, src$mtime)
+  ## etag: recorded by harvest.py's cdf engine for remote sources
+  mr_add_sources(con, src$source, src$size, src$mtime, src$etag)
   ## gdal mdim mosaic checks nodata across sources but takes scale and offset
   ## from the first: a dataset whose packing changes between files cannot be
   ## one virtual array, so stop here (sidecars from harvest.py >= 2026-10-21)
   pk <- lapply(sj, function(f) jsonlite::fromJSON(f, simplifyVector = FALSE)$packing)
   pk <- Filter(Negate(is.null), pk)
   ## each source reports its own arrays: with one array per file only those
-  ## that hold an array are compared
-  for (nm in unique(unlist(lapply(pk, names)))) {
-    u <- unique(vapply(Filter(function(p) !is.null(p[[nm]]), pk), function(p) .j(p[[nm]]), ""))
-    if (length(u) > 1L) stop(sprintf("array '%s': scale/offset/nodata differ between sources: %s",
-                                     nm, paste(u, collapse = " | ")))
+  ## that hold an array are compared (one pass over every source's entries,
+  ## not one per array: a store of one group per source has thousands)
+  pkj <- unlist(lapply(pk, function(p) vapply(p, .j, "")))
+  if (length(pkj)) {
+    u <- lapply(split(unname(pkj), names(pkj)), unique)
+    for (nm in names(u)[lengths(u) > 1L])
+      stop(sprintf("array '%s': scale/offset/nodata differ between sources: %s",
+                   nm, paste(u[[nm]], collapse = " | ")))
   }
   meta <- jsonlite::fromJSON(file.path(dir, "arrays.json"), simplifyVector = FALSE)
   for (nm in names(meta)) {
     m <- meta[[nm]]
     if (!isTRUE(m$scanned)) next
-    frags <- file.path(dir, paste0("chunks_", nm), paste0(src$key, ".parquet"))
-    frags <- frags[file.exists(frags)]
+    ## the array's fragments, of sources whose scan finished (a sources/
+    ## record): listed, not one stat per source, as a store of one group per
+    ## source has thousands of arrays with one fragment each
+    frags <- list.files(file.path(dir, paste0("chunks_", nm)), pattern = "[.]parquet$", full.names = TRUE)
+    frags <- frags[sub("[.]parquet$", "", basename(frags)) %in% src$key]
     ## one codec per array, checked over every fragment before anything is written
     ## fragments are read as datasets of up to `batch` files and about
     ## `batch_bytes` of Parquet: one read and one merge per fragment costs
@@ -159,7 +166,9 @@ mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6,
       info    = ch(r$info, utf8),
       data    = ch(unclass(r$data), function(x) arrow::Array$create(
         lapply(x, function(v) if (is.null(v)) NULL else as.raw(v)), type = arrow::binary())))))
+    ## an array of a subgroup (g/TEMP) is refs_g/TEMP.parquet
     f <- file.path(dir, sprintf("refs_%s.parquet", a$array))
+    dir.create(dirname(f), recursive = TRUE, showWarnings = FALSE)
     if (row_group_rows > 0) {
       per <- if (n > 1L) prod(ceiling(a$shape[-1L] / a$chunks[-1L])) else 1
       steps <- max(1, round(row_group_rows / per))
@@ -186,6 +195,8 @@ mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6,
               dimensions = .zobj(mr_dimensions(con)),
               arrays = arrays,
               remap = lapply(seq_len(nrow(rm)), function(i) as.list(rm[i, ])))
+  ## subgroup attributes, for a store of subgroups (py/plan_groups.py)
+  if (length(gr <- mr_groups(con))) doc$groups <- gr
   writeLines(jsonlite::toJSON(doc, auto_unbox = TRUE, digits = I(17), null = "null",
                               na = "null", pretty = TRUE),
              file.path(dir, "arrays.json"))
@@ -207,7 +218,8 @@ mr_remap <- function(con, path, target = NULL) {
 }
 
 ## ---- render: GDAL multidimensional VRT ---------------------------------------------
-.numpy_gdal <- stats::setNames(names(.gdal_numpy), sub("^[<>|]", "", .gdal_numpy))
+.numpy_gdal <- c(stats::setNames(names(.gdal_numpy), sub("^[<>|]", "", .gdal_numpy)),
+                 S1 = "Byte")  # a char variable (classic netCDF), as GDAL reads a 1D one
 .gdal_type <- function(dtype) .numpy_gdal[[sub("^[<>|]", "", dtype)]]
 .num <- function(x) sprintf("%.17g", as.numeric(x))
 ## zstd where this arrow build has it (some builds lack it), else snappy
@@ -253,29 +265,66 @@ mr_remap <- function(con, path, target = NULL) {
   if (!is.null(at$scale_factor)) xml2::xml_add_child(node, "Scale", .num(at$scale_factor))
 }
 
+## group path and leaf name of a store name: "g/TEMP" -> c("g", "TEMP"),
+## "TEMP" -> c("", "TEMP")
+.split_path <- function(x) {
+  k <- regexpr("/[^/]*$", x)
+  if (k < 0) c("", x) else c(substr(x, 1L, k - 1L), substr(x, k + 1L, nchar(x)))
+}
+.leaf <- function(x) sub("^.*/", "", x)
+
+## A 2D char variable (classic netCDF NC_CHAR) is read by GDAL's netCDF
+## driver as a 1D array of strings, so no VRT array of the stored shape can
+## take it as a source: it is left out of the VRT (the Zarr forms keep it).
+.vrt_unreadable <- function(a) identical(sub("^[<>|]", "", a$dtype), "S1") && length(a$dims) == 2L
+
 mr_write_mdim_vrt <- function(con, file, target = NULL) {
   arrays <- mr_array_list(con)
   names(arrays) <- vapply(arrays, `[[`, "", "array")
+  skip <- vapply(arrays, .vrt_unreadable, TRUE)
+  if (any(skip)) message(sprintf("  mdim VRT: %d 2D char arrays left out (GDAL reads them as strings), e.g. %s",
+                                 sum(skip), names(arrays)[skip][1]))
+  arrays <- arrays[!skip]
   doc <- xml2::xml_new_root("VRTDataset")
   g <- xml2::xml_add_child(doc, "Group", name = "/")
+  ## subgroups (py/plan_groups.py): a group element per path, created with
+  ## its parents, holding its own dimensions and attributes
+  grp_attrs <- mr_groups(con)
+  nodes <- list()
+  group_node <- function(path) {
+    if (!nzchar(path)) return(g)
+    if (!is.null(nodes[[path]])) return(nodes[[path]])
+    pl <- .split_path(path)
+    n <- xml2::xml_add_child(group_node(pl[1]), "Group", name = pl[2])
+    nodes[[path]] <<- n
+    n
+  }
   ## dimensions: every dim of every array, sized from the global shapes, with
   ## type and direction from the plan
   dims <- mr_dimensions(con)
   dsz <- list()
   for (a in arrays) for (i in seq_along(a$dims)) dsz[[a$dims[i]]] <- a$shape[i]
+  paths <- unique(c(vapply(names(dsz), function(d) .split_path(d)[1], ""),
+                    vapply(names(arrays), function(x) .split_path(x)[1], ""), names(grp_attrs)))
+  for (p in sort(paths)) group_node(p)
   for (d in names(dsz)) {
-    attrs <- c(name = d, size = dsz[[d]])
+    pl <- .split_path(d)
+    attrs <- c(name = pl[2], size = dsz[[d]])
     attrs <- c(attrs, unlist(dims[[d]]))
-    if (!is.null(arrays[[d]]) && arrays[[d]]$kind == "coord") attrs <- c(attrs, indexingVariable = d)
-    do.call(xml2::xml_add_child, c(list(g, "Dimension"), as.list(attrs)))
+    if (!is.null(arrays[[d]]) && arrays[[d]]$kind == "coord") attrs <- c(attrs, indexingVariable = pl[2])
+    do.call(xml2::xml_add_child, c(list(group_node(pl[1]), "Dimension"), as.list(attrs)))
   }
   m <- dbReadTable(con, "meta")
   m <- m[!m$key %in% MR_META_JSON, , drop = FALSE]
   .vrt_attrs(g, as.list(stats::setNames(m$value, m$key)))  # dataset, generator, ...
+  for (p in names(grp_attrs)) .vrt_attrs(group_node(p), grp_attrs[[p]])
   for (a in arrays[order(vapply(arrays, `[[`, "", "kind") != "coord")]) {
-    node <- xml2::xml_add_child(g, "Array", name = a$array)
+    pl <- .split_path(a$array)
+    node <- xml2::xml_add_child(group_node(pl[1]), "Array", name = pl[2])
     xml2::xml_add_child(node, "DataType", .gdal_type(a$dtype))
-    for (d in a$dims) xml2::xml_add_child(node, "DimensionRef", ref = d)
+    ## dimensions by name in the array's group, or by full path elsewhere
+    for (d in a$dims) xml2::xml_add_child(node, "DimensionRef",
+      ref = if (.split_path(d)[1] == pl[1]) .leaf(d) else paste0("/", d))
     if (a$storage == "referenced")
       xml2::xml_add_child(node, "BlockSize", paste(a$chunks, collapse = ","))
     .vrt_lifted(node, a)
@@ -355,11 +404,22 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
 }
 
 mr_kerchunk_writer <- function(root, vars_meta, ref_tables, inline = list(),
-                               record_size = 100000L, root_attrs = list()) {
+                               record_size = 100000L, root_attrs = list(), group_attrs = list()) {
   unbox <- jsonlite::unbox
   if (dir.exists(root)) unlink(root, recursive = TRUE)
   dir.create(root, recursive = TRUE)
   metadata <- list(".zgroup" = list(zarr_format = unbox(2L)), ".zattrs" = .zobj(root_attrs))
+  ## subgroups: every parent path of an array name (g/TEMP), with the
+  ## group's attributes where the store has them
+  gp <- unique(unlist(lapply(names(vars_meta), function(v) {
+    parts <- strsplit(v, "/", fixed = TRUE)[[1]]
+    if (length(parts) < 2L) character(0) else
+      vapply(seq_len(length(parts) - 1L), function(k) paste(parts[seq_len(k)], collapse = "/"), "")
+  })))
+  for (p in gp) {
+    metadata[[paste0(p, "/.zgroup")]] <- list(zarr_format = unbox(2L))
+    metadata[[paste0(p, "/.zattrs")]] <- .zobj(group_attrs[[p]])
+  }
   for (v in names(vars_meta)) {
     info <- vars_meta[[v]]; is_inline <- v %in% names(inline)
     metadata[[paste0(v, "/.zarray")]] <- list(
@@ -428,7 +488,7 @@ mr_write_kerchunk_parquet <- function(con, root, target = NULL, record_size = 10
                             compressor = if (ref) a$codec$compressor else NULL,
                             filters = if (ref) a$codec$filters else NULL,
                             fill_value = if (is.null(a$fill)) NULL else .fill_json(a$fill),
-                            attrs = c(list(`_ARRAY_DIMENSIONS` = I(a$dims)), at))
+                            attrs = c(list(`_ARRAY_DIMENSIONS` = I(.leaf(a$dims))), at))
     if (ref) {
       r <- mr_refs(con, nm, target)
       if (any(r$present == 1L & is.na(r$path)))
@@ -443,5 +503,5 @@ mr_write_kerchunk_parquet <- function(con, root, target = NULL, record_size = 10
   m <- dbReadTable(con, "meta")
   m <- m[!m$key %in% MR_META_JSON, , drop = FALSE]
   mr_kerchunk_writer(root, vars_meta, ref_tables, inline = inline, record_size = record_size,
-                     root_attrs = as.list(stats::setNames(m$value, m$key)))
+                     root_attrs = as.list(stats::setNames(m$value, m$key)), group_attrs = mr_groups(con))
 }

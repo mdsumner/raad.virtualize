@@ -1,0 +1,7 @@
+{
+  "id": "imos-tracking",
+  "title": "IMOS animal tracking virtual stores",
+  "description": "Byte-reference indexes of IMOS Animal Tracking Facility (AATAMS) data, read in place from the IMOS public bucket imos-data (s3://imos-data/IMOS/AATAMS/). No data is copied. The first datasets are the MEOP-QC'd CTD profiles of satellite-relay tags on seals and turtles: one cube of the IMOS-CTD_2024 release (profiles by 1 dbar levels), and every tag of both releases as a group of its own. Drafts.",
+  "license": "other",
+  "public_base": "https://data.source.coop/ausantarctic/ausantarctic-scratch/imos-tracking"
+}

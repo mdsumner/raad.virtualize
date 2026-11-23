@@ -131,12 +131,14 @@ for s in $STEPS; do
       # overview image of one field (py/thumbnail.py), a collection asset;
       # a failure leaves the collection without one. STAC_THUMBNAIL=0 skips,
       # STAC_THUMB_ARRAY (default the first of ARRAYS), STAC_THUMB_PALETTE,
-      # STAC_THUMB_LOG10=1 and STAC_THUMB_WIDTH choose what is drawn
+      # STAC_THUMB_LOG10=1, STAC_THUMB_WIDTH, STAC_THUMB_SOURCE (regex on the
+      # source path) and STAC_THUMB_TRANSPOSE=1 choose what is drawn
       rm -f "$WORK/out/thumbnail.png"
       if [ "${STAC_THUMBNAIL:-1}" = 1 ]; then
         if desc=$("$PYTHON" "$HERE/py/thumbnail.py" "$WORK/store.sqlite" "$WORK/out/thumbnail.png" \
               --array "${STAC_THUMB_ARRAY:-${ARRAYS%% *}}" --palette "${STAC_THUMB_PALETTE:-viridis}" \
               --width "${STAC_THUMB_WIDTH:-512}" $([ "${STAC_THUMB_LOG10:-0}" = 1 ] && echo --log10) \
+              ${STAC_THUMB_SOURCE:+--source "$STAC_THUMB_SOURCE"} $([ "${STAC_THUMB_TRANSPOSE:-0}" = 1 ] && echo --transpose) \
               2>> "$LOG"); then
           export STAC_THUMB_DESCRIPTION="Overview of $desc (py/thumbnail.py)."
           echo "stac: thumbnail $desc" | tee -a "$LOG"

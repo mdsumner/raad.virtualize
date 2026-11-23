@@ -25,5 +25,9 @@ tm <- function(label, expr) {
 rg <- as.numeric(Sys.getenv("FLAT_ROW_GROUP_ROWS", "20000"))
 tm("flat refs store", mr_write_flat(con, file.path(out, "flat"), row_group_rows = rg))
 tm("mdim VRT", mr_write_mdim_vrt(con, file.path(out, "mdim.vrt"), target = vt))
-tm("kerchunk Parquet", mr_write_kerchunk_parquet(con, file.path(out, "kerchunk"), target = kt))
+## KERCHUNK_RECORD_SIZE: refs per Parquet file (default 100000); every array
+## gets at least one file, padded to this many rows, so a store of many
+## one-chunk arrays (one group per source) takes a small value
+rs <- as.integer(Sys.getenv("KERCHUNK_RECORD_SIZE", "100000"))
+tm("kerchunk Parquet", mr_write_kerchunk_parquet(con, file.path(out, "kerchunk"), target = kt, record_size = rs))
 DBI::dbDisconnect(con)

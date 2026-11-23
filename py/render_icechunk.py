@@ -59,9 +59,11 @@ byte order), then numcodecs.shuffle, then numcodecs.zlib / gzip / zstd.
 Anything else stops.
 """
 import argparse
+import base64
 import json
 import os
 import shutil
+import struct
 import sys
 import time
 from urllib.parse import urlparse
@@ -186,6 +188,16 @@ def json_safe(x):
     return x
 
 
+def xr_fill(value, dtype):
+    """A _FillValue attribute as xarray reads it from Zarr v3
+    (FillValueCoder): a float one as base64 of the little-endian float64
+    bytes (a plain number stops xarray with "Failed to decode fill_value:
+    expected str or bytes"), an integer one as is."""
+    if np.dtype(dtype).kind != "f":
+        return value
+    return base64.standard_b64encode(struct.pack("<d", float(value))).decode()
+
+
 def fill_of(row):
     if row.get("fill") is None:
         return None
@@ -277,11 +289,19 @@ def main():
     root = zarr.open_group(store, mode="w", attributes=attrs0)
 
     t0 = time.time()
+    # subgroups (a plan of one group per source, py/plan_groups.py), parents
+    # first, with their attributes; arrays are named by path (g/TEMP)
+    for gp, at in sorted((doc.get("groups") or {}).items()):
+        root.require_group(gp).attrs.update(json_safe(at or {}))
+    leaf = lambda dims: [d.split("/")[-1] for d in dims]
     coords = [r for r in rows if r["storage"] != "referenced"]
     for r in coords:
         v = coord_values(r).astype(np.dtype(r["dtype"]).newbyteorder("="))
+        at = json_safe(r.get("attrs") or {})
+        if at.get("_FillValue") is not None:
+            at["_FillValue"] = xr_fill(at["_FillValue"], v.dtype)
         z = root.create_array(r["array"], shape=v.shape, chunks=v.shape, dtype=v.dtype,
-                              dimension_names=r["dims"], attributes=json_safe(r.get("attrs") or {}),
+                              dimension_names=leaf(r["dims"]), attributes=at,
                               fill_value=None)
         z[:] = v
     nref, pending, ncommit = 0, 0, 0
@@ -295,14 +315,20 @@ def main():
         # xarray masks on this attribute for Zarr v3. A NaN fill is left out:
         # zarr writes attributes with bare NaN tokens, which is not JSON and
         # which Icechunk rejects ("bad metadata"), and NaN needs no mask.
+        # xarray (FillValueCoder) reads a float one as base64 of the
+        # little-endian float64 bytes, and stops on a plain number
+        # ("Failed to decode fill_value: expected str or bytes").
         if fill is not None and np.isfinite(fill):
-            attrs["_FillValue"] = fill
+            attrs["_FillValue"] = xr_fill(fill, r["dtype"])
         attrs = json_safe(attrs)
+        # no fill: 0 for numbers; zarr's default (an empty byte) for a char
+        # array, where 0 would be the character "0" (a QC flag value)
+        kind = np.dtype(r["dtype"]).kind
         root.create_array(r["array"], shape=r["shape"], chunks=r["chunks"],
                           dtype=np.dtype(r["dtype"]).newbyteorder("="),
                           serializer=ser, compressors=comp, filters=pre or None,
-                          fill_value=fill if fill is not None else 0,
-                          dimension_names=r["dims"], attributes=attrs)
+                          fill_value=fill if fill is not None else (None if kind == "S" else 0),
+                          dimension_names=leaf(r["dims"]), attributes=attrs)
         n = len(r["dims"])
         pf = pq.ParquetFile(os.path.join(a.flat, f"refs_{r['array']}.parquet"))
         cols = [f"dim_{i}" for i in range(n)] + ["present", "path", "offset", "size"]
@@ -323,7 +349,8 @@ def main():
                 store = session.store
                 root = zarr.open_group(store, mode="r+")
                 pending, ncommit = 0, ncommit + 1
-        print(f"  {r['array']}: shape {r['shape']} chunks {r['chunks']}", file=sys.stderr)
+        if len(rows) <= 200:
+            print(f"  {r['array']}: shape {r['shape']} chunks {r['chunks']}", file=sys.stderr)
     if pending or not ncommit:  # a batch commit may already hold every ref
         snap = session.commit(f"byterefs flat store {os.path.abspath(a.flat)}, target {a.target}")
         ncommit += 1
