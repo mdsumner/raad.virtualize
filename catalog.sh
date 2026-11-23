@@ -61,7 +61,7 @@ fi
 # every row's config must put its dataset in this group, or run.sh publishes
 # it somewhere the catalog does not look
 if [ $ROOT_MODE = 0 ]; then
-  grep -v '^#' "$PRODUCT_DIR/datasets.tsv" | tail -n +2 | tr '\t' '\037' | while IFS=$'\037' read -r dataset config env title; do
+  grep -v '^#' "$PRODUCT_DIR/datasets.tsv" | tail -n +2 | tr '\t' '\037' | while IFS=$'\037' read -r dataset config env title _; do
     [ -n "$dataset" ] || continue
     got=$(cd "$HERE" && env ${env//,/ } HERE="$HERE" bash -c 'source "$1"; echo "${PRODUCT_GROUP:-}"' _ "$config")
     [ "$got" = "$PRODUCT_GROUP" ] || { echo "catalog: $dataset: $config gives PRODUCT_GROUP '$got', not $PRODUCT_GROUP" >&2; exit 1; }

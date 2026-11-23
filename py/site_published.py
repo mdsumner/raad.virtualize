@@ -1,18 +1,28 @@
-"""Write docs/published.md: one table per product listing every dataset and
-the URL of each published form.
+"""Write docs/published.md: a freshness table across every dataset, then one
+table per product listing every dataset and the URL of each published form.
 
 Run by Quarto before rendering the site (project pre-render in
-docs/_quarto.yml). Reads products/*/product.json and datasets.tsv only; no
-network access. A product without "public_base" in product.json is listed
-without URLs.
+docs/_quarto.yml). Reads products/*/product.json and datasets.tsv, and
+docs/_freshness.json where it exists; no network access. A product without
+"public_base" in product.json is listed without URLs.
+
+The freshness table joins two kinds of field. Declared facts come from the
+datasets.tsv columns update_model, upstream_cadence, bytes_owner and
+bytes_at. Computed values (index extent, upstream extent, stale files, build
+record) come from docs/_freshness.json, written weekly by
+mdsumner/bowerbird-byterefs (freshness/freshness.py) and fetched by the
+Pages workflow before the render. Without it the computed columns are empty.
 """
 
 import csv
+import datetime
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "published.md"
+FRESHNESS = ROOT / "docs" / "_freshness.json"
+FRESHNESS_SRC = "https://github.com/mdsumner/bowerbird-byterefs/releases/download/freshness/freshness.json"
 
 # form label, path under <public_base>/<dataset>/
 FORMS = [
@@ -31,6 +41,61 @@ def rows(tsv):
     return list(csv.DictReader(lines, delimiter="\t"))
 
 
+def ymd(v):
+    """YYYYMMDD or YYYYMM (or an ISO time) as YYYY-MM-DD or YYYY-MM."""
+    if not v:
+        return ""
+    v = str(v).replace("-", "")[:8]
+    return f"{v[:4]}-{v[4:6]}-{v[6:8]}" if len(v) == 8 else f"{v[:4]}-{v[4:6]}"
+
+
+def behind(index_to, upstream_to):
+    """Days from the index's last date to the upstream's, both daily."""
+    a, b = (str(x or "").replace("-", "")[:8] for x in (index_to, upstream_to))
+    if len(a) != 8 or len(b) != 8:
+        return ""
+    d = (datetime.date(int(b[:4]), int(b[4:6]), int(b[6:])) - datetime.date(int(a[:4]), int(a[4:6]), int(a[6:]))).days
+    return f"{d} d" if d > 0 else "0"
+
+
+def freshness(products):
+    """The freshness section: declared facts and computed values per dataset."""
+    comp = json.loads(FRESHNESS.read_text()) if FRESHNESS.exists() else None
+    out = ["## Freshness {#freshness}", "",
+           "Each store runs on three clocks: the publisher adds or rewrites files"
+           " (upstream), the aad-filelist corpus lists them (weekly), and the store is"
+           " rebuilt (by hand, today). *Update model* states what a new upstream file"
+           " does to a store: `fixed` (the sources never change; a new release is a"
+           " new dataset), `append` (new files only), `append-rewrite` (new files, and"
+           " the newest are rewritten in place for a while, so the dataset config"
+           " holds those days back) or `rewrite` (files rewritten in place at any"
+           " time). *Index to* is the last date in the published store, *upstream to*"
+           " the last date the corpus lists for the same files, and *stale* the"
+           " referenced files the corpus lists with another size or ETag, or no"
+           " longer lists: their byte references are wrong.", ""]
+    if comp:
+        out += [f"Computed {ymd(comp.get('generated'))} from the corpus run"
+                f" `{comp.get('corpus_run')}` ([freshness.json]({FRESHNESS_SRC})).", ""]
+    else:
+        out += ["Computed values are not available in this build of the site.", ""]
+    out += ["| Dataset | Update model | Upstream cadence | Bytes | Index to | Upstream to | Behind | Stale | Build record |",
+            "|---|---|---|---|---|---|---|---|---|"]
+    for prod, rows in products:
+        for r in rows:
+            c = (comp or {}).get("datasets", {}).get(r["dataset"], {})
+            ix, up, st = c.get("index") or {}, c.get("upstream") or {}, c.get("stale")
+            owner, at = r.get("bytes_owner") or "", r.get("bytes_at") or ""
+            idx_to = ix.get("interval_end")
+            up_to = up.get("newest_date") if r.get("update_model", "").startswith("append") else None
+            stale = "" if not c else ("not in corpus" if st is None else str(st["changed"] + st["removed"]))
+            rec = "" if not c else ("yes" if ix.get("build_record") else "no")
+            out.append(f"| [`{r['dataset']}`](#{r['dataset']}) | {r.get('update_model', '')} |"
+                       f" {r.get('upstream_cadence', '')} | {f'[{owner}]({at})' if at else owner} |"
+                       f" {ymd(idx_to)} | {ymd(up_to)} | {behind(idx_to, up_to) if up_to else ''} |"
+                       f" {stale} | {rec} |")
+    return out + [""]
+
+
 def main():
     out = [
         "---",
@@ -46,6 +111,9 @@ def main():
         "readers open which form is on the [Readers](readers.qmd) page.",
         "",
     ]
+    products = [(json.loads(pj.read_text()), rows(pj.parent / "datasets.tsv"))
+                 for pj in sorted(ROOT.glob("products/*/product.json"))]
+    out += freshness(products)
     for pj in sorted(ROOT.glob("products/*/product.json")):
         prod = json.loads(pj.read_text())
         base = prod.get("public_base", "").rstrip("/")
