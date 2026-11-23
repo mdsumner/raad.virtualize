@@ -39,7 +39,7 @@ DATASET=
 if [ $ROOT_MODE = 1 ]; then PRODUCT_GROUP=; PRODUCT=_root; else PRODUCT_GROUP=$PRODUCT; fi
 while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; shift; done
 STEPS=${*:-build}
-PYTHON=${PYTHON:-python}
+PYTHON=${PYTHON:-$(command -v python || command -v python3 || echo python)}
 WORK=${E2E_WORK:-$HERE/work/$PRODUCT}
 OUT="$WORK/catalog"
 BASE=${CATALOG_BASE:-${STAC_BASE:-}}
