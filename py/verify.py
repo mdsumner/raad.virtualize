@@ -208,6 +208,21 @@ def uses_imagecodecs(doc):
                for r in doc["arrays"] for f in ((r.get("codec") or {}).get("filters") or []))
 
 
+def refs_protocol(path):
+    """The protocol of the chunk references of a kerchunk Parquet store
+    (https, s3, or file for a local path), from the first reference that has
+    a path."""
+    import glob
+    import fsspec
+    import pyarrow.parquet as pq
+    for f in sorted(glob.glob(os.path.join(path, "*", "refs.*.parq"))):
+        col = pq.read_table(f, columns=["path"]).column("path")
+        for v in col.drop_null().to_pylist():
+            if v:
+                return fsspec.core.split_protocol(v)[0] or "file"
+    return "file"
+
+
 def kerchunk_py_reader(path):
     import fsspec
     import zarr
@@ -217,10 +232,13 @@ def kerchunk_py_reader(path):
     except ImportError:
         pass
     # asynchronous throughout, as zarr-python 3 stores expect: the reference
-    # filesystem and its target (inferred from the first ref, https or a local
-    # path) must agree, or fsspec refuses the pair
+    # filesystem and its target (https or a local path) must agree, or fsspec
+    # refuses the pair. The target is stated, not left to fsspec: it infers
+    # it from the first reference it iterates, and an absent chunk's path
+    # reads back as NaN ("argument of type 'float' is not a container")
     fs = fsspec.filesystem("reference", fo=path, lazy=True, asynchronous=True,
-                           skip_instance_cache=True, remote_options={"asynchronous": True})
+                           skip_instance_cache=True, remote_protocol=refs_protocol(path),
+                           remote_options={"asynchronous": True})
     g = zarr.open_group(zarr.storage.FsspecStore(fs, read_only=True, path=""), mode="r",
                         zarr_format=2)
 
