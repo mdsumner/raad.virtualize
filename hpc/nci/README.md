@@ -62,3 +62,48 @@ qsub -P ab12 -l storage=gdata/gb6+scratch/ab12 \
 
 `config/source-coop.sh` publishes with obstore (`py/s3_sync.py`), which the
 image needs.
+
+## Standing job
+
+`standing.pbs` keeps the datasets of `standing.tsv` current from `/g/data`
+without a THREDDS crawl: the filesystem is the listing. Each run, on copyq:
+
+1. lists every source of `standing.tsv` in situ (`py/gdata_listing.py`):
+   path, size and mtime of each matching file, kept in the aad-filelist
+   corpus shape under `LISTINGS` (default `/g/data/$PROJECT/$USER/listings`):
+   `current__<source_id>.parquet`, `changes__<source_id>.parquet`,
+   `runs/<source_id>/<run_id>.parquet` and `heartbeat__<source_id>.json`
+   (`listed_at`, file count, bytes, `listing_hash`, what changed);
+2. checks the last build of each dataset against that listing
+   (`run.sh <config> stale` with `CORPUS_BASE=$LISTINGS`);
+3. when the listing changed, the build is stale, or there is no build yet,
+   submits `bran-build.pbs` with `GDATA_LISTINGS=$LISTINGS` (the config
+   selects its files from the listing and writes `sources.meta.tsv`) and
+   `standing-handoff.pbs` held on it, unless a build or hand-off for that
+   dataset is still queued or running;
+4. writes `$LISTINGS/standing/<dataset>.json` (checked_at, heartbeat, stale
+   count, action) and submits itself for the next run with `qsub -a`.
+
+`standing-handoff.pbs` verifies the build (copyq, the forms point at
+THREDDS) and records it in bowerbird-byterefs: the release
+`<dataset>@<build_id>` and a pull request with the git record. Merging the
+pull request adopts the build. Source.coop keys last one hour, so the
+publish is not part of the chain: after the pull request, submit
+`bran-publish.pbs` with fresh keys, as above. A file of a store's sources
+replaced or removed on `/g/data` shows in the next run's stale check and
+triggers a rebuild.
+
+Once, on a login node: a bowerbird-byterefs checkout that can push, at
+`/g/data/$PROJECT/$USER/bowerbird-byterefs` (or `BBR` in `-v`), and `gh`
+on `PATH`, signed in. Then start the chain:
+
+```
+qsub -P jk72 -l storage=gdata/gb6+gdata/jk72+scratch/jk72 \
+  -v STANDING_STORAGE=gdata/gb6+gdata/jk72+scratch/jk72,STANDING_DRY=1,STANDING_ONCE=1 \
+  hpc/nci/standing.pbs
+```
+
+`STANDING_DRY=1` lists and checks without submitting builds,
+`STANDING_ONCE=1` without submitting the next run; drop both to start the
+chain. `qselect -N rv-standing -u $USER` shows the queued run; `qdel` it to
+stop. Settings are in the header of `standing.pbs`.
