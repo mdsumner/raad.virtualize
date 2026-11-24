@@ -7,3 +7,5 @@
 # Rows that share a source_id share one listing (listed once per run).
 dataset	source_id	roots	match	config	env
 bluelink-daily-temp	gdata_gb6_bran	/g/data/gb6/BRAN/BRAN2020/daily:/g/data/gb6/BRAN/BRAN2023/daily	/ocean_[a-z_]+_[0-9]{4}_[0-9]{2}\.nc$	config/bluelink.sh	BRAN_ROOT=gdata,BRAN_VAR=temp
+# access-om2-01: enable after COSIMA confirms an index may be published (cj50 licence CC BY-NC-ND 4.0); the hand-off makes a public release
+#access-om2-01.iaf-cycle4.ocean-2d-surface_pot_temp-1-daily-mean	gdata_cj50_om2_01_iaf_cycle4	/g/data/cj50/access-om2/raw-output/access-om2-01/01deg_jra55v140_iaf_cycle4	/output[0-9]+/(ocean|ice/OUTPUT)/[^/]+\.nc$	config/access-om2-01.sh	OM201_STEM=ocean-2d-surface_pot_temp-1-daily-mean
