@@ -6,7 +6,11 @@ Build and publication of `ausantarctic/bedmachine`, which holds COGs of
 MEaSUREs BedMachine Antarctica (NSIDC-0756) and the virtual forms over
 them, as `ausantarctic/bedmap` does for Bedmap3. Version 4 (file V04.1) is
 the only version built. Each version takes its own prefix (`v4.1/cog/`,
-`virtual/bedmachine-v4.1/`).
+`virtual/bedmachine-v4.1/`). The product repo is
+[AustralianAntarcticDivision/bedmachine](https://github.com/AustralianAntarcticDivision/bedmachine),
+which holds the byte makers (`bytes/fetch.sh`, `bytes/bedmachine_cog.py`);
+the config, product files and runner are here until raad.virtualize has a
+tag to pin.
 
 ## Source
 

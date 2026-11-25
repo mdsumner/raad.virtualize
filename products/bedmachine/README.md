@@ -4,7 +4,8 @@ Cloud-optimized copies of MEaSUREs BedMachine Antarctica, with virtual
 multidimensional indexes over them. Each version has its own prefix. This
 is a repackaged copy. The authoritative release is the NSIDC DAAC record
 cited below, which needs a NASA Earthdata login and withdraws a version
-when it is retired.
+when it is retired. The scripts that write the COGs are in
+[AustralianAntarcticDivision/bedmachine](https://github.com/AustralianAntarcticDivision/bedmachine).
 
 ## Version 4 (file V04.1)
 
