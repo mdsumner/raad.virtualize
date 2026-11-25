@@ -1,12 +1,15 @@
 """plan_static.py -- mdim VRT plan for static 2D rasters, one array per file.
 
-For a set of single-band GeoTIFFs on one grid with no time axis (Bedmap3).
+For a set of single-band GeoTIFFs on one grid with no time axis (Bedmap3,
+IBCSO, BedMachine).
 Each file is one array of dimensions (y, x), named by its file name without
 the extension, or by NAME on a sources line of the form NAME<TAB>SOURCE. Sources are <SourceBand> with no <SourceTranspose>; the
 <SourceSlab> states the extent so a read opens only the sources it touches.
 
-Every file must share the grid, type, nodata and tiling of the first; all
-are opened and any difference stops the plan.
+Every file must share the grid (size, geotransform, CRS) and tiling of the
+first; all are opened and any difference stops the plan. Type and nodata
+are each file's own (BedMachine has Float32, Int16 and Int8 arrays, and
+the Int8 class arrays have no nodata).
 
 --overviews: each overview level of the files (every file must have the
 same ones) becomes one more array per file, <name>_x<f>, on dims y_x<f> and
@@ -31,14 +34,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from plan_cog import attribute, overview_dirs  # noqa: E402
 
 gdal.UseExceptions()
-VRT_TYPE = {gdal.GDT_Byte: "Byte", gdal.GDT_Int16: "Int16", gdal.GDT_UInt16: "UInt16",
-            gdal.GDT_Int32: "Int32", gdal.GDT_Float32: "Float32", gdal.GDT_Float64: "Float64"}
+VRT_TYPE = {gdal.GDT_Byte: "Byte", gdal.GDT_Int8: "Int8", gdal.GDT_Int16: "Int16",
+            gdal.GDT_UInt16: "UInt16", gdal.GDT_Int32: "Int32", gdal.GDT_UInt32: "UInt32",
+            gdal.GDT_Float32: "Float32", gdal.GDT_Float64: "Float64"}
 
 
 def grid(ds):
-    b = ds.GetRasterBand(1)
+    """The size, geotransform, CRS and tiling that every file must share."""
     return ds.RasterXSize, ds.RasterYSize, ds.GetGeoTransform(), ds.GetSpatialRef().ExportToWkt(), \
-        b.DataType, b.GetNoDataValue(), tuple(b.GetBlockSize())
+        tuple(ds.GetRasterBand(1).GetBlockSize())
 
 
 def main():
@@ -62,7 +66,7 @@ def main():
     sources = [s for _, s in named]
     if len(names) < len(named):
         sys.exit("plan_static: two sources have the same array name")
-    nx, ny, gt, wkt, dtype, nodata, block = first = grid(gdal.Open(sources[0]))
+    nx, ny, gt, wkt, block = first = grid(gdal.Open(sources[0]))
     x0, dx, _, y0, _, dy = gt
     levels = overview_dirs(sources[0]) if a.overviews else []
     if len({round(nx / ox) for _, ox, _ in levels}) < len(levels):
@@ -82,8 +86,9 @@ def main():
     for name, s in named:
         ds = gdal.Open(s)
         if grid(ds) != first:
-            sys.exit(f"plan_static: {s} differs from {sources[0]} in grid, type, nodata or tiling")
-        unit = ds.GetRasterBand(1).GetUnitType()
+            sys.exit(f"plan_static: {s} differs from {sources[0]} in grid or tiling")
+        b = ds.GetRasterBand(1)
+        unit, dtype, nodata = b.GetUnitType(), b.DataType, b.GetNoDataValue()
         mine = overview_dirs(s) if a.overviews else []
         if [(ox, oy) for _, ox, oy in mine] != [(ox, oy) for _, ox, oy in levels]:
             sys.exit(f"plan_static: {s} has other overview levels than {sources[0]}")
