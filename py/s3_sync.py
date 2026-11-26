@@ -16,6 +16,13 @@ token). Size alone is not enough after a rebuild: a rewritten store.sqlite
 keeps its size (SQLite allocates whole pages), and so can a Parquet file.
 An object whose ETag is not of that form is uploaded again.
 
+An Icechunk repository's `repo` file (a file named `repo` beside a
+`snapshots/` directory, the Icechunk 2 layout) names the snapshot each
+branch is at. It is uploaded after every other file, so a reader opening
+the repository during a republish never finds a branch whose snapshot is
+not up yet; Icechunk's own commit writes it last too. --delete runs after
+it.
+
 Connection settings come from the same environment as GDAL: AWS_S3_ENDPOINT,
 AWS_HTTPS, AWS_VIRTUAL_HOSTING, AWS_REGION, and the credentials
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN.
@@ -90,6 +97,13 @@ def local_files(src):
             full = os.path.join(root, f)
             out.append((full, os.path.relpath(full, src).replace(os.sep, "/")))
     return sorted(out, key=lambda x: x[1])
+
+
+def icechunk_pointers(keys):
+    """The keys of Icechunk `repo` files: a `repo` beside a `snapshots/` directory."""
+    roots = {"" if k.startswith("snapshots/") else k[:k.index("/snapshots/") + 1]
+             for k in keys if k.startswith("snapshots/") or "/snapshots/" in k}
+    return {k for k in keys if k.rpartition("/")[2] == "repo" and k[:-len("repo")] in roots}
 
 
 def remote_files(store):
@@ -170,10 +184,18 @@ def main():
         obstore.put(store, key, open(f, "rb"), **extra)  # multipart above obstore's threshold
         return key
 
-    with ThreadPoolExecutor(a.workers) as ex:
-        for i, key in enumerate(ex.map(put, files), 1):
-            if i % 200 == 0 or i == len(files):
-                print(f"s3_sync: {i}/{len(files)} {key}", flush=True)
+    def upload(batch, done):
+        with ThreadPoolExecutor(a.workers) as ex:
+            for i, key in enumerate(ex.map(put, batch), done + 1):
+                if i % 200 == 0 or i == len(files):
+                    print(f"s3_sync: {i}/{len(files)} {key}", flush=True)
+        return done + len(batch)
+
+    # Icechunk branch pointers go up once every other file is up (the
+    # executor waits for the first batch before the second starts)
+    last = icechunk_pointers(keep)
+    n = upload([fk for fk in files if fk[1] not in last], 0)
+    upload([fk for fk in files if fk[1] in last], n)
     print(f"s3_sync: {len(files)} files, {nbytes / 1e6:.1f} MB to {a.dest} in {time.time() - t0:.1f} s")
 
     if a.delete and not single:
