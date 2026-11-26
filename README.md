@@ -82,6 +82,10 @@ Six renderings, all from the store and none derived from another:
    `arrays.json` also states dimension types and directions and, per array,
    the chunk grid size, present and absent chunks and referenced bytes.
 2. **GDAL multidim VRT**: rebuilt from `placements`, so it can be remapped.
+   An array with overview levels (arrays whose `overview_of` names it)
+   lists them in `<Overviews>`, finest first; GDAL 3.13 and later read them
+   as the array's overviews and as the band overviews of its classic view,
+   and earlier GDAL ignores the element.
 3. **kerchunk Parquet**: fsspec layout, readable by xarray and by GDAL
    (`ZARR:"/vsikerchunk_parquet_ref/{DIR}"`).
 4. **Icechunk**: virtual references, one virtual chunk container per source
