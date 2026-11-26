@@ -311,8 +311,13 @@ def icechunk_reader(repo):
         return at
     read.attrs = attrs
     # the array's fill_value metadata, for arrays whose _FillValue attribute
-    # is left out (a NaN fill; py/render_icechunk.py)
-    read.fill = lambda name: g[name].metadata.fill_value
+    # is left out because the fill is NaN (py/render_icechunk.py). An array
+    # with no fill also has no attribute, and Zarr v3 makes its fill_value
+    # 0; xarray masks a v3 array on the attribute only, so it has none.
+    def fill(name):
+        fv = g[name].metadata.fill_value
+        return fv if np.asarray(fv).dtype.kind == "f" and np.isnan(fv) else None
+    read.fill = fill
     return read
 
 

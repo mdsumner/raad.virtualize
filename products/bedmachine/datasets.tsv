@@ -1,0 +1,17 @@
+# Datasets of the group. One row per dataset: dataset name, dataset config,
+# its settings (comma separated, as qsub -v takes them), title. Lines starting
+# with # are skipped.
+# Declared facts (py/site_published.py shows them on the Datasets page):
+# update_model fixed (sources never change; a new release is a new
+# dataset), append (new files only), append-rewrite (new files, and the
+# newest are rewritten in place for a while) or rewrite (files rewritten
+# in place at any time); upstream_cadence, how often the publisher adds
+# files; bytes_owner, project (COGs the project writes) or publisher;
+# bytes_at, where the referenced files are. Build parameters (corpus
+# source, hold-back) stay in the dataset config. owner is research (the
+# research team builds and publishes the store), production (the production
+# team does, from its product repo), or designated (research today, decided on
+# 2026-11-22 to move to production once the store passes the four criteria:
+# metadata declared, codecs read everywhere, shape settled, backlog frozen).
+dataset	config	env	title	update_model	upstream_cadence	bytes_owner	bytes_at	owner
+bedmachine-v4.1	config/bedmachine.sh		BedMachine Antarctica v4.1 bed topography and ice thickness	fixed	new version every 1 to 3 years (a new dataset); NSIDC removes retired versions	project	https://data.source.coop/ausantarctic/bedmachine/v4.1/cog/	research

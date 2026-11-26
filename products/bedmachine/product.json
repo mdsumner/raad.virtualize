@@ -1,0 +1,7 @@
+{
+  "id": "bedmachine",
+  "title": "BedMachine Antarctica: bed topography and ice thickness",
+  "description": "Cloud-optimized copies of MEaSUREs BedMachine Antarctica (Morlighem, NSIDC-0756), with virtual multidimensional indexes (GDAL VRT, Kerchunk, Icechunk, STAC). 500 m grids in EPSG:3031: bed and ice surface elevation (EIGEN-6C4 geoid, ice equivalent), ice thickness, bed error, firn air content, geoid height, and the ice/ocean/land mask, method source, data source and RGI glacier masks. Holds Version 4 (file V04.1, doi:10.5067/POJQI54A45HX); each version takes its own prefix. Repackaged from the NSIDC DAAC release, which is free to use without restriction with citation.",
+  "license": "other",
+  "public_base": "https://data.source.coop/ausantarctic/bedmachine/virtual"
+}
