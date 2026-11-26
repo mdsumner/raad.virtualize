@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Publish Bedmap3 to ausantarctic/bedmap: COGs, virtual forms, anonymous
-# read-back, catalog, README. Needs the product's AWS_* keys
+# Publish Bedmap3 to ausantarctic/bedmap: COGs, verify, virtual forms,
+# anonymous read-back, catalog, README. Needs the product's AWS_* keys
 # exported and the builds of docs/bedmap-source-coop.md done. Stops at the
 # first failure.
 set -euo pipefail
@@ -20,7 +20,9 @@ set -euo pipefail
 python py/s3_sync.py work/bedmap3-cog /vsis3/ausantarctic/bedmap/bedmap3/cog
 INNER
 dr work/bedmap3-upload.sh
-dr run.sh config/bedmap3.sh config/source-coop.sh publish verify-published
+# the public forms reference the COG URLs, so their verify (the publish
+# gate's record) runs once the COGs are up
+dr run.sh config/bedmap3.sh config/source-coop.sh verify publish verify-published
 dr catalog.sh products/bedmap config/source-coop.sh check publish
 # the product landing page: the catalog's README (previews and links added)
 cat > work/bedmap3-upload.sh <<'INNER'

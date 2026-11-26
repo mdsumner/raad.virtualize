@@ -54,5 +54,7 @@ bash hpc/vm/docker-run.sh run.sh config/bedmap3.sh config/source-coop.sh \
 ```
 
 Publication is `hpc/vm/bedmap3-publish.sh`, with the product keys exported. It
-uploads the COGs and README files, publishes the virtual
-forms, reads them back anonymously, and publishes the catalog.
+uploads the COGs, verifies the public forms against them (the publish gate
+needs that record, and the public forms cannot be read before the COGs are
+up), publishes the virtual forms, reads them back anonymously, and publishes
+the catalog and README.

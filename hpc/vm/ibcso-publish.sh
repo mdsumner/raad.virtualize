@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Publish IBCSO releases to ausantarctic/ibcso: COGs, README, virtual forms,
-# anonymous read-back, catalog. Needs the product's AWS_* keys exported and
+# Publish IBCSO releases to ausantarctic/ibcso: COGs, verify, virtual forms,
+# anonymous read-back, catalog, README. Needs the product's AWS_* keys exported and
 # the public builds done (config/ibcso.sh, one per IBCSO_RELEASE). Stops at
 # the first failure. Login credentials cannot delete in these products: a
 # wrong upload is removed from the source.coop dashboard.
@@ -22,7 +22,9 @@ export AWS_S3_ENDPOINT=data.source.coop AWS_HTTPS=YES AWS_VIRTUAL_HOSTING=FALSE 
 python py/s3_sync.py work/ibcso-$prefix-cog /vsis3/ausantarctic/ibcso/$prefix/cog
 INNER
   dr work/ibcso-upload.sh
-  IBCSO_RELEASE=$rel dr run.sh config/ibcso.sh config/source-coop.sh publish verify-published
+  # the public forms reference the COG URLs, so their verify (the publish
+  # gate's record) runs once the COGs are up
+  IBCSO_RELEASE=$rel dr run.sh config/ibcso.sh config/source-coop.sh verify publish verify-published
 done
 cat > work/ibcso-upload.sh <<'INNER'
 set -euo pipefail
