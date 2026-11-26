@@ -352,7 +352,15 @@ states it). GDAL's Zarr v3 reader has no `numcodecs.shuffle`,
 so GDAL does not read shuffled arrays from the Icechunk store (kerchunk is
 Zarr v2 and is read). xarray decodes packed int16 to float64 from the
 Icechunk and kerchunk stores, because the JSON attributes do not keep the
-float32 type of `scale_factor`. Results and findings are in
+float32 type of `scale_factor`. In the VRT form a TIFF source is a
+`<SourceBand>`, and GDAL (3.12.3 to current master) reads it with a RasterIO
+window of `count * step` cells per axis. An index view (`GetView("[0]")`)
+then returns the array's no-data value (0 where none is set) without an
+error, and a strided view (`[::2,::2]`) fails at the raster edge or returns
+decimated or overview values in place of every second element. Contiguous
+slices are read correctly: use `[0:1]` in place of `[0]`, read the
+contiguous window and subsample it for a strided selection, and use the
+declared overviews for a reduced view. Results and findings are in
 [docs/results.md](docs/results.md).
 
 ## Files
