@@ -318,6 +318,13 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
   m <- m[!m$key %in% MR_META_JSON, , drop = FALSE]
   .vrt_attrs(g, as.list(stats::setNames(m$value, m$key)))  # dataset, generator, ...
   for (p in names(grp_attrs)) .vrt_attrs(group_node(p), grp_attrs[[p]])
+  ## overview levels (decision 0006: attrs overview_of, overview_factor) by
+  ## the array they reduce, finest first, for its <Overviews>
+  lv <- Filter(function(a) !is.null(a$attrs$overview_of) &&
+                 !is.null(arrays[[unlist(a$attrs$overview_of)[1]]]), arrays)
+  ovr <- split(names(lv), vapply(lv, function(a) unlist(a$attrs$overview_of)[1], ""))
+  ovr <- lapply(ovr, function(n) n[order(vapply(arrays[n], function(a)
+    prod(as.numeric(unlist(a$attrs$overview_factor))), 0))])
   for (a in arrays[order(vapply(arrays, `[[`, "", "kind") != "coord")]) {
     pl <- .split_path(a$array)
     node <- xml2::xml_add_child(group_node(pl[1]), "Array", name = pl[2])
@@ -378,6 +385,13 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
       }
     }
     .vrt_attrs(node, a$attrs)
+    ## GDAL 3.13 and later read these as the array's overviews (and the
+    ## classic view's band overviews, where type and rank match); earlier
+    ## GDAL ignores the element
+    if (length(ovr[[a$array]])) {
+      ov <- xml2::xml_add_child(node, "Overviews")
+      for (n in ovr[[a$array]]) xml2::xml_add_child(ov, "ArrayFullName", paste0("/", n))
+    }
   }
   xml2::write_xml(doc, file, options = c("format", "no_declaration"))
   invisible(file)
