@@ -64,6 +64,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import shutil
 import struct
 import sys
@@ -104,11 +105,14 @@ def resolve(path, rules):
 
 def root_name(rule_prefix, given=None):
     if given:
+        if not all(c.isascii() and (c.isalnum() or c == "-") for c in given):
+            sys.exit(f"remap root name {given!r} for {rule_prefix!r}: [A-Za-z0-9-]+ (byterefs decision 0014)")
         return given
-    slug = "".join(c if c.isalnum() else "-" for c in rule_prefix.split("://")[-1]).strip("-")
-    while "--" in slug:
-        slug = slug.replace("--", "-")
-    return slug or "root"
+    # decision 0014: any scheme:// removed, each run of other characters than
+    # ASCII letters and digits one "-", no leading or trailing "-"
+    # (/g/data/gb6/ -> g-data-gb6, /vsicurl/https:// -> vsicurl)
+    rest = re.sub(r"[A-Za-z][A-Za-z0-9+.-]*://", "", rule_prefix)
+    return re.sub(r"[^A-Za-z0-9]+", "-", rest).strip("-") or "root"
 
 
 def remap_roots(doc, target):

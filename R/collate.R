@@ -24,11 +24,7 @@ message("ingest ", scan)
 mr_ingest_scan_dir(con, scan)
 message("plan ", vrt)
 mr_set_plan(con, mr_plan_vrt(vrt), plan_uri = basename(vrt))  # published beside the store
-for (r in args[-(1:4)]) {
-  p <- strsplit(r, "|", fixed = TRUE)[[1]]
-  stopifnot(length(p) == 3L)
-  mr_set_remap(con, p[1], p[2], p[3])
-}
+mr_set_remap_rules(con, args[-(1:4)])
 ## byterefs decision 0004: meta.default_target is the target a reader applies
 ## when told none ("" = verbatim); run.sh sets it from the config
 dt <- Sys.getenv("DEFAULT_TARGET")

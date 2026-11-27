@@ -9,7 +9,9 @@
 #
 # Every leading *.sh argument is sourced, in order (dataset, then a publish
 # target). Steps: deps plan harvest collate assert render icechunk browser grist stac verify, and
-# prepare publish publish-stac verify-published stale (not run by default).
+# prepare publish publish-stac verify-published stale remap (not run by default).
+# remap sets the config's REMAPS in an existing store, for a republish that
+# starts from the published store.sqlite instead of a collate.
 # assert applies the storecard assertion documents in assertions/<dataset>/
 # (py/assertions.py; ASSERT_DATASET, default DATASET, names the directory):
 # each is checked against the store and the plan and recorded in the store,
@@ -94,7 +96,7 @@ for s in $STEPS; do
   # the publish gate (py/verify_record.py): a step that changes the store or
   # a form that verify checks removes the record of the last pass, so
   # publish needs a verify after it
-  case $s in plan|harvest|collate|assert|render|icechunk|grist) rm -f "$WORK/out/verify.json" ;; esac
+  case $s in plan|harvest|collate|remap|assert|render|icechunk|grist) rm -f "$WORK/out/verify.json" ;; esac
   case $s in
     deps)
       step deps "$RSCRIPT" "$HERE/R/install-deps.R" "$R_LIB" ;;
@@ -118,6 +120,11 @@ for s in $STEPS; do
       step harvest "$PYTHON" "$HERE/py/harvest.py" --plan "$WORK/plan.vrt" --out "$WORK/scan" \
         "${arr_flags[@]}" --workers "$WORKERS" --engine "${HARVEST_ENGINE:-auto}" \
         ${HARVEST_LIMIT:+--limit "$HARVEST_LIMIT"} ${HARVEST_RECHECK:+--recheck "$HARVEST_RECHECK"} ;;
+    remap)
+      # the config's REMAPS into a store built elsewhere (a republish from the
+      # published store.sqlite skips collate): rules added or replaced, root
+      # names included (byterefs decision 0014)
+      step remap "$RSCRIPT" "$HERE/R/remap.R" "$WORK/store.sqlite" ${REMAPS[@]+"${REMAPS[@]}"} ;;
     collate)
       # byterefs decision 0004: the target readers apply when told none;
       # a config may set DEFAULT_TARGET, else the kerchunk target ("" = verbatim)

@@ -68,8 +68,8 @@ sources() {
   done
 }
 REMAPS=("public|/vsicurl/https://|https://"
-        "public|/g/data/gb6/|https://thredds.nci.org.au/thredds/fileServer/gb6/"
-        "gdal|/g/data/gb6/|/vsicurl/https://thredds.nci.org.au/thredds/fileServer/gb6/")
+        "public|/g/data/gb6/|https://thredds.nci.org.au/thredds/fileServer/gb6/|bran2023"
+        "gdal|/g/data/gb6/|/vsicurl/https://thredds.nci.org.au/thredds/fileServer/gb6/|bran2023")
 KERCHUNK_TARGET=public
 ICECHUNK_TARGET=public
 VRT_TARGET=gdal
