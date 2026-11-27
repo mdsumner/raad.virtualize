@@ -193,7 +193,8 @@ def main():
         # blocks; a netCDF-4 source opens with the HDF5 driver instead
         if "userfaultfd" not in str(e):
             raise
-        gdal.SetConfigOption("GDAL_SKIP", "netCDF")
+        # GDAL_SKIP is read only when drivers register: deregister instead
+        gdal.GetDriverByName("netCDF").Deregister()
         got = read()
     v, nodata, scale, offset, south_up, xv, (vmin, vmax) = got
     valid = np.isfinite(v) & (v >= vmin) & (v <= vmax)
