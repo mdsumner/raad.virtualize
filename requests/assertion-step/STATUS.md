@@ -28,6 +28,24 @@ newest last. Blockers go at the top, marked BLOCKED.
   with the assertion, and for the Zarr forms compares the card with the
   published card under storecard's overlay. Reports go to `cards/<dataset>.md`.
 
+## Ledger: asserted field by projection
+
+Slot each projection gives the asserted facts (bytes-in-place item 13).
+Native: a field of the form's own schema; none: not carried.
+
+| Field | flat arrays.json | kerchunk (Zarr v2) | Icechunk (Zarr v3) | mdim.vrt | STAC items |
+| --- | --- | --- | --- | --- | --- |
+| proj:code | array attrs | .zattrs | array attributes | `<SRS>` (native) | proj:code (native) |
+| spatial:transform | array attrs | .zattrs | array attributes | none (1-D x/y indexing variables restate it) | proj:transform (native) |
+| spatial:shape | array attrs | .zattrs | array attributes | none (dimension sizes) | proj:shape (native) |
+| crs_axes | none | none | none | dataAxisToSRSAxisMapping (native) | none |
+| which assertions | top-level `assertions` | root .zattrs `assertions` | root attributes `assertions` | none | collection `rv:assertions` |
+
+Readers of the Zarr attributes: GDAL 3.13 and later read zarr-conventions
+`proj:`/`spatial:` with the registrations written; earlier GDAL, xarray and
+kerchunk readers see plain attributes. CF `grid_mapping` is not written
+(not an assertion key; out of scope here).
+
 ## Log
 
 - 2026-11-27 started. Branch `claude/project-thread-6t1wb1` (the session's
@@ -45,3 +63,13 @@ newest last. Blockers go at the top, marked BLOCKED.
 - 2026-11-27 next: G02202 north, ASI south and OISST in the same job
   (assertions imported with `py/assertions.py import`). GHRSST MUR waits for
   overview levels; its storecard assertion covers the base level only.
+- 2026-11-27 G02202 north, ASI south, OISST: PASS in all four projections,
+  Zarr cards equal the published cards under storecard's overlays (run
+  45935319931). OISST first failed the card comparison only because the
+  checker applied one variable's overlay; fixed in 7282509. The OISST
+  mdim VRT mapping is 3,4 (time, zlev, lat, lon; EPSG:4326 lat first), and
+  its STAC items gain proj:* (the plan has no `<SRS>`, so they had none).
+  Cards: cards/<dataset>.md for all four.
+- 2026-11-27 next: GHRSST MUR (overview arrays `_x<f>` need the assertion
+  scaled per level, or assertions per level); Bluelink has no assertion.
+  Not published: a scratch republish of these four needs Michael's go-ahead.
