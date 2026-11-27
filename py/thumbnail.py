@@ -194,7 +194,9 @@ def main():
         v = v * (scale or 1) + (offset or 0)
     if south_up:
         v, valid = v[::-1], valid[::-1]
-    if xv is not None and len(xv) > 1 and xv.max() > 180 and xv.max() - xv.min() > 350:
+    if (xv is not None and len(xv) > 1 and xv.min() >= -1 and 180 < xv.max() <= 361
+            and xv.max() - xv.min() > 350):
+        # (a projected x in metres also exceeds 180 and spans more than 350)
         # 0..360 longitudes: columns east of 180 go first
         xs = np.linspace(xv[0], xv[-1], v.shape[1])
         east = xs > 180

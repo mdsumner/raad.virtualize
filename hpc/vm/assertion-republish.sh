@@ -11,6 +11,11 @@
 #   bash hpc/vm/assertion-republish.sh build g02202-v6-daily-south
 #   bash hpc/vm/assertion-republish.sh publish g02202-v6-daily-south
 #   bash hpc/vm/assertion-republish.sh build all
+#   bash hpc/vm/assertion-republish.sh stac g02202-v6-daily-south
+#   bash hpc/vm/assertion-republish.sh publish-stac g02202-v6-daily-south
+#
+# stac re-renders only the STAC and thumbnail of a built dataset;
+# publish-stac uploads only those (keys needed).
 #
 # Datasets: the assertion-cards matrix (.github/workflows/assertion-cards.yml).
 # Stops at the first failure. Writes only to
@@ -19,7 +24,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$HERE"
-[ $# -ge 2 ] || { sed -n '2,18p' "$0"; exit 1; }
+[ $# -ge 2 ] || { sed -n '2,23p' "$0"; exit 1; }
 phase=$1; shift
 SCRATCH=https://data.source.coop/ausantarctic/ausantarctic-scratch
 
@@ -70,7 +75,13 @@ for ds in "${names[@]}"; do
         [ -f "$W/out/verify.json" ] || { echo "assertion-republish: $ds has no verify pass; run build first"; exit 1; }
         : "${AWS_ACCESS_KEY_ID:?export the scratch product keys}"
         bash hpc/vm/docker-run.sh run.sh "$config" config/source-coop.sh publish verify-published ;;
-      *) echo "assertion-republish: phase is build or publish"; exit 1 ;;
+      stac)
+        # the STAC render and thumbnail again, from the built store
+        bash hpc/vm/docker-run.sh run.sh "$config" config/source-coop.sh stac ;;
+      publish-stac)
+        : "${AWS_ACCESS_KEY_ID:?export the scratch product keys}"
+        bash hpc/vm/docker-run.sh run.sh "$config" config/source-coop.sh publish-stac ;;
+      *) echo "assertion-republish: phase is build, publish, stac or publish-stac"; exit 1 ;;
     esac
   )
 done
