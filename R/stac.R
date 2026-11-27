@@ -34,6 +34,9 @@
 ##   map viewers that draw an asset.
 ## BROWSER_TARGET: the remap target of OUT_DIR/browser/icechunk (run.sh
 ##   browser step); its replacements are that asset's chunk containers.
+## STAC_VIEWER: URL of the store viewer page (docs/viewer); with BASE the
+##   collection links to it as rel "alternate", type text/html, with
+##   ?collection=<this collection>. Default the project site; "" leaves it out.
 if (sys.nframe() == 0L) {
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 2L) stop("usage: stac.R STORE OUT_DIR [TARGET] [BASE]")
@@ -466,6 +469,7 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
   items_dir <- isTRUE(as.logical(items_dir))
 
   ## collection
+  viewer <- Sys.getenv("STAC_VIEWER", "https://mdsumner.github.io/raad.virtualize/viewer/index.html")
   btarget <- Sys.getenv("BROWSER_TARGET")
   bcont <- if (nzchar(btarget)) sort(unique(dbGetQuery(con,
     "SELECT replacement FROM remap WHERE target = ?", params = list(btarget))$replacement))
@@ -495,6 +499,10 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
       list(list(rel = "root", href = "./collection.json", type = "application/json")),
       if (!is.null(base)) list(list(rel = "self", type = "application/json",
                                     href = paste0(sub("/$", "", base), "/stac/collection.json"))),
+      if (!is.null(base) && nzchar(viewer)) list(list(rel = "alternate", type = "text/html",
+        title = "Store viewer (one field in the array's own CRS)",
+        href = paste0(viewer, "?collection=",
+                      utils::URLencode(paste0(sub("/$", "", base), "/stac/collection.json"), reserved = TRUE)))),
       if (items_dir) lapply(items, function(x)
         list(rel = "item", href = sprintf("./items/%s.json", x$id), type = "application/geo+json")))),
     `rv:items` = length(items),
