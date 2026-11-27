@@ -5,23 +5,26 @@ flight, the republish queue, open issues, decisions and dangling threads. A
 PR that starts, finishes or parks a thread updates this file. Facts learned
 on the way, each with its check, are in [LEDGER.md](LEDGER.md).
 
-Last updated 2026-11-27.
+Last updated 2026-11-27 (second update).
 
 ## Pull requests in flight
 
 | PR | What | State | Remaining |
 |---|---|---|---|
-| #125 (draft) | Assertion step: storecard `spatial:`/`proj:` assertions applied in every projection, `py/assertion_cards.py` as the done test, `hpc/vm/assertion-republish.sh` | All six datasets of `requests/assertion-step.md` pass their cards. G02202 south and north, ASI south and OISST were republished from the branch (`~/Git/rv-assert2` at `c343c41`) | Paused by Michael, still a draft. Its log lists the MUR and Bluelink republishes and the storecard follow-ups (below) |
-| #126 | Store viewer in the array's own CRS (`docs/viewer/`), `browser` step (relayed Icechunk), STAC `renders`, kerchunk asset type `application/x-kerchunk-parquet`, a STAC link from each collection to the viewer (`ebcaeba`) | Open | Before merge: check xpystac dispatch on the new kerchunk type. After: the sea ice viewer pass (queue, step 6) |
+| #125 (draft) | Assertion step: storecard `spatial:`/`proj:` assertions applied in every projection, `py/assertion_cards.py` as the done test, `hpc/vm/assertion-republish.sh` | Main (#126, #127) merged in at `00cdce3`; the `run.sh` step lists of both PRs kept (`assert` and `browser`). The assertion cards pass for all 14 datasets on the merged code (run 46067391024) | Out of draft, then merge. G02202 south and north, ASI south and OISST were republished from the branch (`~/Git/rv-assert2` at `c343c41`), so they run code that is on main only once it merges |
 
-The four stores republished from #125 run code that is not on main until
-#125 merges.
+#126 (viewer, browser step, STAC renders and viewer link) and #127 (this
+file) merged on 2026-11-27. xpystac, checked before #126 merged, opens an
+asset by media type: `application/vnd+zarr` opened the kerchunk Parquet
+folder as a plain Zarr store, and `application/x-kerchunk-parquet` matches
+no reader, so nothing that opened before stopped opening; the Icechunk
+asset is unchanged.
 
 ## Republish queue
 
-Each dataset is republished once per batch of new schemes, because every
-Icechunk republish leaves the previous build's objects behind (LEDGER,
-2026-11-26). The schemes:
+Each dataset is republished once per batch of new schemes: every Icechunk
+republish leaves the previous build's objects behind (LEDGER, 2026-11-26),
+and each removal is one more pass with `s3_sync.py --delete`. The schemes:
 
 - **A**: assertions (#125). Needs `assertions/<dataset>/`.
 - **O**: `<Overviews>` in the mdim VRT (#122, merged). Any `render` from
@@ -37,10 +40,10 @@ needs no step.
 
 | Group | Dataset | A | O | V | State |
 |---|---|---|---|---|---|
-| seaice | g02202-v6-daily-south | done | n/a | relay; browser rules in config (#126) | Republished with A. Icechunk holds 58 old objects. Re-collate, then `browser stac publish` |
-| seaice | g02202-v6-daily-north | done | n/a | relay | Republished with A. Icechunk holds 58 old objects |
-| seaice | asi-amsr2-v5.4-daily-south | done | n/a | relay; no browser rules yet | Republished with A. Icechunk holds 152 old objects. Row chunks: 2,656 requests per field through the relay |
-| oisst | oisst-v2.1-daily | done | n/a | direct | Republished with A. Icechunk holds 193 old objects |
+| seaice | g02202-v6-daily-south | done | n/a | relay; browser rules in config (#126) | Republished with A; Icechunk cleaned 2026-11-27. Re-collate, then `browser stac publish`. Keep the `browser/` test copy (linked from elsewhere) until Michael retires it |
+| seaice | g02202-v6-daily-north | done | n/a | relay | Republished with A; Icechunk cleaned 2026-11-27 |
+| seaice | asi-amsr2-v5.4-daily-south | done | n/a | relay; no browser rules yet | Republished with A; Icechunk cleaned 2026-11-27. Row chunks: 2,656 requests per field through the relay |
+| oisst | oisst-v2.1-daily | done | n/a | direct | Republished with A; Icechunk cleaned 2026-11-27 |
 | ghrsst | ghrsst-mur-cog-analysed_sst | document ready | pending | direct | Built in `rv-assert2`, not published. One republish gives A, O, V |
 | bluelink | bluelink-daily-{temp, salt, eta_t, mld, u, v, w, tx_trans_int_z, ty_trans_int_z} | documents ready | n/a | direct, untested (THREDDS answers 403 to HEAD with an Origin) | Not republished. One render gives A, R and V |
 | bedmap | bedmap3 | no document (EPSG:3031) | pending | direct | `hpc/vm/bedmap3-publish.sh` (production product; `assertion-republish.sh` refuses it) |
@@ -51,18 +54,20 @@ needs no step.
 | imos-tracking | meop-ctd-2024, meop-ctd-tags | n/a (profiles) | n/a | n/a (not a grid) | Nothing to republish |
 | access-esm | access-esm1-6.historical.ocean-3d-temp-1mon-mean | n/a (tripolar ocean grid) | n/a | not drawable as an affine grid | Nothing to republish |
 
-Old-object counts are published against built objects in each `icechunk/`
-folder (2026-11-27): G02202 south and north 119 against 61, ASI 231 against
-79, OISST 389 against 196. MUR is 302 against 302.
+The four republished stores held the previous build's Icechunk objects
+(58, 58, 152 and 193). They were deleted on 2026-11-27 with `aws s3 rm` and
+CLI credentials, after checking that each published `repo` file equals the
+build's and every build file is published. Afterwards each store matches
+its build by ETag with nothing extra (G02202 south keeps its 120 `browser/`
+objects), and each repository opens anonymously at the build's `main`
+snapshot, array tree and first chunk.
 
 Suggested order:
 
-1. Merge #125 and #126, so each later republish carries A, O and V together.
-2. Remove the old Icechunk objects of the four republished stores:
-   - either delete each `icechunk/` folder in the dashboard and re-upload it
-     from `rv-assert2/work/assert-<dataset>/out/icechunk`, as on 2026-11-26;
-   - or first test whether source-coop CLI credentials can delete, and if
-     they can, use `s3_sync.py --delete`.
+1. Merge #125 and #126, so each later republish carries A, O and V
+   together. #126 merged 2026-11-27; #125 waits on its merge.
+2. Remove the old Icechunk objects of the four republished stores. Done
+   2026-11-27.
 3. MUR: `assertion-republish.sh build` then `publish`.
 4. Bluelink, nine variables: one render with A and R (#117), from the
    published stores.
@@ -72,9 +77,11 @@ Suggested order:
    re-collate, then `browser stac publish`.
 7. ESA CCI: assertion documents, then a build on Pawsey.
 
-Credentials: a dashboard key per publish run (one hour), or
-`eval $(source-coop creds --format env)` with the CLI installed here (0.3.0).
-See [docs/production.md](docs/production.md).
+Credentials: `eval "$(source-coop creds --format env)"` on the VM (CLI 0.3.0,
+signed in 2026-11-27; credentials for 12 hours, renewed by `creds`). Each
+publish that replaces an Icechunk repository ends with `s3_sync.py --delete`
+on its `icechunk/` prefix (`delete_one` sends a header-signed DeleteObject
+through boto3; the proxy refuses the presigned DELETE it sent before). See [docs/production.md](docs/production.md).
 
 ## Open issues
 
@@ -105,9 +112,12 @@ See [docs/production.md](docs/production.md).
 Publishing:
 
 - Every Icechunk republish leaves the previous build's objects behind (new
-  local repository per build, random object names, keys that cannot
-  delete). Long-term options: commit into the published repository, or a
-  credential that deletes (`s3_sync.py --delete`).
+  local repository per build, random object names). They are removable now
+  (`s3_sync.py --delete` with CLI credentials). Committing into the
+  published repository would avoid them.
+- A source-coop CLI session also exists for the `ubuntu` account (the
+  2026-11-27 sign-in was first made there). Remove it if unused: 0.3.0 has
+  no logout command, so delete that account's `~/.cache/source-coop`.
 - `~/Git/rv-assert2` (#125 branch at `c343c41`, untracked
   `work-build-rest.out`) holds the republish builds. Remove it after #125
   merges and the old objects are cleaned.

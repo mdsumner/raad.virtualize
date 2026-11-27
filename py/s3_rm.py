@@ -4,14 +4,15 @@
 
 Lists the prefix and prints the object count and size. Without --yes
 nothing is deleted (a dry run). With --yes each object is deleted with its
-own presigned DELETE request (s3_sync.delete_one): the source.coop data
-proxy has no batch DeleteObjects (POST /<account>?delete answers
-NoSuchBucket), and obstore.delete sends even one path that way. The prefix must have at
+own header-signed DeleteObject request (s3_sync.delete_one, boto3): the
+source.coop data proxy has no batch DeleteObjects (POST /<account>?delete
+answers NoSuchBucket), obstore.delete sends even one path that way, and the
+proxy refuses a presigned DELETE (AccessDenied). The prefix must have at
 least two path levels below the bucket (account/product/prefix on
 source.coop), so a product or bucket root cannot be emptied by mistake.
 
 Connection settings and credentials as for py/s3_sync.py.
-Needs obstore (pip install obstore).
+Needs obstore and boto3.
 """
 import argparse
 import os

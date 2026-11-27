@@ -27,16 +27,14 @@ Connection settings come from the same environment as GDAL: AWS_S3_ENDPOINT,
 AWS_HTTPS, AWS_VIRTUAL_HOSTING, AWS_REGION, and the credentials
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN.
 
-Needs obstore (pip install obstore).
+Needs obstore (pip install obstore), and boto3 for --delete.
 """
 import argparse
-import datetime
+import functools
 import hashlib
 import os
 import sys
 import time
-import urllib.error
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 import obstore
@@ -68,24 +66,40 @@ def store_for(vsis3):
 
 
 def delete_one(store, key):
-    """Delete one object with a single DELETE request.
+    """Delete one object with a single header-signed DeleteObject request.
 
     obstore.delete sends even one path as a batch DeleteObjects
     (POST /<bucket>?delete), which the source.coop proxy answers with
-    NoSuchBucket. A presigned DELETE (query-string signature, session token
-    included) is a plain DeleteObject. An object already gone is not an
-    error. The explicit user agent: the proxy has answered urllib's default
-    with 403.
+    NoSuchBucket, and the proxy refuses a presigned (query-string signed)
+    DELETE with AccessDenied. A DeleteObject signed in its headers, as
+    `aws s3 rm` sends it, is accepted: boto3, with the store's bucket,
+    prefix, endpoint and credentials. An object already gone is not an
+    error; any other refusal is.
     """
-    url = obstore.sign(store, "DELETE", key, datetime.timedelta(minutes=10))
-    req = urllib.request.Request(url, method="DELETE",
-                                 headers={"User-Agent": "curl/8 raad.virtualize"})
+    from botocore.exceptions import ClientError
+    c = store.config
+    full = f"{store.prefix.strip('/')}/{key}" if store.prefix else key
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            r.read()
-    except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise RuntimeError(f"DELETE {key}: HTTP {e.code} {e.read()[:300]!r}") from None
+        _s3_client(tuple(sorted((k, str(v)) for k, v in c.items()))).delete_object(
+            Bucket=c["bucket"], Key=full)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code not in ("NoSuchKey", "404"):
+            raise RuntimeError(f"DELETE {key}: {code} {e.response.get('Error', {}).get('Message', '')}") from None
+
+
+@functools.lru_cache(maxsize=None)
+def _s3_client(config_items):
+    """A boto3 S3 client for an S3Store's config (as sorted (key, str(value)) pairs)."""
+    import boto3
+    from botocore.config import Config
+    c = dict(config_items)
+    path_style = c.get("virtual_hosted_style_request", "True").lower() in ("false", "no", "off", "0")
+    return boto3.client(
+        "s3", endpoint_url=c.get("endpoint"), region_name=c.get("region"),
+        aws_access_key_id=c.get("access_key_id"), aws_secret_access_key=c.get("secret_access_key"),
+        aws_session_token=c.get("session_token"),
+        config=Config(s3={"addressing_style": "path" if path_style else "virtual"}))
 
 
 def local_files(src):
