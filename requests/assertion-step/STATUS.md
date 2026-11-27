@@ -91,3 +91,16 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
   restated from the store's 1-D axes as published (float32-derived: step
   0.10000000369999582, origin -74.99999694728771 on t-grid y), not rounded
   to 0.1. No storecard document exists, so no published-card comparison.
+- 2026-11-27 Bluelink daily, nine variables: PASS in all four projections
+  (assertion-cards run 45941708694). Kerchunk and Icechunk cards carry
+  EPSG:4326 and the transform and lose CRS_NOT_DECLARED; LON_0_360,
+  Y_ASCENDING and COORDS_NAMED_MISSING remain (facts of the store, not
+  assertion targets). mdim.vrt mapping 3,4 for the 4-D variables (temp,
+  salt, u, v, w) and 2,3 for the 3-D ones (eta_t, mld, tx_trans_int_z,
+  ty_trans_int_z). STAC items gain proj:*. Evidence in each document cites
+  the NCI GeoNetwork BRAN2023 record: its referenceSystemInfo holds an empty
+  RS_Identifier, so the catalogue declares no CRS. Cards:
+  cards/bluelink-daily-<var>.md.
+- 2026-11-27 all six datasets in the request pass. Open: storecard's MUR
+  document is stale (rebuild in storecard); a scratch republish of the
+  rendered forms needs Michael's go-ahead.
