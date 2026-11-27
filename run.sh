@@ -50,7 +50,9 @@ while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$
 # Provenance stamped into the store meta (and so into every rendered form).
 # safe.directory: a container running as root may not own the checkout.
 REV=$(git -c safe.directory="$HERE" -C "$HERE" describe --always --dirty 2>/dev/null || echo unversioned)
-REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#")
+# || true: in a git worktree mounted into a container the .git file points
+# outside the mount, git exits 128, and pipefail would end the run silently
+REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#" || true)
 export E2E_GENERATOR="${E2E_REPO:-${REPO:-local}} $REV" E2E_CONFIG="${CONFIGS[*]}"
 STEPS=${*:-${DEFAULT_STEPS:-plan harvest collate assert render icechunk grist stac verify}}
 # python, or python3 where there is no python (the image has python only)
