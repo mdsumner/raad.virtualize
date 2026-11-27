@@ -2,9 +2,9 @@
 title: "Production jobs"
 ---
 
-Status 2026-11-27: planned, not started. The current work is the
+Status 2026-11-27: planned; the credentials step is in place. The current work is the
 republish queue in `STATUS.md`: each dataset republished once under the new
-schemes, with a source.coop key per publish run. This page records the plan
+schemes, with CLI credentials per publish run. This page records the plan
 for the jobs that afterwards keep each published store current and up to
 standard. The production team takes over a store once it passes the four
 criteria on the [Datasets](published.md#freshness) page.
@@ -44,19 +44,25 @@ listing where the files are on a filesystem the job can read
 
 ## Credentials
 
-- **Now:** a dashboard key per publish run. It lasts one hour and can write
-  but not delete.
-- **Next: the source-coop CLI on the VM.**
-  - Sign in once, over an SSH port forward (`source-coop login`).
-  - Use an AWS profile with `credential_process = source-coop creds`, or
-    `eval $(source-coop creds --format env)` at the start of each publish,
-    for `py/s3_sync.py`.
-  - `creds` renews the credentials from the refresh token, and each renewal
+- **Now: the source-coop CLI on the VM** (0.3.0, signed in 2026-11-27).
+  - Sign in once per account, over an SSH tunnel from the laptop:
+
+    ```sh
+    ssh -i <key>.pem -N -L 8400:127.0.0.1:8400 ubuntu@<VM>   # laptop, left running
+    source-coop login --port 8400 --duration 12h              # VM, as the account that publishes
+    ```
+
+    The session belongs to the account that ran `login`, so sign in as the
+    account that runs the publishes.
+  - Each publish starts with `eval "$(source-coop creds --format env)"`, or
+    uses an AWS profile with `credential_process = source-coop creds`.
+    `creds` renews the credentials from the refresh token, and each renewal
     restarts that token's lifetime (about 30 days), so a daily job keeps the
-    sign-in alive.
-  - To check first: whether the proxy honours `login --duration` above one
-    hour, and whether these credentials can delete. If they can delete,
-    `s3_sync.py --delete` removes old Icechunk objects.
+    sign-in alive. Credentials renewed on 2026-11-27 lasted 12 hours.
+  - These credentials write and delete. Deletes must be signed in their
+    headers (`aws s3 rm`, boto3, `s3_sync.py --delete`); the proxy refuses
+    a presigned DELETE.
+- **Before: a dashboard key per publish run.** It lasts one hour.
 - **Later: service accounts** (CLI `next` build).
   - A GitHub OIDC trust for Actions workflows, with no stored secret.
   - An API key with an expiry (30 days to one year) for VM and HPC cron jobs.
@@ -69,19 +75,20 @@ listing where the files are on a filesystem the job can read
 
 Each build creates a new local Icechunk repository, so a republish uploads
 new object names and the previous build's objects stay (LEDGER,
-2026-11-26). An unattended job needs one of:
+2026-11-26). Two ways for an unattended job:
 
+- **Upload, then delete** (available): `s3_sync.py --delete` on the
+  `icechunk/` prefix, with CLI credentials. The `repo` file goes up after
+  every other file and the delete runs last, so a reader never finds a
+  branch whose snapshot is missing.
 - **Commit into the published repository** in place of creating a new one,
-  so a republish adds a commit. Expiring old snapshots still needs delete.
-- **A credential that deletes**, then `s3_sync.py --delete` after the
-  upload.
-
-A dashboard folder delete before the upload works by hand only.
+  so a republish adds a commit. Expiring old snapshots still deletes
+  objects, through Icechunk's own S3 client (untested against the proxy).
 
 ## Increments
 
 1. CLI credentials on the VM for the manual publishes of the republish
-   queue, in place of dashboard keys.
+   queue, in place of dashboard keys. In place since 2026-11-27.
 2. A scheduled check job with no writes: `verify-published`, the cards and
    the viewer for each collection, reported per dataset.
 3. Rebuild jobs for the `append` datasets, one at a time, each with its
