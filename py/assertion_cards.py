@@ -290,7 +290,13 @@ def main(argv=None):
                 if any(o["subject"]["variable"] == var for o in ovs):
                     ref = card_zarr(f"{a.before.rstrip('/')}/{form}", var, ovs)
                     rec["reference"] = ref
-                    if ref.get("card") and after.get("card"):
+                    if ref.get("overlay_applied") is False:
+                        # storecard's document is keyed to the published
+                        # store's metadata digest; a republish since makes it
+                        # stale, and the reference is then the bare card
+                        rec["card_diff"] = None
+                        rec["reference_note"] = "storecard overlay stale (published store changed since it was made)"
+                    elif ref.get("card") and after.get("card"):
                         diff = {k for k in ("grid", "crs", "findings") if ref["card"][k] != after["card"][k]}
                         rec["card_diff"] = sorted(diff)
                         if diff:
@@ -324,7 +330,10 @@ def main(argv=None):
                       "on grid, crs and findings (host findings and provenance fields left out):", ""]
                 for r in refs:
                     d = r.get("card_diff")
-                    L.append(f"- {r['form']}: " + ("equal" if d == [] else f"differs in {', '.join(d or ['(not compared)'])}"))
+                    if r.get("reference_note"):
+                        L.append(f"- {r['form']}: not compared, {r['reference_note']}")
+                    else:
+                        L.append(f"- {r['form']}: " + ("equal" if d == [] else f"differs in {', '.join(d or ['(not compared)'])}"))
             L.append("")
         pathlib.Path(a.md).parent.mkdir(parents=True, exist_ok=True)
         pathlib.Path(a.md).write_text("\n".join(L))
