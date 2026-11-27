@@ -108,3 +108,11 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
   the published store and plan, assert, render, icechunk, grist, stac,
   verify, no keys; publish: publish and verify-published with the scratch
   keys). Waiting on Michael to run it on the VM.
+- 2026-11-27 G02202 south REPUBLISHED to scratch with the assertion applied
+  (Michael, VM clone at 54f8069; verify and verify-published SAME, grist
+  rows agree). Live cards, no overlay: kerchunk and Icechunk EPSG:3412 via
+  proj:code on the array, transform [25000, 0, -3950000, 0, -25000,
+  4350000], costume B, no findings; mdim.vrt
+  `<SRS dataAxisToSRSAxisMapping="3,2">EPSG:3412`; collection lists
+  rv:assertions. A git worktree fails inside the container (its .git file
+  points outside the mount): run from a plain clone.
