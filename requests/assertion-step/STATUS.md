@@ -130,3 +130,9 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
   collection lists rv:assertions. CRS_NOT_DECLARED is gone from all four.
   MUR and Bluelink not yet republished. Thumbnails on the four were drawn
   before b889262 (G02202 still split, OISST rotated; ASI has none).
+- 2026-11-28 paused by Michael. Live: G02202 S/N, ASI S, OISST republished
+  with assertions; thumbnails fixed for G02202 S/N and OISST. Open: ASI
+  thumbnail (HDF5 fallback c343c41 or RV_DOCKER_OPTS seccomp=unconfined,
+  untested); MUR and nine Bluelink stores not republished; storecard
+  follow-up (cards rebuild, assertions/ausantarctic to settled); PR stays
+  draft.
