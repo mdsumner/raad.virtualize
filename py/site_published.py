@@ -17,6 +17,7 @@ Pages workflow before the render. Without it the computed columns are empty.
 import csv
 import datetime
 import json
+import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -130,11 +131,15 @@ def main():
                 prod.get("description", ""), ""]
         if base:
             out += [f"Base: `{base}/<dataset>/`", ""]
-        head = "| Dataset | Title |" + "".join(f" {f} |" for f, _ in FORMS)
-        out += [head, "|---|---|" + "---|" * len(FORMS)]
+        # Map: docs/viewer (one field in the array's own CRS, from the STAC
+        # collection); it says why when a dataset cannot be drawn
+        head = "| Dataset | Title |" + "".join(f" {f} |" for f, _ in FORMS) + " Map |"
+        out += [head, "|---|---|" + "---|" * len(FORMS) + "---|"]
         for r in rows(pj.parent / "datasets.tsv"):
             ds = r["dataset"]
             cells = "".join(f" [{f}]({base}/{ds}/{p}) |" if base else " |" for f, p in FORMS)
+            coll = urllib.parse.quote(f"{base}/{ds}/stac/collection.json", safe="")
+            cells += f" [view](viewer/index.html?collection={coll}) |" if base else " |"
             out.append(f"| [`{ds}`]{{#{ds}}} | {r['title']} |{cells}")
         out.append("")
     OUT.write_text("\n".join(out))
