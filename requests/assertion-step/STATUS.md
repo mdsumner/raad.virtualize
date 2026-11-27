@@ -116,3 +116,8 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
   `<SRS dataAxisToSRSAxisMapping="3,2">EPSG:3412`; collection lists
   rv:assertions. A git worktree fails inside the container (its .git file
   points outside the mount): run from a plain clone.
+- 2026-11-27 thumbnails: py/thumbnail.py rotated polar stereographic grids
+  as if 0..360 longitude (x in metres passes "max > 180, span > 350"), so
+  the G02202 thumbnails were split and swapped; fixed in 3eb327b (rotate only
+  when x is within 0..361). ASI south never had a published thumbnail.
+  assertion-republish.sh gains stac and publish-stac phases to redraw them.
