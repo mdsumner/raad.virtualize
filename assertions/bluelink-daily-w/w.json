@@ -38,7 +38,8 @@
   },
   "crs_from": "convention: BRAN (MOM5) daily output is on a regular 0.1 degree spherical longitude/latitude grid (1-D degrees_east/degrees_north axes); the netCDF files carry no grid_mapping and the plan.vrt has no SRS. EPSG:4326 chosen by Michael (project thread, 2026-11-27)",
   "note": "longitude 0 to 360 and latitude ascending are facts of the store, not corrected here; the 2-D geolon_t/geolat_t named in the coordinates attribute are not in the store",
-  "dataset": "bluelink-daily-w"
+  "dataset": "bluelink-daily-w",
+  "catalogue": "NCI GeoNetwork record f3791_5322_2035_3330 (Bluelink Ocean Reanalysis - BRAN2023, doi:10.25914/2wxj-vt48, ISO 19139, read 2026-11-27): gmd:referenceSystemInfo is present but its RS_Identifier is empty, so no CRS is declared; the EX_GeographicBoundingBox is west -180, east 180, south 75, north 75 (a zero-height box; south is presumably -75), a discovery extent in lon/lat degrees, not a CRS"
  },
  "by": {
   "name": "raad.virtualize assertion step",
