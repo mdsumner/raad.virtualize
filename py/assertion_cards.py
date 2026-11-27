@@ -110,7 +110,7 @@ def card_zarr(url, var, overlay=None):
     except ImportError:
         return {"error": "storecard not installed"}
     try:
-        c = card(url, probe_hosts=False, assertions=[overlay] if overlay else ())
+        c = card(url, probe_hosts=False, assertions=overlay or ())
     except Exception as e:  # noqa: BLE001 - report, do not stop the other forms
         return {"error": f"{type(e).__name__}: {e}"}
     v = next((x for x in c["variables"] if x["name"] == var), None)
@@ -268,9 +268,12 @@ def main(argv=None):
             # card(P) == card(source, assertions=[A]): the published form
             # with storecard's overlay, on the sections the assertion touches
             if form in ("kerchunk", "icechunk") and a.overlay and a.before:
-                ov = pathlib.Path(a.overlay) / f"{form}-{var}.json"
-                if ov.exists():
-                    ref = card_zarr(f"{a.before.rstrip('/')}/{form}", var, json.loads(ov.read_text()))
+                # every variable's overlay for this form: the findings are
+                # the store's, so one variable's overlay alone leaves the
+                # others' CRS findings in the reference
+                ovs = [json.loads(f.read_text()) for f in sorted(pathlib.Path(a.overlay).glob(f"{form}-*.json"))]
+                if any(o["subject"]["variable"] == var for o in ovs):
+                    ref = card_zarr(f"{a.before.rstrip('/')}/{form}", var, ovs)
                     rec["reference"] = ref
                     if ref.get("card") and after.get("card"):
                         diff = {k for k in ("grid", "crs", "findings") if ref["card"][k] != after["card"][k]}
