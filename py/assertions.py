@@ -31,6 +31,9 @@ Checks, each fatal:
   the plan has none it supplies the CRS).
 
 A withdrawn assertion is recorded with applied = false and written nowhere.
+An overview level of an asserted variable (attrs overview_of and
+overview_factor, byterefs decision 0006) gets the assertion scaled to the
+level (level_doc), checked the same way, unless DIR holds a document for it.
 
     python py/assertions.py import --dataset ID --out assertions/ID \
         [--url-base URL] STORECARD_DOC...
@@ -178,6 +181,48 @@ def check(doc, con, srs_by_array, where):
     return out
 
 
+def level_doc(doc, level):
+    """The assertion for an overview level of the asserted variable
+    (byterefs decision 0006: attrs overview_of, overview_factor, in the
+    order of the spatial dimensions): the same CRS and origin, the cell
+    size times the factor, the level's shape and dimensions.
+
+    level: {"array", "dims", "shape", "attrs"} of the level array."""
+    a = dict(doc["asserts"])
+    sd = a["spatial:dimensions"]
+    ldims = level["dims"][-len(sd):]
+    fac = [float(x) for x in level["attrs"]["overview_factor"]]
+    fy, fx = fac[-2], fac[-1]
+    ta, tb, tc, td, te, tf = a["spatial:transform"]
+    a["spatial:transform"] = [ta * fx, tb * fy, tc, td * fx, te * fy, tf]
+    a["spatial:dimensions"] = list(ldims)
+    a["spatial:shape"] = [level["shape"][level["dims"].index(d)] for d in ldims]
+    out = dict(doc, asserts=a, subject=dict(doc["subject"], variable=level["array"]))
+    out["level_of"] = {"variable": doc["subject"]["variable"], "overview_factor": fac}
+    return out
+
+
+def levels_of(rows, var):
+    """Overview levels of var among array rows (dicts with array, kind, dims,
+    shape, attrs as parsed JSON)."""
+    out = []
+    for r in rows:
+        at = r.get("attrs") or {}
+        of = at.get("overview_of")
+        of = of[0] if isinstance(of, list) else of
+        if r.get("kind") == "data" and of == var and at.get("overview_factor"):
+            out.append(r)
+    return out
+
+
+def _store_rows(con):
+    rows = []
+    for r in con.execute("SELECT array, kind, dims, shape, attrs FROM arrays"):
+        rows.append({"array": r["array"], "kind": r["kind"], "dims": json.loads(r["dims"]),
+                     "shape": json.loads(r["shape"]), "attrs": json.loads(r["attrs"] or "{}")})
+    return rows
+
+
 def apply(store, plan, adir):
     con = sqlite3.connect(store)
     con.row_factory = sqlite3.Row
@@ -200,6 +245,21 @@ def apply(store, plan, adir):
                      "checks": checks})
         print(f"assert: {f.name} {sub['variable']} {doc['status']}"
               + ("".join(f"\n  {k}: {v}" for k, v in checks.items()) if applied else " (not applied)"))
+        # overview levels of the variable carry the same assertion, scaled
+        # to the level; an explicit document for a level takes precedence
+        explicit = {json.loads(g.read_text())["subject"]["variable"] for g in files}
+        for lv in levels_of(_store_rows(con), sub["variable"]):
+            if lv["array"] in explicit:
+                continue
+            ld = level_doc(doc, lv)
+            lchecks = check(ld, con, srs, f"{f.name} level {lv['array']}") if applied else {}
+            recs.append({"id": f"{f.stem}@{lv['array']}", "variable": lv["array"], "kind": doc["kind"],
+                         "status": doc["status"], "digest": digest(doc), "applied": applied,
+                         "asserts": ld["asserts"], "crs_axes": doc["crs_axes"],
+                         "by": doc.get("by"), "derived_from": doc.get("derived_from"),
+                         "level_of": ld["level_of"], "checks": lchecks})
+            print(f"assert: {f.name} level {lv['array']}"
+                  + "".join(f"\n  {k}: {v}" for k, v in lchecks.items()))
     vars_ = [r["variable"] for r in recs if r["applied"]]
     if len(vars_) != len(set(vars_)):
         sys.exit("assert: more than one applied assertion for a variable")

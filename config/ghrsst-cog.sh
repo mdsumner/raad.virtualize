@@ -57,6 +57,8 @@ GHRSST_COG_ROOT=${GHRSST_COG_ROOT:-/vsis3/ausantarctic/ghrsst-mur-v2}
 DATASET=ghrsst-mur-cog-$GHRSST_VAR${GHRSST_YEARS:+-$(echo $GHRSST_YEARS | tr ' ' '-')}
 # product group (products/ghrsst/): the scratch prefix on source.coop
 PRODUCT_GROUP=ghrsst
+# assertions/<ASSERT_DATASET>/ (py/assertions.py), also for a subset of years
+ASSERT_DATASET=ghrsst-mur-cog-$GHRSST_VAR
 ARRAYS=$GHRSST_VAR
 GHRSST_PATTERN="^([0-9]{8})090000-JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02\.0-fv04\.1_${GHRSST_VAR}\.tif\$"
 GHRSST_HOLD_BACK=${GHRSST_HOLD_BACK:-17}

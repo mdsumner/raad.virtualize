@@ -32,6 +32,7 @@ concurrency:
 jobs:
   cards:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     container: ghcr.io/hypertidy/gdal-r-python-extras:latest
     strategy:
       fail-fast: false
@@ -53,6 +54,10 @@ jobs:
             group: oisst
             config: config/oisst.sh
             env: ""
+          - dataset: ghrsst-mur-cog-analysed_sst
+            group: ghrsst
+            config: config/ghrsst-cog.sh
+            env: GHRSST_VAR=analysed_sst
     env:
       SCRATCH: https://data.source.coop/ausantarctic/ausantarctic-scratch
     steps:

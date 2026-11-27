@@ -73,3 +73,10 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
 - 2026-11-27 next: GHRSST MUR (overview arrays `_x<f>` need the assertion
   scaled per level, or assertions per level); Bluelink has no assertion.
   Not published: a scratch republish of these four needs Michael's go-ahead.
+- 2026-11-27 GHRSST MUR started. Overview levels: the assert step derives
+  each level's assertion from the base one (same CRS and corner origin,
+  cell size times overview_factor, the level's shape and dimensions;
+  `level_doc` in py/assertions.py) and checks it against the level's
+  coordinates; a document in the directory for a level takes precedence.
+  Checked on the published MUR arrays.json: all five levels agree with
+  their coordinates. Card findings are now compared per variable.

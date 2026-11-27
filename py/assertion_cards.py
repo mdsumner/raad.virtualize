@@ -100,7 +100,11 @@ def _norm_card_var(c, var):
     crs = json.loads(json.dumps(v.get("crs") or {}))
     for s in crs.get("sources") or []:
         s.pop("on", None)
-    findings = sorted(set(c.get("findings_summary") or {}) - {"CHUNK_HOST_NO_CORS"})
+    # the variable's own findings: a store-level summary would mix in the
+    # other variables (an unasserted overview level, another array)
+    fs = c.get("findings_summary") or {}
+    findings = sorted(k for k, arrs in fs.items()
+                      if k != "CHUNK_HOST_NO_CORS" and (not isinstance(arrs, list) or var in arrs))
     return {"grid": g, "crs": crs, "findings": findings}
 
 
@@ -250,12 +254,23 @@ def main(argv=None):
     docs = _load_assertions(a.assertions)
     if not docs:
         sys.exit(f"no applied assertions in {a.assertions}")
+    # overview levels carry the assertion scaled to the level (py/assertions.py)
+    flat = pathlib.Path(a.out) / "flat" / "arrays.json"
+    if flat.exists():
+        sys.path.insert(0, str(pathlib.Path(__file__).parent))
+        from assertions import level_doc, levels_of
+        rows = json.loads(flat.read_text())["arrays"]
+        named = {d["subject"]["variable"] for d in docs}
+        docs += [level_doc(d, lv) for d in list(docs) for lv in levels_of(rows, d["subject"]["variable"])
+                 if lv["array"] not in named]
     forms = [f for f in a.forms.split(",") if f]
     out_dir = pathlib.Path(a.out)
     report, ok_all = [], True
     for doc in docs:
         var, t = doc["subject"]["variable"], target(doc)
         for form in forms:
+            if form == "stac" and doc.get("level_of"):
+                continue  # items describe the base variable only
             if form in ("kerchunk", "icechunk", "stac") and not (out_dir / form).exists():
                 continue
             if form == "mdim.vrt" and not (out_dir / "mdim.vrt").exists():
