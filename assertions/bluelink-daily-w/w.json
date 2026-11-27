@@ -1,0 +1,49 @@
+{
+ "assertion_version": "0",
+ "kind": "grid",
+ "subject": {
+  "dataset": "bluelink-daily-w",
+  "variable": "w"
+ },
+ "asserts": {
+  "spatial:transform": [
+   0.10000000369999582,
+   0.0,
+   -1.1049398479512362e-09,
+   0.0,
+   0.09999999809106058,
+   -74.99999694728771
+  ],
+  "spatial:shape": [
+   1500,
+   3600
+  ],
+  "spatial:dimensions": [
+   "yt_ocean",
+   "xt_ocean"
+  ],
+  "spatial:transform_type": "affine",
+  "spatial:registration": "pixel",
+  "proj:code": "EPSG:4326"
+ },
+ "crs_axes": [
+  "y",
+  "x"
+ ],
+ "evidence": {
+  "method": "transform restated from the regular 1-D coordinates; CRS asserted",
+  "axes": {
+   "x": "xt_ocean",
+   "y": "yt_ocean"
+  },
+  "crs_from": "convention: BRAN (MOM5) daily output is on a regular 0.1 degree spherical longitude/latitude grid (1-D degrees_east/degrees_north axes); the netCDF files carry no grid_mapping and the plan.vrt has no SRS. EPSG:4326 chosen by Michael (project thread, 2026-11-27)",
+  "note": "longitude 0 to 360 and latitude ascending are facts of the store, not corrected here; the 2-D geolon_t/geolat_t named in the coordinates attribute are not in the store",
+  "dataset": "bluelink-daily-w"
+ },
+ "by": {
+  "name": "raad.virtualize assertion step",
+  "kind": "known source CRS"
+ },
+ "made_at": "2026-11-27T04:45:00Z",
+ "status": "proposed"
+}

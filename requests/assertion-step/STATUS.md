@@ -86,3 +86,8 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
   (overview levels added after it was made). Card: cards/ghrsst-mur-cog-analysed_sst.md.
 - 2026-11-27 next: Bluelink needs an assertion (proposed EPSG:4326;
   LON_0_360 and Y_ASCENDING are facts, not targets), from Michael.
+- 2026-11-27 Bluelink: EPSG:4326 asserted for the nine daily variables
+  (Michael's choice), assertions/bluelink-daily-<var>/<var>.json, transform
+  restated from the store's 1-D axes as published (float32-derived: step
+  0.10000000369999582, origin -74.99999694728771 on t-grid y), not rounded
+  to 0.1. No storecard document exists, so no published-card comparison.

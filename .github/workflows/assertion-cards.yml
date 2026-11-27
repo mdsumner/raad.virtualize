@@ -58,6 +58,42 @@ jobs:
             group: ghrsst
             config: config/ghrsst-cog.sh
             env: GHRSST_VAR=analysed_sst
+          - dataset: bluelink-daily-temp
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=temp
+          - dataset: bluelink-daily-salt
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=salt
+          - dataset: bluelink-daily-eta_t
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=eta_t
+          - dataset: bluelink-daily-mld
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=mld
+          - dataset: bluelink-daily-u
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=u
+          - dataset: bluelink-daily-v
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=v
+          - dataset: bluelink-daily-w
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=w
+          - dataset: bluelink-daily-tx_trans_int_z
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=tx_trans_int_z
+          - dataset: bluelink-daily-ty_trans_int_z
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=ty_trans_int_z
     env:
       SCRATCH: https://data.source.coop/ausantarctic/ausantarctic-scratch
     steps:
