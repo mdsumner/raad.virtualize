@@ -50,8 +50,10 @@ when the target has no rule for it). A reader elsewhere reopens the
 repository with a container of the same name and its own prefix and store,
 for example file:///g/data/gb6/ on NCI, and reads in place with no rewrite.
 The root group attribute `byterefs_roots` lists, per root, its verbatim
-prefix and its prefix under every target. Sources under no root stay
-absolute. Readers that ignore container names cannot resolve vcc:// refs.
+prefix and its prefix under every target. Icechunk keys containers by URL
+prefix, so roots whose prefixes coincide under the chosen target share the
+container of the first such root in name order; `byterefs_roots` records it
+as `container` on the others. Sources under no root stay absolute. Readers that ignore container names cannot resolve vcc:// refs.
 
 Zarr v2 codec ids map to Zarr v3: imagecodecs_delta (array to array, TIFF
 PREDICTOR=2; needs imagecodecs, and so does every reader), then bytes (dtype
@@ -128,12 +130,30 @@ def remap_roots(doc, target):
     return roots, table
 
 
-def relative_location(source, roots):
-    """vcc://<name>/<rest> for a verbatim source under a root, else None."""
+def relative_location(source, roots, alias=None):
+    """vcc://<name>/<rest> for a verbatim source under a root, else None.
+    `alias` maps a root to the root whose container it shares."""
     for name, (pre, _) in roots.items():  # longest prefix first
         if source.startswith(pre):
+            name = (alias or {}).get(name, name)
             return f"vcc://{name}/{source[len(pre):]}"
     return None
+
+
+def shared_containers(roots, table):
+    """Icechunk keys virtual chunk containers by URL prefix, so two roots whose
+    prefixes are the same under the chosen target share one container: the
+    first root in name order names it. Returns {root: container root} for the
+    roots that share, and records `container` on them in `table`."""
+    first, alias = {}, {}
+    for name in sorted(roots):
+        url = roots[name][1]
+        if url in first:
+            alias[name] = first[url]
+            table[name]["container"] = first[url]
+        else:
+            first[url] = name
+    return alias
 
 
 def container_for(url):
@@ -238,13 +258,15 @@ def main():
     rows = doc["arrays"]
 
     roots, roots_table = remap_roots(doc, a.target) if a.relocatable else ({}, {})
+    alias = shared_containers(roots, roots_table)
     names = {}  # url_prefix -> container name
     for name, (_, url) in roots.items():
-        names[url] = name
+        if name not in alias:
+            names[url] = name
 
     def location(path):
         if roots:
-            rel = relative_location(path, roots)
+            rel = relative_location(path, roots, alias)
             if rel:
                 return rel
         return resolve(path, rules)
@@ -256,7 +278,7 @@ def main():
             continue
         t = pq.read_table(os.path.join(a.flat, f"refs_{r['array']}.parquet"), columns=["path"])
         for path in set(x for x in t.column("path").to_pylist() if x):
-            rel = relative_location(path, roots) if roots else None
+            rel = relative_location(path, roots, alias) if roots else None
             if rel:
                 name = rel[len("vcc://"):].split("/", 1)[0]
                 url = roots[name][1]

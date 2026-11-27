@@ -8,7 +8,7 @@
 #   ./run.sh config/bran.sh config/aadc-transfer.sh publish verify-published
 #
 # Every leading *.sh argument is sourced, in order (dataset, then a publish
-# target). Steps: deps plan harvest collate assert render icechunk grist stac verify, and
+# target). Steps: deps plan harvest collate assert render icechunk browser grist stac verify, and
 # prepare publish publish-stac verify-published stale (not run by default).
 # assert applies the storecard assertion documents in assertions/<dataset>/
 # (py/assertions.py; ASSERT_DATASET, default DATASET, names the directory):
@@ -26,6 +26,9 @@
 #      HARVEST_ENGINE (auto | gdal | h5py; see py/harvest.py),
 #      R_LIB (default ./r-lib: R packages installed by the deps step),
 #      ICECHUNK_ARGS (extra py/render_icechunk.py options, e.g. "--split 0"),
+#      BROWSER_TARGET (remap target for out/browser/icechunk, a relocatable
+#      Icechunk whose chunk URLs send CORS headers, e.g. through a CORS relay;
+#      unset, the browser step does nothing),
 #      FLAT_ROW_GROUP_ROWS (rows a row group of flat/refs_*.parquet, whole
 #      leading steps; default 20000, 0 = writer default of about 1M),
 #      PUBLISH (a /vsis3/ prefix; set by config/aadc-transfer.sh),
@@ -54,7 +57,7 @@ REV=$(git -c safe.directory="$HERE" -C "$HERE" describe --always --dirty 2>/dev/
 # outside the mount, git exits 128, and pipefail would end the run silently
 REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#" || true)
 export E2E_GENERATOR="${E2E_REPO:-${REPO:-local}} $REV" E2E_CONFIG="${CONFIGS[*]}"
-STEPS=${*:-${DEFAULT_STEPS:-plan harvest collate assert render icechunk grist stac verify}}
+STEPS=${*:-${DEFAULT_STEPS:-plan harvest collate assert render icechunk browser grist stac verify}}
 # python, or python3 where there is no python (the image has python only)
 PYTHON=${PYTHON:-$(command -v python || command -v python3 || echo python)}; RSCRIPT=${RSCRIPT:-Rscript}; GDAL=${GDAL:-gdal}
 WORK=${E2E_WORK:-$HERE/work/$DATASET}
@@ -120,6 +123,18 @@ for s in $STEPS; do
     icechunk)
       step icechunk "$PYTHON" "$HERE/py/render_icechunk.py" "$WORK/out/flat" \
         "$WORK/out/icechunk" --target "$ICECHUNK_TARGET" ${ICECHUNK_ARGS:-} ;;
+    browser)
+      # the icechunk form again for readers in a web page: relocatable, with
+      # each root's container at its BROWSER_TARGET prefix (a host that sends
+      # CORS headers, or a CORS relay in front of one). Before stac, which
+      # lists it. A dataset whose hosts send CORS headers needs none
+      rm -rf "$WORK/out/browser"
+      if [ -n "${BROWSER_TARGET:-}" ]; then
+        step browser "$PYTHON" "$HERE/py/render_icechunk.py" "$WORK/out/flat" \
+          "$WORK/out/browser/icechunk" --target "$BROWSER_TARGET" --relocatable ${ICECHUNK_ARGS:-}
+      else
+        echo "== browser: no BROWSER_TARGET, skipped" | tee -a "$LOG"
+      fi ;;
     grist)
       # grist catalog (hypertidy/grist mdim contract): one row per date and
       # level, dsn the published mdim.vrt; before stac, which lists it
@@ -166,6 +181,7 @@ for s in $STEPS; do
         echo "stac: no stac-geoparquet (pip install rustac)" | tee -a "$LOG"
       fi
       export STAC_GEOPARQUET
+      export BROWSER_TARGET="${BROWSER_TARGET:-}"
       step stac "$RSCRIPT" "$HERE/R/stac.R" "$WORK/store.sqlite" "$WORK/out" \
         "${STAC_TARGET-$KERCHUNK_TARGET}" "${STAC_BASE:-}"
       if [ "$STAC_GEOPARQUET" = 1 ]; then

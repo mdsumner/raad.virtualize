@@ -79,6 +79,20 @@ REMAPS=("public|/vsicurl/https://|https://")
 if [ -n "${SEAICE_MIRROR:-}" ]; then
   REMAPS+=("public|$SEAICE_ROOT|https://" "gdal|$SEAICE_ROOT|/vsicurl/https://")
 fi
+# browser target: NSIDC sends no CORS headers, so chunk reads from a web page
+# go through a CORS relay (GET/HEAD, Range passed through, allow-listed hosts;
+# recipe in github.com/mdsumner/nectar). run.sh browser step renders
+# out/browser/icechunk with it; CORS_RELAY="" leaves it out
+CORS_RELAY=${CORS_RELAY-https://relay.ace-eco-stats.cloud.edu.au/?url=}
+if [ -n "$CORS_RELAY" ]; then
+  REMAPS+=("browser|/vsicurl/https://|${CORS_RELAY}https://")
+  [ -z "${SEAICE_MIRROR:-}" ] || REMAPS+=("browser|$SEAICE_ROOT|${CORS_RELAY}https://")
+  BROWSER_TARGET=browser
+fi
+# map rendering for viewers (STAC render extension): concentration is stored
+# as 0-100 (scale_factor 0.01); 251-255 are flag values (pole hole, coast,
+# land, missing)
+export STAC_RENDERS=${STAC_RENDERS-'{"concentration":{"title":"Sea ice concentration (percent)","assets":["browser"],"rescale":[[0,100]],"nodata":[251,252,253,254,255],"colormap_name":"viridis"}}'}
 # one STAC item file per day is 17,500 uploads: keep the ndjson and
 # stac-geoparquet item forms only, so a publish fits the source.coop key hour
 if [ "$SEAICE_FREQ" = daily ]; then export STAC_ITEM_FILES=${STAC_ITEM_FILES:-0}; fi
