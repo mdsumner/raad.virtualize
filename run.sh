@@ -35,6 +35,10 @@
 #      PUBLISH_WITH (gdal, or obstore for py/s3_sync.py),
 #      S3_SYNC_ARGS (extra py/s3_sync.py options, e.g. --skip-same-size to
 #      resume a publish cut off by an expired token),
+#      VERIFY_PLAN_REMAP (space separated FROM=TO path prefixes: verify and
+#      verify-published read the plan's sources with FROM replaced by TO,
+#      for a plan built where its sources are mounted and verified elsewhere;
+#      config/bluelink.sh sets it where /g/data/gb6 is not mounted),
 #      STAC_TARGET (remap target for STAC item hrefs; default KERCHUNK_TARGET),
 #      STAC_BASE (public URL of the published dataset prefix, for absolute
 #      STAC asset hrefs and GDAL open strings), STAC_ITEM_FILES (see
@@ -70,6 +74,12 @@ LOG="$WORK/log.txt"
 export PYTHONUNBUFFERED=1
 export GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR GDAL_HTTP_MAX_RETRY=${GDAL_HTTP_MAX_RETRY:-5} \
        GDAL_HTTP_RETRY_DELAY=${GDAL_HTTP_RETRY_DELAY:-2}
+
+# --plan-remap options of py/verify.py, one per VERIFY_PLAN_REMAP pair
+plan_remap() {
+  local r
+  for r in ${VERIFY_PLAN_REMAP:-}; do printf -- '--plan-remap\n%s\n' "$r"; done
+}
 
 step() {
   local name=$1; shift
@@ -189,7 +199,7 @@ for s in $STEPS; do
       fi ;;
     verify)
       rm -f "$WORK/out/verify.json"
-      step verify "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
+      step verify "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" $(plan_remap) \
         ${VERIFY_WINDOWS:-}
       checks=(--check verify.py)
       # the catalog rows against their source granules, through the local VRT
@@ -238,7 +248,7 @@ for s in $STEPS; do
       # obstore targets (source.coop) are public and their proxy rejects
       # GDAL's request signing: read back anonymously, as a public reader
       anon=; [ "${PUBLISH_WITH:-gdal}" = obstore ] && anon=AWS_NO_SIGN_REQUEST=YES
-      step verify-published env $anon "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" \
+      step verify-published env $anon "$PYTHON" "$HERE/py/verify.py" --plan "$WORK/plan.vrt" --out "$WORK/out" $(plan_remap) \
         --published "$PUB" ${VERIFY_WINDOWS:-}
       # the published catalog read back from its public URL, each row's dsn
       # opened as written (as grist opens it)

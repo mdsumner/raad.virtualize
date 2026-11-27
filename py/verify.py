@@ -39,6 +39,7 @@ scale_factor and fill value against GDAL on the plan. Exit status 1 on any
 mismatch.
 """
 import argparse
+import atexit
 import base64
 import copy
 import functools
@@ -46,8 +47,10 @@ import hashlib
 import json
 import math
 import os
+import re
 import struct
 import sys
+import tempfile
 import time
 import xml.etree.ElementTree as ET
 
@@ -424,6 +427,27 @@ def same_fill(a, b):
     return a == b or (math.isnan(a) and math.isnan(b))
 
 
+def remapped_plan(plan, rules):
+    """A copy of the plan, beside it, whose <SourceFilename> prefixes are rewritten.
+
+    Each rule is FROM=TO. The copy is removed at exit; the plan itself is not
+    changed (it is published as it is).
+    """
+    text = open(plan).read()
+    for rule in rules:
+        frm, sep, to = rule.partition("=")
+        if not sep or not frm:
+            sys.exit(f"verify: --plan-remap {rule!r} is not FROM=TO")
+        text, n = re.subn(r"(<SourceFilename[^>]*>)" + re.escape(frm),
+                          lambda m: m.group(1) + to, text)
+        print(f"verify: plan sources {frm} -> {to} ({n} sources)")
+    fd, path = tempfile.mkstemp(prefix=".plan-remap-", suffix=".vrt", dir=os.path.dirname(os.path.abspath(plan)))
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    atexit.register(lambda: os.path.exists(path) and os.remove(path))
+    return path
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--plan", required=True)
@@ -432,10 +456,16 @@ def main():
     p.add_argument("--skip", action="append", default=[], help="reader to skip")
     p.add_argument("--sample", type=int, default=4, help="random chunks per array")
     p.add_argument("--published", help="read the forms from this /vsis3/ copy of OUT_DIR")
+    p.add_argument("--plan-remap", action="append", default=[], metavar="FROM=TO",
+                   help="read the plan's sources with the path prefix FROM replaced by TO, for a "
+                        "plan whose sources are not mounted here "
+                        "(/g/data/gb6/=/vsicurl/https://thredds.nci.org.au/thredds/fileServer/gb6/)")
     p.add_argument("--groups", type=int, default=8,
                    help="for a store of subgroups (g/TEMP): check the arrays of this many "
                         "groups, the first, the last and the rest at random (0: all)")
     a = p.parse_args()
+    if a.plan_remap:
+        a.plan = remapped_plan(a.plan, a.plan_remap)
 
     doc = json.load(open(os.path.join(a.out, "flat", "arrays.json")))
     groups = sorted({r["array"].rsplit("/", 1)[0] for r in doc["arrays"] if "/" in r["array"]})

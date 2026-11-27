@@ -73,4 +73,8 @@ REMAPS=("public|/vsicurl/https://|https://"
 KERCHUNK_TARGET=public
 ICECHUNK_TARGET=public
 VRT_TARGET=gdal
+# verify reads the plan's sources (/g/data paths, built on NCI) through
+# THREDDS, as the gdal target does, where /g/data/gb6 is not mounted
+[ -d /g/data/gb6 ] ||
+  VERIFY_PLAN_REMAP=${VERIFY_PLAN_REMAP-/g/data/gb6/=/vsicurl/https://thredds.nci.org.au/thredds/fileServer/gb6/}
 WORKERS=${WORKERS:-8}

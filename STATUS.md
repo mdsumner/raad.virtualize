@@ -44,8 +44,8 @@ needs no step.
 | seaice | g02202-v6-daily-north | done | n/a | relay | Republished with A; Icechunk cleaned 2026-11-27 |
 | seaice | asi-amsr2-v5.4-daily-south | done | n/a | relay; no browser rules yet | Republished with A; Icechunk cleaned 2026-11-27. Row chunks: 2,656 requests per field through the relay |
 | oisst | oisst-v2.1-daily | done | n/a | direct | Republished with A; Icechunk cleaned 2026-11-27 |
-| ghrsst | ghrsst-mur-cog-analysed_sst | document ready | pending | direct | Built in `rv-assert2`, not published. One republish gives A, O, V |
-| bluelink | bluelink-daily-{temp, salt, eta_t, mld, u, v, w, tx_trans_int_z, ty_trans_int_z} | documents ready | n/a | direct, untested (THREDDS answers 403 to HEAD with an Origin) | Not republished. One render gives A, R and V |
+| ghrsst | ghrsst-mur-cog-analysed_sst | done | done | done (link) | Republished 2026-11-27 from main `44e6bc0` (A, O, V): `verify-published` passes, 299 old Icechunk objects deleted, 644 files match the build with nothing extra, the repository opens anonymously at `main` `PXBQEF86` |
+| bluelink | bluelink-daily-{temp, salt, eta_t, mld, u, v, w, tx_trans_int_z, ty_trans_int_z} | documents ready | n/a | direct, untested (THREDDS answers 403 to HEAD with an Origin) | Not republished. Absolute Icechunk refs (decided 2026-11-27, below). `eta_t` built and verified on the VM through THREDDS (`VERIFY_PLAN_REMAP`); the re-render fixes the float `_FillValue` for `xr.open_zarr` |
 | bedmap | bedmap3 | no document (EPSG:3031) | pending | direct | `hpc/vm/bedmap3-publish.sh` (production product; `assertion-republish.sh` refuses it) |
 | bedmachine | bedmachine-v4.1 | no document (EPSG:3031) | pending | direct | `hpc/vm/bedmachine-publish.sh` |
 | ibcso | ibcso-v2, ibcso-annual-2024, ibcso-annual-2025 | no documents (EPSG:9354) | pending | direct | `hpc/vm/ibcso-publish.sh` |
@@ -69,8 +69,8 @@ Suggested order:
 2. Remove the old Icechunk objects of the four republished stores. Done
    2026-11-27.
 3. MUR: `assertion-republish.sh build` then `publish`.
-4. Bluelink, nine variables: one render with A and R (#117), from the
-   published stores.
+4. Bluelink, nine variables: one republish each with A and the
+   `_FillValue` fix, absolute refs, verified on the VM through THREDDS.
 5. COG products (Bedmap3, BedMachine, IBCSO, GEBCO): write assertion
    documents from each COG's CRS, then use each product's publish script.
 6. Sea ice viewer pass: the browser rules for ASI and G02202 north, a
@@ -87,7 +87,7 @@ through boto3; the proxy refuses the presigned DELETE it sent before). See [docs
 
 | Issue | What | Next |
 |---|---|---|
-| #117 | Relocatable Icechunk by default; re-render the nine Bluelink stores (in-place `/g/data` reads, float `_FillValue`) | With the Bluelink republish. First check that GDAL `/vsiicechunk/` resolves `vcc://` refs |
+| #117 | Relocatable Icechunk by default; re-render the nine Bluelink stores (in-place `/g/data` reads, float `_FillValue`) | Checked 2026-11-27: GDAL's Icechunk driver does not resolve `vcc://` refs (icechunk-python and icechunk-js do). Decided: the published stores keep absolute refs; on NCI, read the netCDF in place or render a local relocatable Icechunk from the flat refs. Re-scope #117 to the re-render (fill value) and drop the default flip |
 | #99 | storecard findings on the scratch stores | 1 (no CRS): fixed by A where republished. 2 (BRAN `coordinates` names absent arrays): open. 3 (kerchunk form drops CF `_FillValue`): open. 4 (hosts without CORS): the relay (#126) |
 
 ## Decisions
@@ -163,6 +163,10 @@ Upstream:
   sea ice, Bedmap3, BedMachine and IBCSO stores
   ([docs/viewer-strategy.md](docs/viewer-strategy.md)).
 - icechunk-js does not merge chunk requests (ASI: 2,656 requests per field).
+- GDAL's Icechunk driver does not resolve relocatable `vcc://<container>/`
+  refs through the repository's named containers ("Cannot open vcc://..."),
+  so relocatable stores are for icechunk-python and icechunk-js readers.
+  Candidate item for mdsumner/osgeo-upstream `notes/2026-11-16-icechunk-driver-gaps.md`.
 
 ## Production jobs
 
