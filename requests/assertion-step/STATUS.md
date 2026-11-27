@@ -121,3 +121,5 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
   the G02202 thumbnails were split and swapped; fixed in 3eb327b (rotate only
   when x is within 0..361). ASI south never had a published thumbnail.
   assertion-republish.sh gains stac and publish-stac phases to redraw them.
+- 2026-11-28 thumbnail rotation removed altogether (Michael: the preview is
+  an image of the array as stored); only the south-up flip remains.

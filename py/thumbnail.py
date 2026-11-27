@@ -12,8 +12,8 @@ step of the source. A raster source (GeoTIFF, COG) is read with the classic
 API, so its overviews serve the reduction; any other source through the
 multidimensional API. Values are stretched between the 2nd and 98th
 percentiles of the valid cells (log10 first with --log10) onto the palette;
-nodata, NaN and values outside the CF valid range are transparent. A south-up grid is flipped and a 0..360
-longitude grid is rotated to -180..180.
+nodata, NaN and values outside the CF valid range are transparent. A south-up grid is flipped; columns are
+drawn in stored order (a 0..360 longitude grid is not rotated).
 
 --source REGEX takes the last placement among the sources whose path
 matches, rather than the last of all (a source with data, where the last
@@ -194,14 +194,6 @@ def main():
         v = v * (scale or 1) + (offset or 0)
     if south_up:
         v, valid = v[::-1], valid[::-1]
-    if (xv is not None and len(xv) > 1 and xv.min() >= -1 and 180 < xv.max() <= 361
-            and xv.max() - xv.min() > 350):
-        # (a projected x in metres also exceeds 180 and spans more than 350)
-        # 0..360 longitudes: columns east of 180 go first
-        xs = np.linspace(xv[0], xv[-1], v.shape[1])
-        east = xs > 180
-        v = np.concatenate([v[:, east], v[:, ~east]], 1)
-        valid = np.concatenate([valid[:, east], valid[:, ~east]], 1)
     if a.transpose:
         v, valid = v.T, valid.T
     rgba, (lo, hi) = colour(v, valid, a.palette, a.log10)
