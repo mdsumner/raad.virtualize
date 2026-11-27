@@ -104,3 +104,7 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
 - 2026-11-27 all six datasets in the request pass. Open: storecard's MUR
   document is stale (rebuild in storecard); a scratch republish of the
   rendered forms needs Michael's go-ahead.
+- 2026-11-27 republish script: hpc/vm/assertion-republish.sh (build: fetch
+  the published store and plan, assert, render, icechunk, grist, stac,
+  verify, no keys; publish: publish and verify-published with the scratch
+  keys). Waiting on Michael to run it on the VM.
