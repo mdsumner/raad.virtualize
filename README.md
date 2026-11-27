@@ -398,31 +398,36 @@ declared overviews for a reduced view. Results and findings are in
 
 ## Current state
 
-- **BRAN2023 daily** over NCI THREDDS: `temp` 2010 (1,116,900 refs;
-  collate 12 s, render 16 s, Icechunk 5 s) verified locally and published to
-  the AADC transfer bucket; `salt` January and February 2010 published and
-  verified from the bucket.
-- **GHRSST MUR COGs** (source.coop): the TIFF path verified end to end on
-  synthetic COGs of the same encoding (Int16, ZSTD, `PREDICTOR=2`, a sparse
-  tile, a missing day); not yet run against the bucket.
-- **OISST** (NOAA v2.1 AVHRR daily, 1981-09-01 to present): fully harvested
-  in the legacy layout, 16,387 files, published as `oisst-refs.sqlite`.
-  `config/oisst.sh` reharvests the full series through the current pipeline
-  (plan from `py/plan_daily.py`), to the `oisst/` group of the scratch
-  product.
+Release `v0.1.0` (2026-11-26). 31 datasets in 11 product groups are
+published; the [Datasets](docs/published.md) page lists them with their
+freshness.
 
-- **IMOS MEOP seal CTD profiles** (classic netCDF on the IMOS public
-  bucket): the 2024 release as one cube (265 files, 126,518 profiles by
-  1000 levels, 1.55M refs; plan 16 s, harvest 8 s from the header alone,
-  collate 23 s) and both releases as one group per tag (564 groups, 27,432
-  one-chunk arrays; 54 min, of which collate 30 and render 19), verified
-  locally; group `imos-tracking/` of the scratch product. A plan of nested
-  groups is a store whose arrays and dimensions are named by path
-  (`g/TEMP`), rendered as nested groups in every form. One chunk table and
-  one view per array does not scale to tens of thousands of arrays: SQLite
-  reads `sqlite_master` again after every CREATE (about 57 ms each at
-  27,000 arrays), and the flat, kerchunk and Icechunk forms are one object
-  per array each (82,000 objects for the per-tag store).
+- **Scratch product** `ausantarctic/ausantarctic-scratch` (drafts):
+  - sea ice (G02202 v6 daily south and north, ASI AMSR2 v5.4 daily south);
+  - OISST v2.1 daily;
+  - GHRSST MUR `analysed_sst`;
+  - Bluelink BRAN daily, nine variables;
+  - IMOS MEOP CTD profiles, the 2024 cube and one group per tag;
+  - ESA CCI ocean colour v6.0, six datasets;
+  - ACCESS-ESM1.6 historical ocean temperature.
+- **Product repositories on source.coop**, the virtual forms beside the
+  COGs:
+  - Bedmap3 (`ausantarctic/bedmap`);
+  - BedMachine v4.1 (`ausantarctic/bedmachine`);
+  - IBCSO v2 and the 2024 and 2025 annual releases (`ausantarctic/ibcso`);
+  - GEBCO 2024 to 2026 (`ausantarctic/gebco`).
+- A plan of nested groups (the MEOP per-tag store) is a store whose arrays
+  and dimensions are named by path (`g/TEMP`), rendered as nested groups in
+  every form.
+- The legacy two-table OISST store is the release artifact
+  `oisst-refs.sqlite` (16,387 files, `legacy/`).
+
+[STATUS.md](STATUS.md) holds the pull requests in flight, the republish
+queue for the new schemes (assertions, VRT overviews, the viewer), open
+issues, decisions and dangling threads. [LEDGER.md](LEDGER.md) holds facts
+learned, each with its check, including build timings and scale limits.
+The [viewer strategy](docs/viewer-strategy.md) and the plan for
+[production jobs](docs/production.md) are on the site.
 
 ## Roadmap
 
@@ -434,7 +439,8 @@ declared overviews for a reduced view. Results and findings are in
 - Further BRAN variables and years. Beyond a few years of BRAN, materialise `refs_<array>` (the
   view has no index) and batch the mosaic.
 - Record attribute types in the store, so readers keep float32 packing.
-- Production publishing to the public endpoints (Pawsey, source.coop).
+- Production jobs that keep each store current and up to standard
+  ([docs/production.md](docs/production.md)).
 - Longer term this store is a prototype of the reference-extraction model
   proposed for GDAL itself (`gdal mdim` chunk-reference extraction, built on
   `GDALMDArray::GetRawBlockInfo`): the same table, produced by one code path
