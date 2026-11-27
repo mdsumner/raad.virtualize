@@ -136,3 +136,6 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
   untested); MUR and nine Bluelink stores not republished; storecard
   follow-up (cards rebuild, assertions/ausantarctic to settled); PR stays
   draft.
+- 2026-11-28 ASI south thumbnail published (HDF5 fallback, c343c41); all
+  three sea ice thumbnails correct at the data URL and in the Portolan
+  browser (an incognito window skips the browser cache).
