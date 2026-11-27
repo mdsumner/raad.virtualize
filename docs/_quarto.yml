@@ -41,6 +41,8 @@ website:
           - href: esacci-oc.md
           - href: bedmap-source-coop.md
           - href: bedmachine-source-coop.md
+          - href: viewer-strategy.md
+          - href: production.md
     right:
       - icon: github
         href: https://github.com/mdsumner/raad.virtualize
