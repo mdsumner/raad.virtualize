@@ -257,7 +257,10 @@ mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6,
               meta = .zobj(as.list(stats::setNames(m$value, m$key))[setdiff(m$key, MR_META_JSON)]),
               dimensions = .zobj(mr_dimensions(con)),
               arrays = arrays,
-              remap = lapply(seq_len(nrow(rm)), function(i) as.list(rm[i, ])))
+              remap = lapply(seq_len(nrow(rm)), function(i) {
+                r <- as.list(rm[i, ])  # root only where named (decision 0014)
+                r[!(names(r) == "root" & vapply(r, function(x) is.na(x[1]), TRUE))]
+              }))
   ## subgroup attributes, for a store of subgroups (py/plan_groups.py)
   if (length(gr <- mr_groups(con))) doc$groups <- gr
   ## the assertions applied at render (py/assertions.py): which, and the

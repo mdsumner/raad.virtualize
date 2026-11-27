@@ -82,6 +82,7 @@ mr_init <- function(con, meta = list()) {
       target      TEXT NOT NULL,        -- e.g. 'public', 's3', 'local'
       prefix      TEXT NOT NULL,
       replacement TEXT NOT NULL,
+      root        TEXT,                 -- name of the root at prefix (byterefs decision 0014)
       PRIMARY KEY (target, prefix)) WITHOUT ROWID")
   meta <- utils::modifyList(list(format_version = MR_FORMAT), meta)
   for (k in names(meta))
@@ -485,10 +486,34 @@ mr_dimensions <- function(con) {
 }
 
 ## ---- remap: publish-time prefix rewrite of verbatim sources --------------------
-mr_set_remap <- function(con, target, prefix, replacement) {
-  dbExecute(con, "INSERT INTO remap(target,prefix,replacement) VALUES(?,?,?)
-                  ON CONFLICT(target,prefix) DO UPDATE SET replacement=excluded.replacement",
-            params = list(target, prefix, replacement))
+## root (byterefs decision 0014): optional name of the root at `prefix`, for
+## projections that write paths relative to it (Icechunk vcc://<root>/);
+## [A-Za-z0-9-]+, and every rule of one prefix that gives a root gives the same
+mr_set_remap <- function(con, target, prefix, replacement, root = NA_character_) {
+  if (!"root" %in% dbListFields(con, "remap"))  # a store from before 0014
+    dbExecute(con, "ALTER TABLE remap ADD COLUMN root TEXT")
+  if (!is.na(root)) {
+    if (!grepl("^[A-Za-z0-9-]+$", root))
+      stop(sprintf("remap root '%s' for %s: a name of [A-Za-z0-9-]+", root, prefix))
+    other <- dbGetQuery(con, "SELECT DISTINCT root FROM remap WHERE prefix = ? AND target <> ?
+                              AND root IS NOT NULL", params = list(prefix, target))$root
+    if (length(other) && any(other != root))
+      stop(sprintf("remap root for %s: '%s' here, '%s' on another rule", prefix, root, other[1]))
+  }
+  dbExecute(con, "INSERT INTO remap(target,prefix,replacement,root) VALUES(?,?,?,?)
+                  ON CONFLICT(target,prefix) DO UPDATE SET replacement=excluded.replacement,
+                  root=excluded.root",
+            params = list(target, prefix, replacement, root))
+  invisible(con)
+}
+
+## rules as a config's REMAPS gives them: "target|prefix|replacement[|root]"
+mr_set_remap_rules <- function(con, rules) {
+  for (r in rules) {
+    p <- strsplit(r, "|", fixed = TRUE)[[1]]
+    if (!length(p) %in% 3:4) stop(sprintf("remap rule '%s': target|prefix|replacement[|root]", r))
+    mr_set_remap(con, p[1], p[2], p[3], if (length(p) == 4L) p[4] else NA_character_)
+  }
   invisible(con)
 }
 
