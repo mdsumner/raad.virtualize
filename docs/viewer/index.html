@@ -115,6 +115,7 @@ import { feature } from "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm
 const DEFAULT_CATALOG = "https://data.source.coop/ausantarctic/ausantarctic-scratch/catalog.json";
 const LAND = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-50m.json";
 const PIXEL_BUDGET = 8e6;
+const PLAYPROJ = "https://hypertidy.github.io/playproj/store.html";
 // hosts that send CORS headers for anonymous reads
 const CORS_HOSTS = [/^https:\/\/data\.source\.coop\//, /^https:\/\/s3\.us-west-2\.amazonaws\.com\/us-west-2\.opendata\.source\.coop\//];
 // proj4 strings for the codes these stores use; others come from epsg.io
@@ -441,6 +442,9 @@ async function showCollection(url) {
     ["CRS", `${esc(code || "unknown")}${def ? "" : " (no definition; no coastline)"}`],
     ["transform", `${gt.map((v) => +v.toPrecision(10)).join(", ")} (${how})`],
     ["containers", esc((asset["rv:virtual_chunk_containers"] || []).join(", ") || "-")],
+    // hypertidy/playproj reads the same store and reprojects on the GPU
+    // (Mercator, Equal Earth, Spilhaus, native)
+    ["other views", `<a href="${PLAYPROJ}#${esc(href)}::varname=${encodeURIComponent(name)}::projection=equal_earth${axes.length ? `::dimIndices_${encodeURIComponent(axes[0].name)}=${idx[0]}` : ""}">playproj</a>`],
   ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
   $("view").hidden = false;
   if (def) coastline(def, gt, H, W, flipY, flipX);
