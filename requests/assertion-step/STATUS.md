@@ -123,3 +123,10 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
   assertion-republish.sh gains stac and publish-stac phases to redraw them.
 - 2026-11-28 thumbnail rotation removed altogether (Michael: the preview is
   an image of the array as stored); only the south-up flip remains.
+- 2026-11-28 live cards after Michael's batch publish, no overlay: G02202
+  south EPSG:3412 and north EPSG:3411, ASI south EPSG:3976 (Y_ASCENDING
+  left, a fact), OISST EPSG:4326 (LON_0_360, Y_ASCENDING left) in kerchunk
+  and Icechunk; each mdim.vrt has its `<SRS dataAxisToSRSAxisMapping>`; each
+  collection lists rv:assertions. CRS_NOT_DECLARED is gone from all four.
+  MUR and Bluelink not yet republished. Thumbnails on the four were drawn
+  before b889262 (G02202 still split, OISST rotated; ASI has none).
