@@ -60,8 +60,10 @@ for ds in "${names[@]}"; do
         for f in store.sqlite plan.vrt; do
           curl -fsSL -o "$W/$f" "$SCRATCH/$group/$ds/$f"
         done
-        curl -fsSL -o "$W/sources.meta.tsv" "$SCRATCH/$group/$ds/sources.meta.tsv" ||
+        # optional: not every dataset has one
+        curl -fsL -o "$W/sources.meta.tsv" "$SCRATCH/$group/$ds/sources.meta.tsv" 2>/dev/null ||
           rm -f "$W/sources.meta.tsv"
+        echo "assertion-republish: $ds fetched; render and verify (log: $W/log.txt)"
         bash hpc/vm/docker-run.sh run.sh "$config" config/source-coop.sh \
           assert render icechunk grist stac verify ;;
       publish)
