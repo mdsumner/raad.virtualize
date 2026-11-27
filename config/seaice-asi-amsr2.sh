@@ -56,6 +56,8 @@ ASI_URL=https://data.seaice.uni-bremen.de/amsr2/asi_daygrid_swath/$ASI_GRID/netc
 DATASET=asi-amsr2-v5.4-daily-$SEAICE_HEM${SEAICE_FIRST:+-$SEAICE_FIRST}${SEAICE_LAST:+-$SEAICE_LAST}
 # product group (products/seaice/): the scratch prefix on source.coop
 PRODUCT_GROUP=seaice
+# assertions/<ASSERT_DATASET>/ (py/assertions.py), also for a subset build
+ASSERT_DATASET=asi-amsr2-v5.4-daily-$SEAICE_HEM
 ARRAYS=${SEAICE_ARRAYS:-z}
 ASI_PATTERN='-([0-9]{8})-v[0-9.]+\.nc$'
 ASI_MIRROR=

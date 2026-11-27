@@ -31,6 +31,12 @@ Checks, each fatal:
   the plan has none it supplies the CRS).
 
 A withdrawn assertion is recorded with applied = false and written nowhere.
+
+    python py/assertions.py import --dataset ID --out assertions/ID \
+        [--url-base URL] STORECARD_DOC...
+
+restates storecard documents (keyed to a published store) as documents of
+this repository (keyed to the dataset id), one per variable.
 """
 
 import argparse
@@ -208,6 +214,25 @@ def apply(store, plan, adir):
     con.close()
 
 
+def import_storecard(src, dataset, out_dir, url=None):
+    """A raad.virtualize assertion from a storecard document: the same
+    asserts, crs_axes, evidence, by, made_at and status, with the subject
+    keyed to the dataset id and variable and derived_from naming the
+    storecard document and its subject."""
+    d = json.loads(pathlib.Path(src).read_text())
+    var = d["subject"]["variable"]
+    out = {"assertion_version": d["assertion_version"], "kind": d["kind"],
+           "subject": {"dataset": dataset, "variable": var},
+           "asserts": d["asserts"], "crs_axes": d["crs_axes"], "evidence": d.get("evidence"),
+           "by": d.get("by"), "made_at": d.get("made_at"), "status": d["status"],
+           "derived_from": {"url": url or str(src), "subject": d["subject"]}}
+    validate(out, src)
+    f = pathlib.Path(out_dir) / f"{var}.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(out, indent=1) + "\n")
+    print(f"import: {src} -> {f}")
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sp = p.add_subparsers(dest="cmd", required=True)
@@ -215,9 +240,18 @@ def main(argv=None):
     a.add_argument("--store", required=True)
     a.add_argument("--plan")
     a.add_argument("dir")
+    m = sp.add_parser("import", help="restate storecard documents as assertions/<dataset>/<variable>.json")
+    m.add_argument("--dataset", required=True)
+    m.add_argument("--out", required=True, help="assertions/<dataset>")
+    m.add_argument("--url-base", help="URL of the storecard assertions directory, for derived_from")
+    m.add_argument("src", nargs="+")
     args = p.parse_args(argv)
     if args.cmd == "apply":
         apply(args.store, args.plan, args.dir)
+    else:
+        for s in args.src:
+            url = f"{args.url_base.rstrip('/')}/{pathlib.Path(s).name}" if args.url_base else None
+            import_storecard(s, args.dataset, args.out, url)
 
 
 if __name__ == "__main__":

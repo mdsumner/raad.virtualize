@@ -35,3 +35,13 @@ newest last. Blockers go at the top, marked BLOCKED.
   G02202 south Icechunk: CRS_NOT_DECLARED, PROJECTED_NO_GRID_MAPPING; with
   storecard's overlay: no findings. Published mdim.vrt has no `<SRS>`; STAC
   items already carry `proj:code` EPSG:3412 from the plan.
+- 2026-11-27 G02202 south: PASS in all four projections (assertion-cards
+  run 45932750068): kerchunk and Icechunk cards carry EPSG:3412 and the
+  transform, with no CRS findings, and equal the published cards under
+  storecard's overlay on grid, crs and findings; mdim.vrt has
+  `<SRS dataAxisToSRSAxisMapping="3,2">EPSG:3412`; STAC items unchanged in
+  value (EPSG:3412 from the plan before, from the assertion now). Card
+  diff: cards/g02202-v6-daily-south.md.
+- 2026-11-27 next: G02202 north, ASI south and OISST in the same job
+  (assertions imported with `py/assertions.py import`). GHRSST MUR waits for
+  overview levels; its storecard assertion covers the base level only.

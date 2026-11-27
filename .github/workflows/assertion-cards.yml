@@ -41,6 +41,18 @@ jobs:
             group: seaice
             config: config/seaice-g02202.sh
             env: SEAICE_HEM=south
+          - dataset: g02202-v6-daily-north
+            group: seaice
+            config: config/seaice-g02202.sh
+            env: SEAICE_HEM=north
+          - dataset: asi-amsr2-v5.4-daily-south
+            group: seaice
+            config: config/seaice-asi-amsr2.sh
+            env: SEAICE_HEM=south
+          - dataset: oisst-v2.1-daily
+            group: oisst
+            config: config/oisst.sh
+            env: ""
     env:
       SCRATCH: https://data.source.coop/ausantarctic/ausantarctic-scratch
     steps:
@@ -71,6 +83,7 @@ jobs:
             --overlay /tmp/storecard/assertions/ausantarctic/${{ matrix.dataset }} \
             --md cards/${{ matrix.dataset }}.md --json cards/${{ matrix.dataset }}.json || status=$?
           cat cards/${{ matrix.dataset }}.md >> "$GITHUB_STEP_SUMMARY"
+          cat cards/${{ matrix.dataset }}.md
           exit ${status:-0}
       - uses: actions/upload-artifact@v4
         if: always()

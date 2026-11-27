@@ -1,0 +1,61 @@
+{
+ "assertion_version": "0",
+ "kind": "grid",
+ "subject": {
+  "dataset": "asi-amsr2-v5.4-daily-south",
+  "variable": "z"
+ },
+ "asserts": {
+  "spatial:transform": [
+   3125.0,
+   0.0,
+   -3950000.0,
+   0.0,
+   3125.0,
+   -3950000.0
+  ],
+  "spatial:shape": [
+   2656,
+   2528
+  ],
+  "spatial:dimensions": [
+   "y",
+   "x"
+  ],
+  "spatial:transform_type": "affine",
+  "spatial:registration": "pixel",
+  "proj:code": "EPSG:3976"
+ },
+ "crs_axes": [
+  "x",
+  "y"
+ ],
+ "evidence": {
+  "method": "transform restated from the regular 1-D coordinates; CRS asserted",
+  "axes": {
+   "x": "x",
+   "y": "y"
+  },
+  "crs_from": "the source files' own grid mapping, as GDAL reads it into the dataset's plan.vrt <SRS>; the virtual store does not carry it",
+  "srs": "WGS 84 / NSIDC Sea Ice Polar Stereographic South, AUTHORITY EPSG 3976",
+  "plan": "https://data.source.coop/ausantarctic/ausantarctic-scratch/seaice/asi-amsr2-v5.4-daily-south/plan.vrt",
+  "note": "the files label WGS 84 (raad.virtualize config/seaice-asi-amsr2.sh); the Hughes 1980 form EPSG:3412 also fits this grid to 1e-4 cell (see f03d-asi-latlon2d.json), so the label decides",
+  "dataset": "asi-amsr2-v5.4-daily-south",
+  "era": "all",
+  "ledger": "https://github.com/rgdal-dev/rasterwise/blob/main/ledger/raadtools.csv"
+ },
+ "by": {
+  "name": "storecard ausantarctic tier 1",
+  "kind": "known source CRS"
+ },
+ "made_at": "2026-11-09T20:13:35Z",
+ "status": "proposed",
+ "derived_from": {
+  "url": "https://github.com/hypertidy/storecard/blob/main/assertions/ausantarctic/asi-amsr2-v5.4-daily-south/icechunk-z.json",
+  "subject": {
+   "url": "https://data.source.coop/ausantarctic/ausantarctic-scratch/seaice/asi-amsr2-v5.4-daily-south/icechunk",
+   "variable": "z",
+   "metadata_digest": "sha256:d97bf540681c6e0aa53b3143fe616b908f5eb92b0b5605c77d803796e9f63260"
+  }
+ }
+}
