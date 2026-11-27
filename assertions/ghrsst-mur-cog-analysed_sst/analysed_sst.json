@@ -1,0 +1,59 @@
+{
+ "assertion_version": "0",
+ "kind": "grid",
+ "subject": {
+  "dataset": "ghrsst-mur-cog-analysed_sst",
+  "variable": "analysed_sst"
+ },
+ "asserts": {
+  "spatial:transform": [
+   0.01,
+   0.0,
+   -179.995,
+   0.0,
+   -0.01,
+   89.995
+  ],
+  "spatial:shape": [
+   17999,
+   36000
+  ],
+  "spatial:dimensions": [
+   "y",
+   "x"
+  ],
+  "spatial:transform_type": "affine",
+  "spatial:registration": "pixel",
+  "proj:code": "EPSG:4326"
+ },
+ "crs_axes": [
+  "y",
+  "x"
+ ],
+ "evidence": {
+  "method": "transform restated from the regular 1-D coordinates; CRS asserted",
+  "axes": {
+   "x": "x",
+   "y": "y"
+  },
+  "crs_from": "the source COGs (ausantarctic/ghrsst-mur-v2) declare EPSG:4326, origin -179.995, 89.995, pixel 0.01 (gdalinfo, GDAL 3.8.4)",
+  "note": "base level only; the overview arrays (analysed_sst_x2 ...) are not asserted",
+  "dataset": "ghrsst-mur-cog-analysed_sst",
+  "era": "all",
+  "ledger": "https://github.com/rgdal-dev/rasterwise/blob/main/ledger/raadtools.csv"
+ },
+ "by": {
+  "name": "storecard ausantarctic tier 1",
+  "kind": "known source CRS"
+ },
+ "made_at": "2026-11-09T20:13:50Z",
+ "status": "proposed",
+ "derived_from": {
+  "url": "https://github.com/hypertidy/storecard/blob/main/assertions/ausantarctic/ghrsst-mur-cog-analysed_sst/icechunk-analysed_sst.json",
+  "subject": {
+   "url": "https://data.source.coop/ausantarctic/ausantarctic-scratch/ghrsst/ghrsst-mur-cog-analysed_sst/icechunk",
+   "variable": "analysed_sst",
+   "metadata_digest": "sha256:7253fcfd645ddf7119c4e864fc7544774d5f439e2d6ec5c99f3abfe17cc22175"
+  }
+ }
+}

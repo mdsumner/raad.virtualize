@@ -33,6 +33,8 @@ OISST_URL=https://noaa-cdr-sea-surface-temp-optimum-interpolation-pds.s3.amazona
 DATASET=oisst-v2.1-daily${OISST_MONTHS:+-$(echo $OISST_MONTHS | tr ' ' '-')}
 # product group (products/oisst/): the scratch prefix on source.coop
 PRODUCT_GROUP=oisst
+# assertions/<ASSERT_DATASET>/ (py/assertions.py), also for a subset build
+ASSERT_DATASET=oisst-v2.1-daily
 ARRAYS="sst anom err ice"
 OISST_PATTERN='oisst-avhrr-v02r01\.([0-9]{8})(_preliminary)?\.nc$'
 [ -z "${OISST_MIRROR:-}" ] || OISST_MIRROR="${OISST_MIRROR%/}/"

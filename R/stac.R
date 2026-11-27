@@ -300,7 +300,13 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
   role_of <- vapply(dims, `[[`, "", "role")
   dx <- names(role_of)[role_of == "x"][1]; dy <- names(role_of)[role_of == "y"][1]
   dt <- names(role_of)[role_of == "t"][1]
-  epsg <- .epsg(plan$srs)
+  ## an applied assertion (py/assertions.py) states the CRS where the plan
+  ## has none, and must agree with the plan where it has one (the assert
+  ## step checks); its proj:code wins, as in every other form
+  asr <- .applied_assertions(con)
+  acode <- unique(unlist(lapply(asr[intersect(names(asr), names(cube_data))],
+                                function(r) r$asserts$`proj:code`)))
+  epsg <- if (length(acode) == 1L) acode else .epsg(plan$srs)
   geographic <- !is.na(dx) && !is.na(dy) &&
     (is.na(epsg) || epsg == "EPSG:4326") &&
     (!is.na(epsg) || grepl("^degrees?_?e", tolower(dims[[dx]]$attrs$units %||% "")) ||
@@ -413,7 +419,16 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
       }
     }
     if (is.null(props$datetime)) props["datetime"] <- list(NULL)
-    if (!is.na(epsg) && !is.na(dx) && !is.na(dy) && !is.null(arrays[[dx]]$affine) &&
+    rec <- asr[[p$array[1]]]
+    if (!is.null(rec) && !is.null(rec$asserts$`proj:code`) && !is.na(dx) && !is.na(dy)) {
+      ## the asserted grid, cut to the item's x and y ranges
+      t6 <- as.numeric(unlist(rec$asserts$`spatial:transform`))
+      ix <- rng(dx) %||% full(dx); iy <- rng(dy) %||% full(dy)
+      props[["proj:code"]] <- rec$asserts$`proj:code`
+      props[["proj:shape"]] <- I(c(length(iy), length(ix)))
+      props[["proj:transform"]] <- I(c(t6[1], t6[2], t6[3] + t6[1] * (ix[1] - 1),
+                                       t6[4], t6[5], t6[6] + t6[5] * (iy[1] - 1)))
+    } else if (!is.na(epsg) && !is.na(dx) && !is.na(dy) && !is.null(arrays[[dx]]$affine) &&
         !is.null(arrays[[dy]]$affine)) {
       ax <- arrays[[dx]]$affine; ay <- arrays[[dy]]$affine
       ix <- rng(dx) %||% full(dx); iy <- rng(dy) %||% full(dy)
@@ -507,6 +522,7 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
         list(rel = "item", href = sprintf("./items/%s.json", x$id), type = "application/geo+json")))),
     `rv:items` = length(items),
     `rv:meta` = meta[setdiff(names(meta), MR_META_JSON)])
+  if (length(ar <- mr_assertions(con))) coll$`rv:assertions` <- .assertion_summary(ar)
 
   if (is.null(renders)) coll$renders <- NULL
   writeLines(js(coll, TRUE), file.path(dir, "collection.json"))

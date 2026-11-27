@@ -47,6 +47,9 @@ case "$SEAICE_FREQ" in
   *) echo "SEAICE_FREQ must be daily or monthly" >&2; exit 1 ;;
 esac
 DATASET=g02202-v6-$SEAICE_FREQ-$SEAICE_HEM${SEAICE_FIRST:+-$SEAICE_FIRST}${SEAICE_LAST:+-$SEAICE_LAST}
+# assertions/<ASSERT_DATASET>/ (py/assertions.py): the grid and CRS of the
+# full series hold for a smoke test of a date range too
+ASSERT_DATASET=g02202-v6-$SEAICE_FREQ-$SEAICE_HEM
 # product group (products/seaice/): the scratch prefix on source.coop
 PRODUCT_GROUP=seaice
 ARRAYS=${SEAICE_ARRAYS:-$SEAICE_CONC}

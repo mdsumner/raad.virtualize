@@ -18,6 +18,9 @@
 # after the run). The container runs as root, so work/ is root-owned.
 #
 #   RV_IMAGE   default ghcr.io/hypertidy/gdal-r-python-extras:latest
+#   RV_DOCKER_OPTS  extra docker run options, e.g. --security-opt
+#              seccomp=unconfined (lets GDAL's netCDF driver use userfaultfd
+#              for /vsi files; drops docker's syscall filter for the run)
 #   RV_MOUNTS  extra host directories mounted read-only at the same path,
 #              space separated; default /rdsi when it exists (the raad
 #              collection, for OISST_MIRROR and SEAICE_MIRROR)
@@ -35,7 +38,7 @@ done
 mounts=()
 for m in ${RV_MOUNTS-$([ -d /rdsi ] && echo /rdsi)}; do mounts+=(-v "$m:$m:ro"); done
 PKGS="obstore imagecodecs fastparquet rustac"
-exec docker run --rm -i -v "$HERE:$HERE" -w "$HERE" ${mounts[@]+"${mounts[@]}"} ${envs[@]+"${envs[@]}"} "$IMAGE" bash -c '
+exec docker run --rm -i ${RV_DOCKER_OPTS:-} -v "$HERE:$HERE" -w "$HERE" ${mounts[@]+"${mounts[@]}"} ${envs[@]+"${envs[@]}"} "$IMAGE" bash -c '
   python -c "import obstore, imagecodecs, fastparquet, rustac" 2>/dev/null ||
     python -m pip install -q '"$PKGS"' 2>/dev/null ||
     python -m pip install -q --break-system-packages '"$PKGS"'

@@ -8,8 +8,12 @@
 #   ./run.sh config/bran.sh config/aadc-transfer.sh publish verify-published
 #
 # Every leading *.sh argument is sourced, in order (dataset, then a publish
-# target). Steps: deps plan harvest collate render icechunk browser grist stac verify, and
+# target). Steps: deps plan harvest collate assert render icechunk browser grist stac verify, and
 # prepare publish publish-stac verify-published stale (not run by default).
+# assert applies the storecard assertion documents in assertions/<dataset>/
+# (py/assertions.py; ASSERT_DATASET, default DATASET, names the directory):
+# each is checked against the store and the plan and recorded in the store,
+# and every render writes it. A dataset with no directory renders as before.
 # stale compares the build record (sources.meta.tsv) with the listing corpus
 # (or the config's stale_check, for a source the corpus does not list).
 # verify records a pass in out/verify.json (py/verify_record.py); publish
@@ -49,9 +53,11 @@ while [ $# -ge 1 ] && [[ $1 == *.sh ]]; do source "$1"; CONFIGS+=("$(basename "$
 # Provenance stamped into the store meta (and so into every rendered form).
 # safe.directory: a container running as root may not own the checkout.
 REV=$(git -c safe.directory="$HERE" -C "$HERE" describe --always --dirty 2>/dev/null || echo unversioned)
-REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#")
+# || true: in a git worktree mounted into a container the .git file points
+# outside the mount, git exits 128, and pipefail would end the run silently
+REPO=$(git -c safe.directory="$HERE" -C "$HERE" remote get-url origin 2>/dev/null | sed -E "s#//[^@/]*@#//#" || true)
 export E2E_GENERATOR="${E2E_REPO:-${REPO:-local}} $REV" E2E_CONFIG="${CONFIGS[*]}"
-STEPS=${*:-${DEFAULT_STEPS:-plan harvest collate render icechunk browser grist stac verify}}
+STEPS=${*:-${DEFAULT_STEPS:-plan harvest collate assert render icechunk browser grist stac verify}}
 # python, or python3 where there is no python (the image has python only)
 PYTHON=${PYTHON:-$(command -v python || command -v python3 || echo python)}; RSCRIPT=${RSCRIPT:-Rscript}; GDAL=${GDAL:-gdal}
 WORK=${E2E_WORK:-$HERE/work/$DATASET}
@@ -78,7 +84,7 @@ for s in $STEPS; do
   # the publish gate (py/verify_record.py): a step that changes the store or
   # a form that verify checks removes the record of the last pass, so
   # publish needs a verify after it
-  case $s in plan|harvest|collate|render|icechunk|grist) rm -f "$WORK/out/verify.json" ;; esac
+  case $s in plan|harvest|collate|assert|render|icechunk|grist) rm -f "$WORK/out/verify.json" ;; esac
   case $s in
     deps)
       step deps "$RSCRIPT" "$HERE/R/install-deps.R" "$R_LIB" ;;
@@ -108,6 +114,9 @@ for s in $STEPS; do
       export DEFAULT_TARGET="${DEFAULT_TARGET-${KERCHUNK_TARGET:-}}"
       step collate "$RSCRIPT" "$HERE/R/collate.R" "$WORK/scan" "$WORK/plan.vrt" \
         "$WORK/store.sqlite" "$DATASET" ${REMAPS[@]+"${REMAPS[@]}"} ;;
+    assert)
+      step assert "$PYTHON" "$HERE/py/assertions.py" apply --store "$WORK/store.sqlite" \
+        --plan "$WORK/plan.vrt" "$HERE/assertions/${ASSERT_DATASET:-$DATASET}" ;;
     render)
       step render "$RSCRIPT" "$HERE/R/render.R" "$WORK/store.sqlite" "$WORK/out" \
         "$KERCHUNK_TARGET" "$VRT_TARGET" ;;

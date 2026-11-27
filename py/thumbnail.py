@@ -12,8 +12,8 @@ step of the source. A raster source (GeoTIFF, COG) is read with the classic
 API, so its overviews serve the reduction; any other source through the
 multidimensional API. Values are stretched between the 2nd and 98th
 percentiles of the valid cells (log10 first with --log10) onto the palette;
-nodata, NaN and values outside the CF valid range are transparent. A south-up grid is flipped and a 0..360
-longitude grid is rotated to -180..180.
+nodata, NaN and values outside the CF valid range are transparent. A south-up grid is flipped; columns are
+drawn in stored order (a 0..360 longitude grid is not rotated).
 
 --source REGEX takes the last placement among the sources whose path
 matches, rather than the last of all (a source with data, where the last
@@ -183,9 +183,19 @@ def main():
     a = ap.parse_args()
 
     array, src, src_array, off = pick(a.store, a.array, a.source)
-    got = read_classic(src, src_array, a.width)
-    if got is None:
-        got = read_mdim(src, src_array, off, a.width)
+    def read():
+        got = read_classic(src, src_array, a.width)
+        return got if got is not None else read_mdim(src, src_array, off, a.width)
+    try:
+        got = read()
+    except RuntimeError as e:
+        # netCDF over /vsi needs userfaultfd, which docker's default seccomp
+        # blocks; a netCDF-4 source opens with the HDF5 driver instead
+        if "userfaultfd" not in str(e):
+            raise
+        # GDAL_SKIP is read only when drivers register: deregister instead
+        gdal.GetDriverByName("netCDF").Deregister()
+        got = read()
     v, nodata, scale, offset, south_up, xv, (vmin, vmax) = got
     valid = np.isfinite(v) & (v >= vmin) & (v <= vmax)
     if nodata is not None and np.isfinite(nodata):
@@ -194,12 +204,6 @@ def main():
         v = v * (scale or 1) + (offset or 0)
     if south_up:
         v, valid = v[::-1], valid[::-1]
-    if xv is not None and len(xv) > 1 and xv.max() > 180 and xv.max() - xv.min() > 350:
-        # 0..360 longitudes: columns east of 180 go first
-        xs = np.linspace(xv[0], xv[-1], v.shape[1])
-        east = xs > 180
-        v = np.concatenate([v[:, east], v[:, ~east]], 1)
-        valid = np.concatenate([valid[:, east], valid[:, ~east]], 1)
     if a.transpose:
         v, valid = v.T, valid.T
     rgba, (lo, hi) = colour(v, valid, a.palette, a.log10)

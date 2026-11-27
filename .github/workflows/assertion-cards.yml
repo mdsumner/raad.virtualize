@@ -1,0 +1,137 @@
+name: assertion-cards
+
+# The done test of the assertion step (requests/assertion-step.md): for each
+# dataset, the published store.sqlite and plan.vrt are fetched, the assert,
+# render, icechunk and stac steps run from them (no harvest, no source
+# reads), and py/assertion_cards.py compares every projection with the
+# dataset's assertions. The report is the job summary and an artifact
+# (cards-<dataset>), to be committed as requests/assertion-step/cards/.
+# Nothing is published.
+
+on:
+  pull_request:
+    paths:
+      - "assertions/**"
+      - "py/assertions.py"
+      - "py/assertion_cards.py"
+      - "py/render_icechunk.py"
+      - "R/mdimrefs.R"
+      - "R/mdimrefs_pipeline.R"
+      - "R/stac.R"
+      - "run.sh"
+      - ".github/workflows/assertion-cards.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assertion-cards-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container: ghcr.io/hypertidy/gdal-r-python-extras:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dataset: g02202-v6-daily-south
+            group: seaice
+            config: config/seaice-g02202.sh
+            env: SEAICE_HEM=south
+          - dataset: g02202-v6-daily-north
+            group: seaice
+            config: config/seaice-g02202.sh
+            env: SEAICE_HEM=north
+          - dataset: asi-amsr2-v5.4-daily-south
+            group: seaice
+            config: config/seaice-asi-amsr2.sh
+            env: SEAICE_HEM=south
+          - dataset: oisst-v2.1-daily
+            group: oisst
+            config: config/oisst.sh
+            env: ""
+          - dataset: ghrsst-mur-cog-analysed_sst
+            group: ghrsst
+            config: config/ghrsst-cog.sh
+            env: GHRSST_VAR=analysed_sst
+          - dataset: bluelink-daily-temp
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=temp
+          - dataset: bluelink-daily-salt
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=salt
+          - dataset: bluelink-daily-eta_t
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=eta_t
+          - dataset: bluelink-daily-mld
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=mld
+          - dataset: bluelink-daily-u
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=u
+          - dataset: bluelink-daily-v
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=v
+          - dataset: bluelink-daily-w
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=w
+          - dataset: bluelink-daily-tx_trans_int_z
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=tx_trans_int_z
+          - dataset: bluelink-daily-ty_trans_int_z
+            group: bluelink
+            config: config/bluelink.sh
+            env: BLUELINK_FREQ=daily BRAN_VAR=ty_trans_int_z
+    env:
+      SCRATCH: https://data.source.coop/ausantarctic/ausantarctic-scratch
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: |
+          python -m pip install --quiet "storecard[virtual] @ git+https://github.com/hypertidy/storecard" ||
+            python -m pip install --quiet --break-system-packages "storecard[virtual] @ git+https://github.com/hypertidy/storecard"
+          git clone --depth 1 https://github.com/hypertidy/storecard /tmp/storecard
+      - name: Published store and plan
+        run: |
+          W=work/${{ matrix.dataset }}; mkdir -p "$W"
+          B=$SCRATCH/${{ matrix.group }}/${{ matrix.dataset }}
+          curl -fsSL -o "$W/store.sqlite" "$B/store.sqlite"
+          curl -fsSL -o "$W/plan.vrt" "$B/plan.vrt"
+          ls -la "$W"
+      - name: Assert and render
+        run: |
+          export ${{ matrix.env }}
+          export E2E_WORK=$PWD/work/${{ matrix.dataset }} STAC_THUMBNAIL=0 STAC_GEOPARQUET=0
+          bash run.sh ${{ matrix.config }} assert render icechunk stac
+      - name: Cards
+        run: |
+          W=work/${{ matrix.dataset }}
+          mkdir -p cards
+          python py/assertion_cards.py --out "$W/out" --assertions assertions/${{ matrix.dataset }} \
+            --before "$SCRATCH/${{ matrix.group }}/${{ matrix.dataset }}" \
+            --overlay /tmp/storecard/assertions/ausantarctic/${{ matrix.dataset }} \
+            --md cards/${{ matrix.dataset }}.md --json cards/${{ matrix.dataset }}.json || status=$?
+          cat cards/${{ matrix.dataset }}.md >> "$GITHUB_STEP_SUMMARY"
+          cat cards/${{ matrix.dataset }}.md
+          exit ${status:-0}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cards-${{ matrix.dataset }}
+          path: |
+            cards/
+            work/${{ matrix.dataset }}/log.txt
+            work/${{ matrix.dataset }}/out/flat/arrays.json
+            work/${{ matrix.dataset }}/out/stac/collection.json

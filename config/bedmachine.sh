@@ -63,4 +63,4 @@ export STAC_TITLE=${STAC_TITLE:-BedMachine Antarctica $BEDMACHINE_VERSION bed to
 # thumbnail: bed, blues below sea level and earth tones above
 export STAC_THUMB_PALETTE=${STAC_THUMB_PALETTE:-topo}
 # the grist catalog contract needs a date; a static grid has none
-DEFAULT_STEPS="plan harvest collate render icechunk stac verify"
+DEFAULT_STEPS="plan harvest collate assert render icechunk stac verify"

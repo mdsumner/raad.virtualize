@@ -1,0 +1,59 @@
+{
+ "assertion_version": "0",
+ "kind": "grid",
+ "subject": {
+  "dataset": "oisst-v2.1-daily",
+  "variable": "anom"
+ },
+ "asserts": {
+  "spatial:transform": [
+   0.25,
+   0.0,
+   0.0,
+   0.0,
+   0.25,
+   -90.0
+  ],
+  "spatial:shape": [
+   720,
+   1440
+  ],
+  "spatial:dimensions": [
+   "lat",
+   "lon"
+  ],
+  "spatial:transform_type": "affine",
+  "spatial:registration": "pixel",
+  "proj:code": "EPSG:4326"
+ },
+ "crs_axes": [
+  "y",
+  "x"
+ ],
+ "evidence": {
+  "method": "transform restated from the regular 1-D coordinates; CRS asserted",
+  "axes": {
+   "x": "lon",
+   "y": "lat"
+  },
+  "crs_from": "convention: NCEI OISST v2.1 AVHRR netCDF has no grid_mapping and the plan.vrt has no SRS; the product is documented as a regular 0.25 degree latitude/longitude grid, read as EPSG:4326 by raadtools",
+  "note": "longitude 0 to 360, latitude ascending (south-up storage)",
+  "dataset": "oisst-v2.1-daily",
+  "era": "all",
+  "ledger": "https://github.com/rgdal-dev/rasterwise/blob/main/ledger/raadtools.csv"
+ },
+ "by": {
+  "name": "storecard ausantarctic tier 1",
+  "kind": "known source CRS"
+ },
+ "made_at": "2026-11-09T20:13:17Z",
+ "status": "proposed",
+ "derived_from": {
+  "url": "https://github.com/hypertidy/storecard/blob/main/assertions/ausantarctic/oisst-v2.1-daily/icechunk-anom.json",
+  "subject": {
+   "url": "https://data.source.coop/ausantarctic/ausantarctic-scratch/oisst/oisst-v2.1-daily/icechunk",
+   "variable": "anom",
+   "metadata_digest": "sha256:1d6c9a8747f1b0c1ee3cf5fcdff4b7b7403e2079d558f286bf64f7a66d9f8a08"
+  }
+ }
+}
