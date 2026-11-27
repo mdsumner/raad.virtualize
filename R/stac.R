@@ -3,7 +3,8 @@
 ## Rscript stac.R STORE OUT_DIR [TARGET] [BASE]
 ##   OUT_DIR/stac/collection.json  datacube collection, assets for every form
 ##                                 found in OUT_DIR (flat, mdim.vrt, kerchunk,
-##                                 icechunk, grist, thumbnail.png), the store,
+##                                 icechunk, browser/icechunk, grist,
+##                                 thumbnail.png), the store,
 ##                                 the plan and the stac-geoparquet items
 ##   OUT_DIR/stac/items.ndjson     the items, one per line; run.sh translates
 ##                                 it to stac/items.parquet (stac-geoparquet)
@@ -28,6 +29,11 @@
 ##   extent is not a grid (profiles, tracks): it gives each item its bbox
 ##   and time range, and the collection its extent where STAC_BBOX and
 ##   STAC_INTERVAL are unset. Empty fields leave the item's default.
+## STAC_RENDERS: a JSON object written as the collection's `renders` (STAC
+##   render extension v2: rescale, nodata, colormap_name per render), for
+##   map viewers that draw an asset.
+## BROWSER_TARGET: the remap target of OUT_DIR/browser/icechunk (run.sh
+##   browser step); its replacements are that asset's chunk containers.
 if (sys.nframe() == 0L) {
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 2L) stop("usage: stac.R STORE OUT_DIR [TARGET] [BASE]")
@@ -40,7 +46,8 @@ STAC_EXT <- c(
   datacube   = "https://stac-extensions.github.io/datacube/v2.2.0/schema.json",
   file       = "https://stac-extensions.github.io/file/v2.1.0/schema.json",
   projection = "https://stac-extensions.github.io/projection/v2.0.0/schema.json",
-  xarray     = "https://stac-extensions.github.io/xarray-assets/v1.0.0/schema.json")
+  xarray     = "https://stac-extensions.github.io/xarray-assets/v1.0.0/schema.json",
+  render     = "https://stac-extensions.github.io/render/v2.0.0/schema.json")
 
 ## ---- the plan: dimension types, SRS, coordinate units ----------------------------
 .stac_plan <- function(file) {
@@ -176,7 +183,7 @@ STAC_EXT <- c(
   sort(unique(out))
 }
 
-.form_assets <- function(out, base, containers = NULL) {
+.form_assets <- function(out, base, containers = NULL, browser_containers = NULL) {
   rel <- function(p) if (is.null(base)) paste0("../", p) else paste0(sub("/$", "", base), "/", p)
   gd <- function(s) if (is.null(base)) NULL else s
   a <- list()
@@ -186,7 +193,9 @@ STAC_EXT <- c(
       description = "Open with GDAL's multidimensional API (gdal mdim, gdalraster, osgeo.gdal); reads go to the source files.",
       `rv:form` = "mdim-vrt", `rv:gdal` = gd(.gdal_url(rel("mdim.vrt"))))
   if (dir.exists(file.path(out, "kerchunk")))
-    a$kerchunk <- list(href = rel("kerchunk/"), type = "application/vnd+zarr",
+    ## not a Zarr media type: a plain Zarr reader finds the metadata but not
+    ## the chunks, whose keys are rows of the Parquet references
+    a$kerchunk <- list(href = rel("kerchunk/"), type = "application/x-kerchunk-parquet",
       title = "kerchunk Parquet references (Zarr v2)", roles = list("data", "references", "virtual"),
       description = "fsspec reference filesystem in Parquet layout; GDAL reads it as ZARR:\"/vsikerchunk_parquet_ref/{...}\".",
       `xarray:open_kwargs` = list(engine = "kerchunk"),
@@ -199,6 +208,16 @@ STAC_EXT <- c(
       `xarray:open_kwargs` = list(engine = "zarr", consolidated = FALSE),
       `rv:form` = "icechunk",
       `rv:virtual_chunk_containers` = if (length(containers)) I(containers))
+  ## the same references with chunk URLs through a CORS relay (run.sh
+  ## browser step), for readers in a web page
+  if (dir.exists(file.path(out, "browser", "icechunk")))
+    a$browser <- list(href = rel("browser/icechunk/"), type = "application/vnd.zarr+icechunk",
+      title = "Icechunk repository for browsers (chunk reads through a CORS relay)",
+      roles = list("data", "references", "virtual"),
+      description = paste("The icechunk asset's references, relocatable (vcc://), with container",
+                          "prefixes that send CORS headers; for map viewers in a web page."),
+      `rv:form` = "icechunk-browser",
+      `rv:virtual_chunk_containers` = if (length(browser_containers)) I(browser_containers))
   if (file.exists(file.path(out, "flat", "arrays.json")))
     a$refs <- list(href = rel("flat/arrays.json"), type = "application/json",
       title = "Flat refs store (arrays.json + refs_<array>.parquet)", roles = list("metadata", "references"),
@@ -447,12 +466,17 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
   items_dir <- isTRUE(as.logical(items_dir))
 
   ## collection
-  forms <- .form_assets(out, base, .containers(unique(P$path)))
+  btarget <- Sys.getenv("BROWSER_TARGET")
+  bcont <- if (nzchar(btarget)) sort(unique(dbGetQuery(con,
+    "SELECT replacement FROM remap WHERE target = ?", params = list(btarget))$replacement))
+  forms <- .form_assets(out, base, .containers(unique(P$path)), bcont)
+  renders <- if (nzchar(Sys.getenv("STAC_RENDERS")))
+    jsonlite::fromJSON(Sys.getenv("STAC_RENDERS"), simplifyVector = FALSE)
   textent <- if (!is.null(ttime)) I(list(I(.iso(range(ttime))))) else
     if (length(interval)) I(list(I(interval))) else I(list(I(c(NA, NA))))
   coll <- list(
     type = "Collection", stac_version = STAC_VERSION,
-    stac_extensions = I(unname(STAC_EXT[c("datacube", "xarray")])),
+    stac_extensions = I(unname(STAC_EXT[c("datacube", "xarray", if (length(renders)) "render")])),
     id = meta$dataset,
     title = if (nzchar(Sys.getenv("STAC_TITLE"))) Sys.getenv("STAC_TITLE") else meta$dataset,
     description = sprintf(paste(
@@ -466,6 +490,7 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     `cube:dimensions` = cube_dims, `cube:variables` = cube_vars,
     item_assets = item_assets,
     assets = forms,
+    renders = renders,
     links = unname(c(
       list(list(rel = "root", href = "./collection.json", type = "application/json")),
       if (!is.null(base)) list(list(rel = "self", type = "application/json",
@@ -475,6 +500,7 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     `rv:items` = length(items),
     `rv:meta` = meta[setdiff(names(meta), MR_META_JSON)])
 
+  if (is.null(renders)) coll$renders <- NULL
   writeLines(js(coll, TRUE), file.path(dir, "collection.json"))
   ## each item is serialized once: the ndjson row has no links (its relative
   ## links would resolve against stac/, not stac/items/), the item file gets

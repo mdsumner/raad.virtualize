@@ -9,6 +9,7 @@ project:
   resources:
     - "handover/index.html"
     - "handover/snapshot.html"
+    - "viewer/index.html"
 
 website:
   title: "raad.virtualize"

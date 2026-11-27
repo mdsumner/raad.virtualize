@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Store viewer</title>
+<!--
+  Store viewer for the published STAC collections.
+
+  Draws one 2-D field of a collection's Icechunk asset in the array's own CRS:
+  one canvas pixel per array cell, no reprojection of the raster, so grids
+  that hold a pole or cross the antimeridian draw as they are stored. The
+  coastline is projected into the array's CRS (proj4) and drawn over it.
+
+  ?collection=<url of a STAC collection.json>   one dataset
+  ?catalog=<url of a STAC catalog.json>         list of datasets (default:
+                                                the ausantarctic-scratch root)
+  &asset=<key>  &t=<index>                      optional
+
+  Asset choice: the asset named by the collection's first `renders` entry,
+  else `browser` (run.sh browser step: chunk reads through a CORS relay),
+  else `icechunk` when every virtual chunk container is on a host that sends
+  CORS headers (source.coop).
+
+  Georeferencing: `spatial:transform` and `proj:code` on the array, else the
+  first and last values of its 1-D coordinate arrays and the CRS from the
+  collection's cube:dimensions (EPSG:4326 for lon/lat names).
+
+  Level: the variable or its coarsest sibling overview `<name>_x<f>`
+  (py/plan_cog.py --overviews) that fits PIXEL_BUDGET cells, finest first.
+
+  Display: rescale and nodata from the render; else valid_range; else the 2nd
+  and 98th percentiles of the field. The fill value is always transparent.
+-->
+<style>
+:root {
+  --ink: #15232e; --muted: #5a6b78; --rule: #d3dde4; --surface: #ffffff;
+  --bg: #f5f7f9; --accent: #0f7f86; --warn: #7f1d1d; --warn-soft: #f8d4d4;
+  --coast: rgba(20, 20, 20, 0.85);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #e6edf2; --muted: #9fb0bc; --rule: #33434f; --surface: #17222b;
+    --bg: #0f171d; --accent: #4fc1c8; --warn: #f8d4d4; --warn-soft: #5a1d1d;
+    --coast: rgba(240, 240, 240, 0.85);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #e6edf2; --muted: #9fb0bc; --rule: #33434f; --surface: #17222b;
+  --bg: #0f171d; --accent: #4fc1c8; --warn: #f8d4d4; --warn-soft: #5a1d1d;
+  --coast: rgba(240, 240, 240, 0.85);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+       font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header, main { max-width: 1100px; margin: 0 auto; padding: 12px 16px; }
+header h1 { font-size: 1.2rem; margin: 0 0 2px; }
+header p { margin: 0; color: var(--muted); font-size: .9rem; }
+a { color: var(--accent); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+            margin: 10px 0; }
+.controls label { display: flex; gap: 6px; align-items: center; font-size: .9rem; }
+.controls input[type=range] { width: min(420px, 70vw); }
+.stage { position: relative; background: var(--surface); border: 1px solid var(--rule);
+         border-radius: 6px; padding: 8px; }
+.frame { position: relative; margin: 0 auto; max-width: 100%; }
+canvas, svg.overlay { display: block; width: 100%; height: auto; }
+canvas { image-rendering: pixelated; }
+svg.overlay { position: absolute; inset: 0; pointer-events: none; }
+svg.overlay path { fill: none; stroke: var(--coast); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.meta { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px;
+        font-size: .85rem; margin-top: 10px; overflow-wrap: anywhere; }
+.meta dt { color: var(--muted); }
+.meta dd { margin: 0; }
+.readout { font: 13px/1.4 ui-monospace, "IBM Plex Mono", monospace; min-height: 1.4em;
+           margin-top: 6px; color: var(--muted); }
+.legend { display: flex; align-items: center; gap: 8px; font-size: .85rem; margin-top: 6px; }
+.legend canvas { width: 200px; height: 12px; border: 1px solid var(--rule); image-rendering: auto; }
+.note { background: var(--warn-soft); color: var(--warn); padding: 8px 10px;
+        border-radius: 6px; margin: 10px 0; font-size: .9rem; }
+.status { color: var(--muted); font-size: .9rem; }
+ul.list { padding-left: 1.1em; }
+ul.list li { margin: 3px 0; }
+ul.list .why { color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Store viewer</h1>
+  <p id="subtitle">One field of a published virtual store, drawn in its own CRS.</p>
+</header>
+<main>
+  <div id="status" class="status">Loading...</div>
+  <div id="note"></div>
+  <div id="list"></div>
+  <div id="view" hidden>
+    <div class="controls" id="controls"></div>
+    <div class="stage">
+      <div class="frame" id="frame">
+        <canvas id="canvas"></canvas>
+        <svg class="overlay" id="overlay" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="legend"><span id="lo"></span><canvas id="ramp" width="256" height="1"></canvas><span id="hi"></span><span id="units"></span></div>
+      <div class="readout" id="readout"></div>
+    </div>
+    <dl class="meta" id="meta"></dl>
+  </div>
+</main>
+<script type="module">
+import * as zarr from "https://cdn.jsdelivr.net/npm/zarrita@0.7.5/+esm";
+import { IcechunkStore } from "https://cdn.jsdelivr.net/npm/icechunk-js@0.6.1/+esm";
+import proj4 from "https://cdn.jsdelivr.net/npm/proj4@2.22.0/+esm";
+import { feature } from "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm";
+
+const DEFAULT_CATALOG = "https://data.source.coop/ausantarctic/ausantarctic-scratch/catalog.json";
+const LAND = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-50m.json";
+const PIXEL_BUDGET = 8e6;
+// hosts that send CORS headers for anonymous reads
+const CORS_HOSTS = [/^https:\/\/data\.source\.coop\//, /^https:\/\/s3\.us-west-2\.amazonaws\.com\/us-west-2\.opendata\.source\.coop\//];
+// proj4 strings for the codes these stores use; others come from epsg.io
+const PROJ = {
+  "EPSG:3412": "+proj=stere +lat_0=-90 +lat_ts=-70 +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378273 +b=6356889.449 +units=m +no_defs",
+  "EPSG:3411": "+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +a=6378273 +b=6356889.449 +units=m +no_defs",
+  "EPSG:3976": "+proj=stere +lat_0=-90 +lat_ts=-70 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
+  "EPSG:3031": "+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
+  "EPSG:3413": "+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
+};
+// colour ramps as evenly spaced stops
+const RAMPS = {
+  viridis: ["#440154", "#482878", "#3e4989", "#31688e", "#26828e", "#1f9e89", "#35b779", "#6ece58", "#b5de2b", "#fde725"],
+  gray: ["#000000", "#ffffff"],
+  ice: ["#08306b", "#2171b5", "#6baed6", "#c6dbef", "#ffffff"],
+};
+
+// ---- the imagecodecs_delta filter (TIFF PREDICTOR=2) --------------------------
+// The COG-backed stores (py/plan_cog.py) carry it; zarrita has no codec of
+// that name. Decoding is a running sum along the last axis, row by row,
+// wrapping in the array's integer type.
+class ImagecodecsDelta {
+  kind = "array_to_array";
+  constructor(axis, dist) { this.axis = axis; this.dist = dist; }
+  static fromConfig(config) {
+    const axis = config?.axis ?? -1, dist = config?.dist ?? 1;
+    if (axis !== -1 || dist !== 1) throw new Error(`imagecodecs_delta: only axis -1, dist 1 (got ${axis}, ${dist})`);
+    return new ImagecodecsDelta(axis, dist);
+  }
+  encode() { throw new Error("imagecodecs_delta: read only"); }
+  decode(chunk) {
+    const { data, shape } = chunk;
+    const n = shape[shape.length - 1];
+    const out = new data.constructor(data.length);
+    for (let r = 0; r < data.length; r += n) {
+      out[r] = data[r];
+      for (let i = 1; i < n; i++) out[r + i] = out[r + i - 1] + data[r + i];
+    }
+    return { data: out, shape: chunk.shape, stride: chunk.stride };
+  }
+}
+zarr.registry.set("imagecodecs_delta", () => ImagecodecsDelta);
+
+// ---- helpers ---------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const status = (s) => { $("status").textContent = s; };
+const note = (s) => { $("note").innerHTML = s ? `<div class="note">${s}</div>` : ""; };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const abs = (href, base) => new URL(href, base).href;
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} for ${url}`);
+  return r.json();
+}
+
+function corsReadable(asset) {
+  const c = asset["rv:virtual_chunk_containers"] || [];
+  return c.every((u) => CORS_HOSTS.some((re) => re.test(u)));
+}
+
+// the asset to draw and why
+function chooseAsset(coll) {
+  const assets = coll.assets || {};
+  const want = params.get("asset");
+  if (want) return assets[want] ? { key: want } : { why: `no asset "${want}"` };
+  const render = Object.values(coll.renders || {})[0];
+  for (const key of render?.assets || []) if (assets[key]) return { key, render };
+  if (assets.browser) return { key: "browser", render };
+  if (assets.icechunk && corsReadable(assets.icechunk)) return { key: "icechunk", render };
+  if (assets.icechunk) {
+    const c = (assets.icechunk["rv:virtual_chunk_containers"] || []).join(", ");
+    return { why: `chunks at ${c}, which sends no CORS headers; no browser asset yet (run.sh browser step)` };
+  }
+  return { why: "no Icechunk asset" };
+}
+
+// ---- catalog list ----------------------------------------------------------------
+async function collections(catalogUrl, depth = 0) {
+  const cat = await getJSON(catalogUrl);
+  if (cat.type === "Collection") return [{ url: catalogUrl, coll: cat }];
+  const kids = (cat.links || []).filter((l) => l.rel === "child").map((l) => abs(l.href, catalogUrl));
+  if (depth > 3) return [];
+  const out = await Promise.all(kids.map((u) => collections(u, depth + 1).catch(() => [])));
+  return out.flat();
+}
+
+async function showList() {
+  const url = params.get("catalog") || DEFAULT_CATALOG;
+  status(`Reading ${url} ...`);
+  const all = await collections(url);
+  all.sort((a, b) => a.url.localeCompare(b.url));
+  const items = all.map(({ url: u, coll }) => {
+    const pick = chooseAsset(coll);
+    const title = esc(coll.title || coll.id);
+    return pick.key
+      ? `<li><a href="?collection=${encodeURIComponent(u)}">${title}</a> <span class="why">(${esc(pick.key)})</span></li>`
+      : `<li>${title} <span class="why">- ${esc(pick.why)}</span></li>`;
+  });
+  $("list").innerHTML = `<ul class="list">${items.join("")}</ul>`;
+  status(`${all.length} collections in ${url}`);
+}
+
+// ---- georeferencing --------------------------------------------------------------
+async function crsDef(code) {
+  if (!code) return null;
+  if (code === "EPSG:4326" || code === "OGC:CRS84") return "EPSG:4326";
+  if (PROJ[code]) return PROJ[code];
+  const m = /^EPSG:(\d+)$/.exec(code);
+  if (!m) return null;
+  const r = await fetch(`https://epsg.io/${m[1]}.proj4`);
+  return r.ok ? (await r.text()).trim() : null;
+}
+
+async function coordTransform(root, arr, dims) {
+  const [yn, xn] = dims.slice(-2);
+  const read = async (name) => (await zarr.get(await zarr.open(root.resolve(name), { kind: "array" }))).data;
+  const [y, x] = await Promise.all([read(yn), read(xn)]);
+  const ny = y.length, nx = x.length;
+  const dx = (x[nx - 1] - x[0]) / (nx - 1), dy = (y[ny - 1] - y[0]) / (ny - 1);
+  return [dx, 0, x[0] - dx / 2, 0, dy, y[0] - dy / 2];
+}
+
+function stacCode(coll, dims) {
+  const cd = coll["cube:dimensions"] || {};
+  for (const d of dims.slice(-2)) {
+    const rs = cd[d]?.reference_system ?? cd[d.replace(/_x\d+$/, "")]?.reference_system;
+    if (typeof rs === "number") return `EPSG:${rs}`;
+    if (typeof rs === "string" && /^\d+$/.test(rs)) return `EPSG:${rs}`;
+    if (typeof rs === "string" && /^EPSG:/i.test(rs)) return rs.toUpperCase();
+  }
+  const [yn, xn] = dims.slice(-2).map((d) => d.replace(/_x\d+$/, "").toLowerCase());
+  if (/^(lat|latitude)$/.test(yn) && /^(lon|long|longitude)$/.test(xn)) return "EPSG:4326";
+  return null;
+}
+
+// ---- level choice ----------------------------------------------------------------
+async function openLevels(root, name) {
+  const base = await zarr.open(root.resolve(name), { kind: "array" });
+  const levels = [{ name, arr: base, factor: 1 }];
+  for (const f of [2, 4, 8, 16, 32, 64]) {
+    try {
+      const a = await zarr.open(root.resolve(`${name}_x${f}`), { kind: "array" });
+      levels.push({ name: `${name}_x${f}`, arr: a, factor: f });
+    } catch { /* no such level */ }
+  }
+  return levels;
+}
+
+function cells(a) { const s = a.shape; return s[s.length - 1] * s[s.length - 2]; }
+
+// ---- time and other leading dimensions -------------------------------------------
+function cfTime(units) {
+  const m = /^\s*(days|hours|minutes|seconds)\s+since\s+(.+)$/i.exec(units || "");
+  if (!m) return null;
+  const mult = { days: 86400e3, hours: 3600e3, minutes: 60e3, seconds: 1e3 }[m[1].toLowerCase()];
+  let t0 = m[2].trim().replace(" ", "T");
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(t0)) t0 += "T00:00:00";
+  if (!/[zZ]|[+-]\d\d:?\d\d$/.test(t0)) t0 += "Z";
+  const base = Date.parse(t0);
+  return Number.isFinite(base) ? (v) => new Date(base + v * mult).toISOString().replace("T00:00:00.000Z", "").replace(".000Z", "Z") : null;
+}
+
+async function leadingAxes(root, arr, dims) {
+  const lead = dims.slice(0, -2);
+  return Promise.all(lead.map(async (d, i) => {
+    let label = (k) => `${d} ${k}`;
+    try {
+      const c = await zarr.open(root.resolve(d), { kind: "array" });
+      if (c.shape.length === 1 && c.shape[0] === arr.shape[i] && c.shape[0] <= 2e5) {
+        const v = (await zarr.get(c)).data;
+        const fmt = cfTime(c.attrs?.units);
+        label = fmt ? (k) => fmt(Number(v[k])) : (k) => `${d} = ${v[k]}${c.attrs?.units ? " " + c.attrs.units : ""}`;
+      }
+    } catch { /* no coordinate array */ }
+    return { name: d, n: arr.shape[i], label };
+  }));
+}
+
+// ---- drawing ---------------------------------------------------------------------
+function ramp(name) {
+  const stops = (RAMPS[name] || RAMPS.viridis).map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+  const lut = new Uint8Array(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const p = (i / 255) * (stops.length - 1), k = Math.min(Math.floor(p), stops.length - 2), f = p - k;
+    for (let c = 0; c < 3; c++) lut[i * 3 + c] = Math.round(stops[k][c] * (1 - f) + stops[k + 1][c] * f);
+  }
+  return lut;
+}
+
+function percentiles(data, skip, lo = 0.02, hi = 0.98) {
+  const step = Math.max(1, Math.floor(data.length / 200000));
+  const v = [];
+  for (let i = 0; i < data.length; i += step) { const x = Number(data[i]); if (Number.isFinite(x) && !skip(x)) v.push(x); }
+  if (!v.length) return [0, 1];
+  v.sort((a, b) => a - b);
+  return [v[Math.floor(lo * (v.length - 1))], v[Math.floor(hi * (v.length - 1))]];
+}
+
+function draw(field, H, W, flipY, flipX, range, skip, lut) {
+  const cv = $("canvas");
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  const img = ctx.createImageData(W, H);
+  const [lo, hi] = range, span = hi - lo || 1;
+  for (let r = 0; r < H; r++) {
+    const rr = flipY ? H - 1 - r : r;
+    for (let c = 0; c < W; c++) {
+      const cc = flipX ? W - 1 - c : c;
+      const v = Number(field[r * W + c]);
+      const o = (rr * W + cc) * 4;
+      if (!Number.isFinite(v) || skip(v)) { img.data[o + 3] = 0; continue; }
+      const k = Math.max(0, Math.min(255, Math.round(((v - lo) / span) * 255)));
+      img.data[o] = lut[k * 3]; img.data[o + 1] = lut[k * 3 + 1]; img.data[o + 2] = lut[k * 3 + 2]; img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const rc = $("ramp"), rx = rc.getContext("2d"), ri = rx.createImageData(256, 1);
+  for (let i = 0; i < 256; i++) { ri.data.set([lut[i * 3], lut[i * 3 + 1], lut[i * 3 + 2], 255], i * 4); }
+  rx.putImageData(ri, 0, 0);
+}
+
+// coastline in array pixel space: x = (X - c) / a, y = (Y - f) / e
+async function coastline(def, gt, H, W, flipY, flipX) {
+  const svg = $("overlay");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let land;
+  try { const topo = await getJSON(LAND); land = feature(topo, topo.objects.land); }
+  catch { return; }
+  const fwd = def === "EPSG:4326" ? (p) => p : proj4("EPSG:4326", def).forward;
+  const [a, , c, , e, f] = gt;
+  const px = ([lon, lat]) => {
+    let X, Y;
+    try { [X, Y] = fwd([lon, lat]); } catch { return null; }
+    if (!Number.isFinite(X) || !Number.isFinite(Y)) return null;
+    let x = (X - c) / a, y = (Y - f) / e;
+    if (flipY) y = H - y;
+    if (flipX) x = W - x;
+    if (x < -W || x > 2 * W || y < -H || y > 2 * H) return null;
+    return [x, y];
+  };
+  const parts = [];
+  const rings = [];
+  for (const g of land.features.map((ft) => ft.geometry)) {
+    const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+    for (const p of polys) for (const r of p) rings.push(r);
+  }
+  for (const r of rings) {
+    let d = "", prev = null;
+    for (const ll of r) {
+      const q = px(ll);
+      // break at unprojectable points and at jumps (antimeridian in 4326)
+      if (!q || (prev && Math.abs(q[0] - prev[0]) > W / 3)) { prev = null; continue; }
+      d += (prev ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1);
+      prev = q;
+    }
+    if (d) parts.push(d);
+  }
+  svg.innerHTML = `<path d="${parts.join("")}"/>`;
+}
+
+// ---- one collection --------------------------------------------------------------
+async function showCollection(url) {
+  status(`Reading ${url} ...`);
+  const coll = await getJSON(url);
+  $("title").textContent = coll.title || coll.id;
+  $("subtitle").innerHTML = `<a href="${esc(url)}">${esc(url)}</a> - <a href="?">all datasets</a>`;
+  const pick = chooseAsset(coll);
+  if (!pick.key) { status(""); note(`Cannot draw this collection: ${esc(pick.why)}.`); return; }
+  const asset = coll.assets[pick.key];
+  const href = abs(asset.href, url).replace(/\/$/, "");
+  status(`Opening ${href} ...`);
+  const root = await zarr.open(await IcechunkStore.open(href), { kind: "group" });
+
+  const vars = Object.entries(coll["cube:variables"] || {}).filter(([, v]) => v.type === "data").map(([k]) => k);
+  if (!vars.length) { note("The collection lists no data variable (cube:variables)."); return; }
+  const name = params.get("variable") || vars[0];
+  const levels = await openLevels(root, name);
+  const fits = levels.filter((l) => cells(l.arr) <= PIXEL_BUDGET);
+  if (!fits.length) {
+    note(`${esc(name)} is ${levels[0].arr.shape.slice(-2).join(" x ")} cells with no overview within ${PIXEL_BUDGET / 1e6}M; not drawn.`);
+    status(""); return;
+  }
+  const lvl = fits[0];
+  const arr = lvl.arr, base = levels[0].arr;
+  const dims = arr.dimensionNames || base.dimensionNames || [];
+  const H = arr.shape.at(-2), W = arr.shape.at(-1);
+
+  // georeferencing
+  const at = arr.attrs || {}, bt = base.attrs || {};
+  let gt = at["spatial:transform"], code = at["proj:code"], how = "array attributes";
+  if (!gt && bt["spatial:transform"]) {
+    const [a, b, c, d, e, f] = bt["spatial:transform"];
+    const sx = base.shape.at(-1) / W, sy = base.shape.at(-2) / H;
+    gt = [a * sx, b, c, d, e * sy, f]; code = code || bt["proj:code"]; how = `${name} attributes, scaled to the level`;
+  }
+  if (!gt) { gt = await coordTransform(root, arr, dims); how = "coordinate arrays"; }
+  code = code || bt["proj:code"] || stacCode(coll, dims);
+  const def = await crsDef(code);
+  const flipY = gt[4] > 0, flipX = gt[0] < 0;
+
+  // values
+  const render = pick.render && (pick.render.assets || []).includes(pick.key) ? pick.render : null;
+  const fill = arr.fillValue ?? at._FillValue ?? bt._FillValue;
+  const nodata = new Set([...(render?.nodata ?? []), ...(fill != null ? [Number(fill)] : [])].map(Number));
+  const skip = (v) => nodata.has(v);
+  const scale = at.scale_factor ?? bt.scale_factor ?? 1, offset = at.add_offset ?? bt.add_offset ?? 0;
+  const units = at.units ?? bt.units ?? "";
+  const lut = ramp(render?.colormap_name || params.get("colormap") || "viridis");
+
+  const axes = await leadingAxes(root, arr, dims);
+  const idx = axes.map((ax, i) => {
+    const key = i === 0 ? "t" : `i${i}`;
+    const q = params.has(key) ? Number(params.get(key)) : NaN;
+    return Number.isInteger(q) && q >= 0 && q < ax.n ? q : ax.n - 1;
+  });
+
+  $("controls").innerHTML = axes.map((ax, i) =>
+    `<label>${esc(ax.name)} <input type="range" id="ax${i}" min="0" max="${ax.n - 1}" value="${idx[i]}"><span id="axl${i}"></span></label>`).join("");
+  $("meta").innerHTML = [
+    ["asset", `${pick.key} (${esc(asset.title || "")})`],
+    ["array", `${esc(lvl.name)} ${arr.shape.join(" x ")}${lvl.factor > 1 ? `, overview of ${esc(name)} (1/${lvl.factor})` : ""}`],
+    ["dimensions", esc(dims.join(", "))],
+    ["CRS", `${esc(code || "unknown")}${def ? "" : " (no definition; no coastline)"}`],
+    ["transform", `${gt.map((v) => +v.toPrecision(10)).join(", ")} (${how})`],
+    ["containers", esc((asset["rv:virtual_chunk_containers"] || []).join(", ") || "-")],
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  $("view").hidden = false;
+  if (def) coastline(def, gt, H, W, flipY, flipX);
+
+  let field = null, range = null, seq = 0;
+  async function load() {
+    const my = ++seq;
+    axes.forEach((ax, i) => { $(`axl${i}`).textContent = ax.label(idx[i]); });
+    status(`Reading ${axes.map((ax, i) => ax.label(idx[i])).join(", ")} ...`);
+    const t0 = performance.now();
+    let out;
+    try {
+      out = await zarr.get(arr, [...idx, null, null]);
+    } catch (err) {
+      if (my === seq) { status(""); note(`Chunk read failed: ${esc(err?.message || err)}`); }
+      return;
+    }
+    if (my !== seq) return;
+    note("");
+    field = out.data;
+    range = render?.rescale?.[0] || at.valid_range || bt.valid_range || percentiles(field, skip);
+    draw(field, H, W, flipY, flipX, range, skip, lut);
+    const sv = (v) => +(v * scale + offset).toPrecision(5);
+    $("lo").textContent = sv(range[0]); $("hi").textContent = sv(range[1]); $("units").textContent = units === "1" ? "" : units;
+    status(`${H} x ${W} cells in ${Math.round(performance.now() - t0)} ms`);
+    const q = new URLSearchParams(location.search); q.set("t", idx[0] ?? 0);
+    history.replaceState(null, "", "?" + q.toString());
+  }
+  axes.forEach((ax, i) => {
+    $(`ax${i}`).addEventListener("change", (ev) => { idx[i] = Number(ev.target.value); load(); });
+    $(`ax${i}`).addEventListener("input", (ev) => { $(`axl${i}`).textContent = ax.label(Number(ev.target.value)); });
+  });
+  const inv = def && def !== "EPSG:4326" ? proj4("EPSG:4326", def).inverse : (p) => p;
+  $("canvas").addEventListener("mousemove", (ev) => {
+    if (!field) return;
+    const b = ev.target.getBoundingClientRect();
+    let col = Math.floor(((ev.clientX - b.left) / b.width) * W), row = Math.floor(((ev.clientY - b.top) / b.height) * H);
+    if (flipY) row = H - 1 - row;
+    if (flipX) col = W - 1 - col;
+    if (row < 0 || col < 0 || row >= H || col >= W) return;
+    const v = Number(field[row * W + col]);
+    const X = gt[2] + (col + 0.5) * gt[0], Y = gt[5] + (row + 0.5) * gt[4];
+    let ll = "";
+    try { const [lon, lat] = inv([X, Y]); if (Number.isFinite(lon)) ll = `  lon ${lon.toFixed(3)} lat ${lat.toFixed(3)}`; } catch { /* outside */ }
+    const val = !Number.isFinite(v) || skip(v) ? `nodata (${v})` : `${+(v * scale + offset).toPrecision(6)} ${units} (stored ${v})`;
+    $("readout").textContent = `row ${row} col ${col}  x ${X.toFixed(1)} y ${Y.toFixed(1)}${ll}  ${val}`;
+  });
+  await load();
+}
+
+(async () => {
+  try {
+    const c = params.get("collection");
+    if (c) await showCollection(c); else await showList();
+  } catch (err) {
+    status(""); note(esc(err?.message || err)); console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
