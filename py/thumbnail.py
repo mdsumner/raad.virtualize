@@ -183,9 +183,18 @@ def main():
     a = ap.parse_args()
 
     array, src, src_array, off = pick(a.store, a.array, a.source)
-    got = read_classic(src, src_array, a.width)
-    if got is None:
-        got = read_mdim(src, src_array, off, a.width)
+    def read():
+        got = read_classic(src, src_array, a.width)
+        return got if got is not None else read_mdim(src, src_array, off, a.width)
+    try:
+        got = read()
+    except RuntimeError as e:
+        # netCDF over /vsi needs userfaultfd, which docker's default seccomp
+        # blocks; a netCDF-4 source opens with the HDF5 driver instead
+        if "userfaultfd" not in str(e):
+            raise
+        gdal.SetConfigOption("GDAL_SKIP", "netCDF")
+        got = read()
     v, nodata, scale, offset, south_up, xv, (vmin, vmax) = got
     valid = np.isfinite(v) & (v >= vmin) & (v <= vmax)
     if nodata is not None and np.isfinite(nodata):
