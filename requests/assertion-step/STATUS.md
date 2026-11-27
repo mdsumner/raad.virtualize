@@ -80,3 +80,9 @@ kerchunk readers see plain attributes. CF `grid_mapping` is not written
   coordinates; a document in the directory for a level takes precedence.
   Checked on the published MUR arrays.json: all five levels agree with
   their coordinates. Card findings are now compared per variable.
+- 2026-11-27 GHRSST MUR: PASS, base and five overview levels, in kerchunk,
+  Icechunk and mdim.vrt (STAC: base). The published-card comparison is not
+  made: storecard's MUR document is stale against the republished store
+  (overview levels added after it was made). Card: cards/ghrsst-mur-cog-analysed_sst.md.
+- 2026-11-27 next: Bluelink needs an assertion (proposed EPSG:4326;
+  LON_0_360 and Y_ASCENDING are facts, not targets), from Michael.
