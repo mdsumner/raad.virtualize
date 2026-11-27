@@ -40,12 +40,12 @@ needs no step.
 
 | Group | Dataset | A | O | V | State |
 |---|---|---|---|---|---|
-| seaice | g02202-v6-daily-south | done | n/a | relay; browser rules in config (#126) | Republished with A; Icechunk cleaned 2026-11-27. Re-collate, then `browser stac publish`. Keep the `browser/` test copy (linked from elsewhere) until Michael retires it |
+| seaice | g02202-v6-daily-south | done | n/a | relay; browser rules in config (#126) | Republished with A; Icechunk cleaned 2026-11-27. `remap` (sets the config's browser rules in the published store; no re-collate), then `browser stac publish`. Keep the `browser/` test copy (linked from elsewhere) until Michael retires it |
 | seaice | g02202-v6-daily-north | done | n/a | relay | Republished with A; Icechunk cleaned 2026-11-27 |
 | seaice | asi-amsr2-v5.4-daily-south | done | n/a | relay; no browser rules yet | Republished with A; Icechunk cleaned 2026-11-27. Row chunks: 2,656 requests per field through the relay |
 | oisst | oisst-v2.1-daily | done | n/a | direct | Republished with A; Icechunk cleaned 2026-11-27 |
 | ghrsst | ghrsst-mur-cog-analysed_sst | done | done | done (link) | Republished 2026-11-27 from main `44e6bc0` (A, O, V): `verify-published` passes, 299 old Icechunk objects deleted, 644 files match the build with nothing extra, the repository opens anonymously at `main` `PXBQEF86` |
-| bluelink | bluelink-daily-{temp, salt, eta_t, mld, u, v, w, tx_trans_int_z, ty_trans_int_z} | documents ready | n/a | direct, untested (THREDDS answers 403 to HEAD with an Origin) | Not republished. Absolute Icechunk refs (decided 2026-11-27, below). `eta_t` built and verified on the VM through THREDDS (`VERIFY_PLAN_REMAP`); the re-render fixes the float `_FillValue` for `xr.open_zarr` |
+| bluelink | bluelink-daily-{temp, salt, eta_t, mld, u, v, w, tx_trans_int_z, ty_trans_int_z} | documents ready | n/a | direct, untested (THREDDS answers 403 to HEAD with an Origin) | Not republished. Absolute Icechunk refs (decided 2026-11-27, below). Root `/g/data/gb6/` named `bran2023` for relocatable renders (one root for the BRAN2020 and BRAN2023 parts of the series). `eta_t` built and verified on the VM through THREDDS (`VERIFY_PLAN_REMAP`); the re-render fixes the float `_FillValue` for `xr.open_zarr` |
 | bedmap | bedmap3 | no document (EPSG:3031) | pending | direct | `hpc/vm/bedmap3-publish.sh` (production product; `assertion-republish.sh` refuses it) |
 | bedmachine | bedmachine-v4.1 | no document (EPSG:3031) | pending | direct | `hpc/vm/bedmachine-publish.sh` |
 | ibcso | ibcso-v2, ibcso-annual-2024, ibcso-annual-2025 | no documents (EPSG:9354) | pending | direct | `hpc/vm/ibcso-publish.sh` |
@@ -73,8 +73,9 @@ Suggested order:
    `_FillValue` fix, absolute refs, verified on the VM through THREDDS.
 5. COG products (Bedmap3, BedMachine, IBCSO, GEBCO): write assertion
    documents from each COG's CRS, then use each product's publish script.
-6. Sea ice viewer pass: the browser rules for ASI and G02202 north, a
-   re-collate, then `browser stac publish`.
+6. Sea ice viewer pass: the browser rules for ASI, then `remap browser stac`
+   and a publish for each sea ice store (`remap` sets the config's rules in
+   the published store, so no re-collate).
 7. ESA CCI: assertion documents, then a build on Pawsey.
 
 Credentials: `eval "$(source-coop creds --format env)"` on the VM (CLI 0.3.0,
@@ -106,6 +107,9 @@ through boto3; the proxy refuses the presigned DELETE it sent before). See [docs
   assertion route in 0015 or drop it. The Bluelink brief that proposed 0015
   has not been seen by these sessions.
 - `mdstest/uploadtest.tif` (2024): keep or delete.
+- Root names for the G02202 browser rules. Unnamed, the browser root
+  `/vsicurl/https://` takes the slug `vsicurl`; proposed: name the NSIDC
+  product path (for example `nsidc-g02202-v6`).
 
 ## Dangling threads
 
@@ -146,6 +150,10 @@ Products and sources:
 
 Metadata and specification:
 
+- byterefs/spec decision 0014 (named remap roots, proposed): its heading
+  reads "0011". raad.virtualize follows it: `REMAPS` take an optional fourth
+  field `root`, the store's `remap` table has a `root` column, and the slug
+  rule is the decision's text.
 - storecard (from #125): its MUR document is stale (overview levels came
   later). Moving `assertions/ausantarctic` to settled is still to do.
 - Attribute types in the store: xarray decodes packed int16 to float64,
