@@ -52,4 +52,4 @@ export STAC_TITLE=${STAC_TITLE:-Bedmap3 ice thickness, bed and surface elevation
 # thumbnail: bed_topography, blues below sea level and earth tones above
 export STAC_THUMB_PALETTE=${STAC_THUMB_PALETTE:-topo}
 # the grist catalog contract needs a date; a static grid has none
-DEFAULT_STEPS="plan harvest collate render icechunk stac verify"
+DEFAULT_STEPS="plan harvest collate assert render icechunk stac verify"

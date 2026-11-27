@@ -104,16 +104,78 @@ mr_ingest_scan_dir <- function(con, dir, verbose = TRUE, batch = 2000L,
           endian = if (startsWith(a$dtype, ">")) "big" else "little")
 }
 
+## ---- assertions (py/assertions.py) ------------------------------------------------
+## storecard assertion documents (v0), checked against the store and the plan
+## by the assert step and recorded in meta key `assertions`. An applied
+## record's `asserts` (zarr-conventions spatial: and proj: keys) become
+## attributes of its variable in every Zarr form, with the conventions'
+## registrations, and its CRS the variable's <SRS> in the mdim VRT.
+MR_CONVENTIONS <- list(
+  `spatial:` = list(uuid = "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4",
+    schema_url = "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v1/schema.json",
+    spec_url = "https://github.com/zarr-conventions/spatial/blob/v1/README.md",
+    name = "spatial:", description = "Spatial coordinate information"),
+  `proj:` = list(uuid = "f17cb550-5864-4468-aeb7-f3180cfb622f",
+    schema_url = "https://raw.githubusercontent.com/zarr-conventions/proj/refs/tags/v0.1/schema.json",
+    spec_url = "https://github.com/zarr-conventions/proj/blob/v0.1/README.md",
+    name = "proj:", description = "Coordinate reference system information for geospatial data"))
+
+## the records, list() for a store with none
+mr_assertions <- function(con) {
+  v <- dbGetQuery(con, "SELECT value FROM meta WHERE key = 'assertions'")$value
+  if (!length(v)) return(list())
+  jsonlite::fromJSON(v, simplifyVector = FALSE)
+}
+
+## the applied record for each asserted variable, by variable
+.applied_assertions <- function(con) {
+  r <- Filter(function(x) isTRUE(x$applied), mr_assertions(con))
+  stats::setNames(r, vapply(r, function(x) x$variable, ""))
+}
+
+## an array's attributes with an assertion's keys and the conventions that
+## register them (an existing zarr_conventions list is kept, without repeats)
+.assert_attrs <- function(attrs, rec) {
+  as <- lapply(rec$asserts, function(v) if (is.list(v)) I(unlist(v)) else v)
+  attrs[names(as)] <- as
+  conv <- attrs$zarr_conventions %||% list()
+  have <- vapply(conv, function(x) x$uuid %||% "", "")
+  pre <- unique(sub(":.*$", ":", names(as)))
+  for (k in pre) if (!is.null(MR_CONVENTIONS[[k]]) && !MR_CONVENTIONS[[k]]$uuid %in% have)
+    conv[[length(conv) + 1L]] <- MR_CONVENTIONS[[k]]
+  attrs$zarr_conventions <- unname(conv)
+  attrs
+}
+
+## the asserted CRS of an array as GDAL takes it: the SRS text (proj:code,
+## else proj:wkt2, else PROJJSON) and dataAxisToSRSAxisMapping, the 1-based
+## index of the array dimension of each CRS axis in CRS axis order
+.assert_srs <- function(dims, rec) {
+  a <- rec$asserts
+  sd <- unlist(a$`spatial:dimensions`)  # c(y, x)
+  role <- c(y = sd[1], x = sd[2])
+  order <- role[unlist(rec$crs_axes)]
+  srs <- a$`proj:code` %||% a$`proj:wkt2` %||%
+    as.character(jsonlite::toJSON(a$`proj:projjson`, auto_unbox = TRUE, digits = I(17)))
+  list(srs = srs, mapping = paste(match(order, dims), collapse = ","))
+}
+
 mr_array_list <- function(con) {
   A <- mr_arrays(con)
+  asr <- .applied_assertions(con)
   lapply(seq_len(nrow(A)), function(i) {
     a <- A[i, , drop = FALSE]
-    list(array = a$array, kind = a$kind, storage = a$storage,
+    out <- list(array = a$array, kind = a$kind, storage = a$storage,
          dims = I(unlist(.fjl(a$dims))), shape = I(as.integer(unlist(.fjl(a$shape)))),
          chunks = I(as.integer(unlist(.fjl(a$chunks)))), dtype = a$dtype,
          fill = if (is.na(a$fill)) NULL else a$fill,
          codec = .fjl(a$codec), attrs = .zobj(.fjl(a$attrs)), affine = .fjl(a$affine),
          values = { v <- .coord_values(a); if (is.null(v)) NULL else I(v) })
+    if (!is.null(rec <- asr[[a$array]])) {
+      out$attrs <- .assert_attrs(out$attrs, rec)
+      out$srs <- .assert_srs(unlist(out$dims), rec)
+    }
+    out
   })
 }
 
@@ -137,7 +199,8 @@ mr_array_list <- function(con) {
 mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6,
                           row_group_rows = 2e4) {
   dir.create(dir, recursive = TRUE, showWarnings = FALSE)
-  arrays <- mr_array_list(con)
+  ## the asserted SRS is for the VRT; the flat form carries the attributes
+  arrays <- lapply(mr_array_list(con), function(a) { a$srs <- NULL; a })
   for (k in seq_along(arrays)) {
     a <- arrays[[k]]
     if (a$storage != "referenced") next
@@ -197,6 +260,9 @@ mr_write_flat <- function(con, dir, verbose = TRUE, rows_per_chunk = 1e6,
               remap = lapply(seq_len(nrow(rm)), function(i) as.list(rm[i, ])))
   ## subgroup attributes, for a store of subgroups (py/plan_groups.py)
   if (length(gr <- mr_groups(con))) doc$groups <- gr
+  ## the assertions applied at render (py/assertions.py): which, and the
+  ## digest of each document, so a reader can tell asserted from source facts
+  if (length(asr <- mr_assertions(con))) doc$assertions <- .assertion_summary(asr)
   writeLines(jsonlite::toJSON(doc, auto_unbox = TRUE, digits = I(17), null = "null",
                               na = "null", pretty = TRUE),
              file.path(dir, "arrays.json"))
@@ -245,9 +311,19 @@ mr_remap <- function(con, path, target = NULL) {
 
 .lifted <- c("units", "_FillValue", "scale_factor", "add_offset", "missing_value")
 
+## a summary of the assertion records for the renders' metadata: no asserts
+## (they are on the arrays) and no check text
+.assertion_summary <- function(recs) lapply(recs, function(r)
+  Filter(Negate(is.null), list(id = r$id, variable = r$variable, kind = r$kind, status = r$status,
+                               digest = r$digest, applied = r$applied, by = r$by,
+                               derived_from = r$derived_from$url)))
+
 .vrt_attrs <- function(node, attrs) {
   for (k in names(attrs)) {
     if (k %in% .lifted) next
+    ## the convention registrations are objects, with no VRT attribute form;
+    ## the VRT's own slot for the CRS is <SRS> (mr_write_mdim_vrt)
+    if (k == "zarr_conventions") next
     v <- unlist(attrs[[k]])
     if (is.null(v)) next
     at <- xml2::xml_add_child(node, "Attribute", name = k)
@@ -335,6 +411,9 @@ mr_write_mdim_vrt <- function(con, file, target = NULL) {
     if (a$storage == "referenced")
       xml2::xml_add_child(node, "BlockSize", paste(a$chunks, collapse = ","))
     .vrt_lifted(node, a)
+    ## an asserted CRS (py/assertions.py): GDAL's slot for it
+    if (!is.null(a$srs))
+      xml2::xml_add_child(node, "SRS", a$srs$srs, dataAxisToSRSAxisMapping = a$srs$mapping)
     if (a$storage == "affine") {
       xml2::xml_add_child(node, "RegularlySpacedValues", start = .num(a$affine$start),
                           increment = .num(a$affine$step))
@@ -516,6 +595,8 @@ mr_write_kerchunk_parquet <- function(con, root, target = NULL, record_size = 10
   }
   m <- dbReadTable(con, "meta")
   m <- m[!m$key %in% MR_META_JSON, , drop = FALSE]
+  ra <- as.list(stats::setNames(m$value, m$key))
+  if (length(asr <- mr_assertions(con))) ra$assertions <- .assertion_summary(asr)
   mr_kerchunk_writer(root, vars_meta, ref_tables, inline = inline, record_size = record_size,
-                     root_attrs = as.list(stats::setNames(m$value, m$key)), group_attrs = mr_groups(con))
+                     root_attrs = ra, group_attrs = mr_groups(con))
 }

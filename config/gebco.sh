@@ -55,4 +55,4 @@ export STAC_TITLE=${STAC_TITLE:-GEBCO_$GEBCO_YEAR Grid, global 15 arc-second ele
 # thumbnail: blues below sea level and earth tones above
 export STAC_THUMB_PALETTE=${STAC_THUMB_PALETTE:-topo}
 # the grist catalog contract needs a date; a static grid has none
-DEFAULT_STEPS="plan harvest collate render icechunk stac verify"
+DEFAULT_STEPS="plan harvest collate assert render icechunk stac verify"

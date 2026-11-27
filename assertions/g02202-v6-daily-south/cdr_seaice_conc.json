@@ -1,0 +1,60 @@
+{
+ "assertion_version": "0",
+ "kind": "grid",
+ "subject": {
+  "dataset": "g02202-v6-daily-south",
+  "variable": "cdr_seaice_conc"
+ },
+ "asserts": {
+  "spatial:transform": [
+   25000.0,
+   0.0,
+   -3950000.0,
+   0.0,
+   -25000.0,
+   4350000.0
+  ],
+  "spatial:shape": [
+   332,
+   316
+  ],
+  "spatial:dimensions": [
+   "y",
+   "x"
+  ],
+  "spatial:transform_type": "affine",
+  "spatial:registration": "pixel",
+  "proj:code": "EPSG:3412"
+ },
+ "crs_axes": [
+  "x",
+  "y"
+ ],
+ "evidence": {
+  "method": "transform restated from the regular 1-D coordinates; CRS asserted",
+  "axes": {
+   "x": "x",
+   "y": "y"
+  },
+  "crs_from": "the source files' own grid mapping, as GDAL reads it into the dataset's plan.vrt <SRS>; the virtual store does not carry it",
+  "srs": "PROJCRS NSIDC Sea Ice Polar Stereographic South (Hughes 1980), ID EPSG 3412",
+  "plan": "https://data.source.coop/ausantarctic/ausantarctic-scratch/seaice/g02202-v6-daily-south/plan.vrt",
+  "dataset": "g02202-v6-daily-south",
+  "era": "all",
+  "ledger": "https://github.com/rgdal-dev/rasterwise/blob/main/ledger/raadtools.csv"
+ },
+ "by": {
+  "name": "storecard ausantarctic tier 1",
+  "kind": "known source CRS"
+ },
+ "made_at": "2026-11-09T20:13:25Z",
+ "status": "proposed",
+ "derived_from": {
+  "url": "https://github.com/hypertidy/storecard/blob/main/assertions/ausantarctic/g02202-v6-daily-south/icechunk-cdr_seaice_conc.json",
+  "subject": {
+   "url": "https://data.source.coop/ausantarctic/ausantarctic-scratch/seaice/g02202-v6-daily-south/icechunk",
+   "variable": "cdr_seaice_conc",
+   "metadata_digest": "sha256:51a10034322159bf7808153949bf9ca197a8e07ae85fea06f99073f7792d1bea"
+  }
+ }
+}

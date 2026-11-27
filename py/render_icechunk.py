@@ -286,6 +286,10 @@ def main():
     attrs0 = dict(doc.get("meta") or {})
     if roots_table:
         attrs0["byterefs_roots"] = roots_table
+    # the assertions applied at render (py/assertions.py), as the flat and
+    # kerchunk forms record them; their keys are on the arrays' attributes
+    if doc.get("assertions"):
+        attrs0["assertions"] = doc["assertions"]
     root = zarr.open_group(store, mode="w", attributes=attrs0)
 
     t0 = time.time()

@@ -112,5 +112,5 @@ VRT_TARGET=gdal
 # one item per tag (265 or 564): ndjson and stac-geoparquet only
 export STAC_ITEM_FILES=${STAC_ITEM_FILES:-0}
 # no time axis on a grid, so no grist catalog
-DEFAULT_STEPS="plan harvest collate render icechunk stac verify"
+DEFAULT_STEPS="plan harvest collate assert render icechunk stac verify"
 WORKERS=${WORKERS:-16}

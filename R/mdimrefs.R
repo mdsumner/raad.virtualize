@@ -16,8 +16,9 @@ MR_FORMAT   <- "byterefs/0.1"
 ## readers also accept "mdim-refs/0.2" (same layout) until byterefs/0.2 (byterefs decision 0003)
 MR_RESERVED <- c("meta", "sources", "arrays", "placements", "remap")
 ## meta keys that hold JSON for the renders, not dataset attributes
-## (groups: the attributes of each subgroup of the plan, by path)
-MR_META_JSON <- c("coord_attrs", "dimensions", "groups")
+## (groups: the attributes of each subgroup of the plan, by path;
+## assertions: the records of py/assertions.py apply, see mr_assertions)
+MR_META_JSON <- c("coord_attrs", "dimensions", "groups", "assertions")
 
 .q   <- function(con, x) as.character(dbQuoteIdentifier(con, x))
 .j   <- function(x) if (is.null(x)) NA_character_ else
