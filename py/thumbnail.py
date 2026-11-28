@@ -77,6 +77,32 @@ def pick(store, array, source_rx=None):
     return array, src, src_array, json.loads(off)
 
 
+def store_fill(store, array):
+    """The array's fill value in the store (its Zarr fill_value, which ingest
+    checks against _FillValue and missing_value), as a float, or None."""
+    con = sqlite3.connect(f"file:{store}?mode=ro", uri=True)
+    row = con.execute("SELECT fill FROM arrays WHERE array = ?", (array,)).fetchone()
+    con.close()
+    try:
+        return None if row is None or row[0] is None else float(row[0])
+    except ValueError:
+        return None
+
+
+def nodata_json(v):
+    """A no-data value as STAC writes it (common metadata `nodata`): a number,
+    an integer where it is one, or "nan", "inf" or "-inf". json writes a float
+    in its shortest round-trip form, so a float32 fill such as -1e20 stays
+    -1.0000000200408773e+20."""
+    if v is None:
+        return None
+    if np.isnan(v):
+        return "nan"
+    if np.isinf(v):
+        return "inf" if v > 0 else "-inf"
+    return int(v) if v.is_integer() and abs(v) < 2 ** 53 else v
+
+
 def num(x):
     """The numbers in an attribute value: a number, a list, or a string such
     as "{-1,1}"."""
@@ -264,11 +290,12 @@ def main():
     stretch = f"{'log10 ' if a.log10 else ''}{lo:.4g} to {hi:.4g}"
     if a.render:
         write_render(a.render, array, (lo, hi), scale, offset, a.palette, a.log10,
-                     [k for k in a.render_assets.split(",") if k], what)
+                     [k for k in a.render_assets.split(",") if k], what,
+                     nodata=store_fill(a.store, array))
     print(f"{what}; {a.palette}, {stretch}")
 
 
-def write_render(path, array, stretch, scale, offset, palette, log10, assets, what):
+def write_render(path, array, stretch, scale, offset, palette, log10, assets, what, nodata=None):
     """A STAC `renders` object (render extension v2) for array, from the
     thumbnail's stretch. `rescale` applies to the stored values: the
     collection declares no `raster:bands` scale and offset for a renderer to
@@ -276,7 +303,11 @@ def write_render(path, array, stretch, scale, offset, palette, log10, assets, wh
     colour stored values. The stretch is in physical units, so a CF-packed
     array's is converted back with its scale_factor and add_offset. Written
     only for the viridis palette (the one colormap name both viewers share)
-    and not for a log10 stretch, which `rescale` cannot state."""
+    and not for a log10 stretch, which `rescale` cannot state. nodata, the
+    array's fill in the store (stored units, as `rescale`), is the render's
+    `nodata` where given: portolan-browser masks only a declared no-data value,
+    and draws an undeclared fill as the low end of the ramp (LEDGER,
+    2026-11-28)."""
     if os.path.exists(path):
         os.remove(path)
     lo, hi = stretch
@@ -290,6 +321,8 @@ def write_render(path, array, stretch, scale, offset, palette, log10, assets, wh
         "rescale": [[float(f"{v:.6g}") for v in stored]],
         "colormap_name": palette,
     }}
+    if nodata_json(nodata) is not None:
+        render[array]["nodata"] = nodata_json(nodata)
     with open(path, "w") as f:
         json.dump(render, f)
 

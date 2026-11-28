@@ -420,7 +420,8 @@ async function showCollection(url) {
   // values
   const render = pick.render && (pick.render.assets || []).includes(pick.key) ? pick.render : null;
   const fill = arr.fillValue ?? at._FillValue ?? bt._FillValue;
-  const nodata = new Set([...(render?.nodata ?? []), ...(fill != null ? [Number(fill)] : [])].map(Number));
+  // a render's nodata is one value (render extension v2) or a list of them
+  const nodata = new Set([...[render?.nodata ?? []].flat(), ...(fill != null ? [Number(fill)] : [])].map(Number));
   const skip = (v) => nodata.has(v);
   const scale = at.scale_factor ?? bt.scale_factor ?? 1, offset = at.add_offset ?? bt.add_offset ?? 0;
   const units = at.units ?? bt.units ?? "";
