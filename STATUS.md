@@ -5,7 +5,7 @@ flight, the republish queue, open issues, decisions and dangling threads. A
 PR that starts, finishes or parks a thread updates this file. Facts learned
 on the way, each with its check, are in [LEDGER.md](LEDGER.md).
 
-Last updated 2026-11-28 (eighth update).
+Last updated 2026-11-28 (ninth update).
 
 ## Pull requests in flight
 
@@ -20,7 +20,8 @@ registration at `v0.1`, Portolan findings), #136 and #137 (the VM's
 portolan-browser site with `fix/geozarr-0.10`), #138 (a `renders` entry
 from the thumbnail stretch), #139 (step 5 published), #140 (`nodata` from
 the store's fill, Bluelink republished), #141 (step 5 leftovers deleted,
-sea ice browser forms).
+sea ice browser forms), #142 (the Portolan drafts on main), #143 (step 7:
+ESA CCI documents, exact `plan_cog.py` coordinates, the public-COG build).
 #126 (viewer, browser step, STAC renders and viewer link) and #127 (this
 file) merged on 2026-11-27. xpystac, checked before #126 merged,
 opens an asset by media type: `application/vnd+zarr` opened the kerchunk
@@ -58,7 +59,7 @@ needs no step.
 | bedmachine | bedmachine-v4.1 | done (EPSG:3031, 10 arrays) | done | direct | Republished 2026-11-28 from main `c764490` (A, O): fresh builds in `work/step5-<dataset>`, then the publish script's steps after the COG upload (the published COGs equal the local ones by ETag). `verify` and `verify-published` pass; every build file is published with the same ETag. The local COGs were fetched from the product (LEDGER, 2026-11-28). The 87 old Icechunk objects were deleted 2026-11-28 (CLI credentials); the store equals its build, and `verify-published` passes again |
 | ibcso | ibcso-v2, ibcso-annual-2024, ibcso-annual-2025 | done (EPSG:9354, 4 arrays each) | done | direct | Republished 2026-11-28 from main `c764490` (A, O): fresh builds in `work/step5-<dataset>`, then the publish script's steps after the COG upload (the published COGs equal the local ones by ETag). `verify` and `verify-published` pass; every build file is published with the same ETag. Deleted 2026-11-28 (CLI credentials): 70 old Icechunk objects and 4 per-array STAC items (`stac/items/{bed,ice_surface,rid,tid}.json`) in each, and the two `v2/cog/` `.aux.xml` sidecars, after a check that every leftover predated the step 5 publish. Without the sidecars, `bed.tif` and `ice_surface.tif` report the band description `elevation`, as the annual COGs do (LEDGER, 2026-11-28). Each store equals its build, and `verify-published` passes again |
 | gebco | gebco-2024, gebco-2025, gebco-2026 | done (EPSG:4326, `elevation`) | done | direct | Republished 2026-11-28 from main `c764490` (A, O): fresh builds in `work/step5-<dataset>`, then the publish script's steps after the COG upload (the published COGs equal the local ones by ETag). `verify` and `verify-published` pass; every build file is published with the same ETag. The 48, 43 and 43 old Icechunk objects were deleted 2026-11-28 (CLI credentials); each store equals its build, and `verify-published` passes again. The COGs at the product root are not touched |
-| oceancolour | esacci-oc-v6.0-{monthly, 5day}-{chlor_a, chlor_a_log10_bias, chlor_a_log10_rmsd} | done (EPSG:4326, 6 documents) | done in the rebuild | direct (Acacia); the viewer link comes with the rebuild | Published 2026-11-04 from Setonix (`4835eb2`). Rebuilt 2026-11-28 on the VM from the public COGs (`ESACCI_COG_ROOT=public`, `7ab63b8`, plain clone), every step with `config/source-coop.sh`: `verify` 117 SAME, 0 DIFFERENT for each, and six assertions applied to each (the base array and five overview levels). The rebuilds have the published stores' arrays, source counts and time axes; their sources are public HTTPS paths, not Setonix scratch paths, and their coordinates are exact (LEDGER, 2026-11-28). `chlor_a_log10_bias` and `chlor_a_log10_rmsd` get a render; `chlor_a` has a log10 stretch, which a render cannot state. Not published. A compare with the published prefixes lists only `icechunk/` objects as remote-only (115 for monthly `chlor_a`, 65 for 5-day), so the publish ends with `s3_sync.py --delete` on `icechunk/` |
+| oceancolour | esacci-oc-v6.0-{monthly, 5day}-{chlor_a, chlor_a_log10_bias, chlor_a_log10_rmsd} | done (EPSG:4326, 6 documents) | done | direct (Acacia), viewer link | Republished 2026-11-28 from main `7ab63b8` (A, O, V), built on the VM from the public COGs (`ESACCI_COG_ROOT=public`, plain clone), every step with `config/source-coop.sh`: `verify` and `verify-published` 117 SAME, 0 DIFFERENT for each, six assertions applied to each (the base array and five overview levels). The sources are public HTTPS paths in place of Setonix scratch paths, and the coordinates are exact (LEDGER, 2026-11-28). `chlor_a_log10_bias` and `chlor_a_log10_rmsd` have a render; `chlor_a` has a log10 stretch, which a render cannot state. Old Icechunk objects deleted (115 monthly `chlor_a`, 80 each for the other monthly, 65 each 5-day); each store equals its build with nothing extra. The group catalog republished (`catalog.sh products/oceancolour config/source-coop.sh check publish`). The published `mdim.vrt` and Icechunk forms read anonymously as EPSG:4326 with the asserted transform |
 | imos-tracking | meop-ctd-2024, meop-ctd-tags | n/a (profiles) | n/a | n/a (not a grid) | Nothing to republish |
 | access-esm | access-esm1-6.historical.ocean-3d-temp-1mon-mean | n/a (tripolar ocean grid) | n/a | not drawable as an affine grid | Nothing to republish |
 
@@ -103,9 +104,9 @@ Suggested order:
    `py/assertions.py apply` passes on copies of the six published stores.
    The rebuild ran on the VM from the public COGs, not on Pawsey: it needs
    no Setonix scratch copy, and with `py/plan_cog.py` writing 17 digits the
-   coordinates are exact. Built 2026-11-28 (see the table); the publish,
-   `verify-published` and the `icechunk/` delete pass follow the merge and
-   a go.
+   coordinates are exact. Published 2026-11-28 after #143 merged (see the
+   table): publish, `verify-published`, the `icechunk/` delete pass and the
+   group catalog.
 
 Credentials: `eval "$(source-coop creds --format env)"` on the VM (CLI 0.3.0,
 signed in 2026-11-27; credentials for 12 hours, renewed by `creds` only

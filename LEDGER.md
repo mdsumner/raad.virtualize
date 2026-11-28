@@ -8,6 +8,7 @@ fact is learned; open work goes in [STATUS.md](STATUS.md).
 
 | Date | Fact | Check |
 |---|---|---|
+| 2026-11-28 | A group catalog's `datasets.json` records each dataset's `generator` and `created`, so a dataset republish leaves the group's row stale until `catalog.sh products/<group> config/source-coop.sh check publish` runs. The collections are linked by relative path and do not change | the ESA CCI rows of `oceancolour/datasets.json` before (`4835eb2`, 2026-11-03) and after (`7ab63b8`) the step 7 catalog publish |
 | 2026-11-28 | CLI credentials (`source-coop creds`) delete in the production products: 528 single-object deletes in `ausantarctic/{bedmap,bedmachine,ibcso,gebco}`, each key then 404 anonymously. Dashboard keys could not delete there on 2026-11-03 | `work/step5-<dataset>.icedelete.out`; `curl -w '%{http_code}'` on each deleted key |
 | 2026-11-28 | `verify-published` of a store built from the raad mirror reads the plan's `/rdsi` sources, so the mirror must be mounted (`RV_MOUNTS` unset gives the default `/rdsi`). With `RV_MOUNTS=` the reference reads fail, windows report DIFFERENT, and verify stops on "No such file or directory" | ASI publish, 2026-11-28: `work/step6-asi.publish.out`, then `work/step6-asi.verify-published.out` |
 | 2026-11-26 | source.coop dashboard keys last one hour and include `AWS_SESSION_TOKEN`. A run after expiry fails with `ExpiredToken` and writes nothing | The failing run's stderr; last-modified of the target objects unchanged |
