@@ -3,7 +3,9 @@ CF packing is read from the attributes where the driver gives no scale and
 offset. A netCDF-4 file with a packed 4D field and a 2D Time_bnds (the BRAN
 layout), opened with the HDF5 driver (as thumbnail.py does over /vsi in
 docker), opens as Time_bnds alone; the field is drawn through the
-multidimensional API, with its scale_factor and add_offset.
+multidimensional API, with its scale_factor and add_offset. A 2D field
+placed as "lift:z" (py/plan_lift.py, the ASI layout) is read as the
+source's z.
 Run from the repository root, with GDAL's netCDF and HDF5 drivers:
   python tests/thumbnail_subdataset.py
 """
@@ -51,8 +53,22 @@ def make(path):
     temp.WriteArray(field)
 
 
+def make_lift(path):
+    """An ASI-shaped file: z(y, x) float32, one 2D field, no time axis."""
+    ds = gdal.GetDriverByName("netCDF").CreateMultiDimensional(path, [], ["FORMAT=NC4"])
+    rg = ds.GetRootGroup()
+    f64 = gdal.ExtendedDataType.Create(gdal.GDT_Float64)
+    dims = {n: rg.CreateDimension(n, None, None, k) for n, k in [("y", 4), ("x", 5)]}
+    for n in ("y", "x"):
+        rg.CreateMDArray(n, [dims[n]], f64).WriteArray(np.arange(dims[n].GetSize(), dtype="float64"))
+    rg.CreateMDArray("z", [dims["y"], dims["x"]], gdal.ExtendedDataType.Create(gdal.GDT_Float32)).WriteArray(lifted)
+
+
+lifted = np.arange(4 * 5, dtype="float32").reshape(4, 5)
 path = os.path.join(tempfile.mkdtemp(), "ocean_temp.nc")
 make(path)
+lift_path = os.path.join(os.path.dirname(path), "asi.nc")
+make_lift(lift_path)
 
 gdal.GetDriverByName("netCDF").Deregister()
 opened = gdal.OpenEx(path, gdal.OF_RASTER)
@@ -64,4 +80,9 @@ v, _, scale, offset = read_mdim(path, "temp", [2, 1, 0, 0], 512)[:4]
 assert v.shape == (4, 5), v.shape
 assert np.array_equal(v, field[2, 1]), v
 assert (scale, offset) == (0.5, 10.0), (scale, offset)
+
+# the lifted placement: three offsets (the new axis first), the source's z
+assert read_classic(lift_path, "lift:z", 512) is None  # HDF5 lists x, y, z as subdatasets
+v = read_mdim(lift_path, "lift:z", [0, 0, 0], 512)[0]
+assert np.array_equal(v, lifted), v
 print("thumbnail_subdataset: ok")

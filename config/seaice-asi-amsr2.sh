@@ -91,6 +91,20 @@ REMAPS=("public|/vsicurl/https://|https://")
 if [ -n "$ASI_MIRROR" ]; then
   REMAPS+=("public|$ASI_MIRROR|$ASI_URL/" "gdal|$ASI_MIRROR|/vsicurl/$ASI_URL/")
 fi
+# browser target: data.seaice.uni-bremen.de sends no CORS headers, so chunk
+# reads from a web page go through the CORS relay, as for
+# config/seaice-g02202.sh; CORS_RELAY="" leaves it out. A store built with
+# SEAICE_MIRROR holds mirror paths, so a remap of it needs SEAICE_MIRROR set
+# as at the build
+CORS_RELAY=${CORS_RELAY-https://relay.ace-eco-stats.cloud.edu.au/?url=}
+if [ -n "$CORS_RELAY" ]; then
+  REMAPS+=("browser|/vsicurl/https://|${CORS_RELAY}https://")
+  [ -z "$ASI_MIRROR" ] || REMAPS+=("browser|$ASI_MIRROR|${CORS_RELAY}$ASI_URL/")
+  BROWSER_TARGET=browser
+fi
+# map rendering for viewers (STAC render extension): z is concentration in
+# percent, 0..100, with NaN where there is no data (land, missing)
+export STAC_RENDERS=${STAC_RENDERS-'{"z":{"title":"Sea ice concentration (percent)","assets":["browser"],"rescale":[[0,100]],"nodata":"nan","colormap_name":"viridis"}}'}
 # one STAC item file per day is 5,000+ uploads: keep the ndjson and
 # stac-geoparquet item forms only
 export STAC_ITEM_FILES=${STAC_ITEM_FILES:-0}

@@ -3,8 +3,11 @@
 # (requests/assertion-step.md). No harvest and no collate: each dataset's
 # published store.sqlite and plan.vrt are fetched into a fresh work
 # directory (work/assert-<dataset>), and the remap, assert, render,
-# icechunk, grist, stac and verify steps run from them (remap sets the
-# config's REMAPS, root names included, in the fetched store). Phase "build"
+# icechunk, grist, browser (where the config sets BROWSER_TARGET), stac and
+# verify steps run from them (remap sets the config's REMAPS, root names
+# included, in the fetched store; render writes them into out/flat, which
+# the browser step reads them from). The sea ice stores were built from the
+# raad mirror, so their rows set SEAICE_MIRROR for the mirror rules. Phase "build"
 # needs no keys; phase "publish" uploads with the
 # scratch product's keys (dashboard keys last one hour, so publish a few datasets per
 # key set) and reads every form back anonymously.
@@ -32,9 +35,9 @@ SCRATCH=https://data.source.coop/ausantarctic/ausantarctic-scratch
 # dataset group config env
 table() {
   cat <<'EOF'
-g02202-v6-daily-south seaice config/seaice-g02202.sh SEAICE_HEM=south
-g02202-v6-daily-north seaice config/seaice-g02202.sh SEAICE_HEM=north
-asi-amsr2-v5.4-daily-south seaice config/seaice-asi-amsr2.sh SEAICE_HEM=south
+g02202-v6-daily-south seaice config/seaice-g02202.sh SEAICE_HEM=south,SEAICE_MIRROR=/rdsi/PUBLIC/raad/data
+g02202-v6-daily-north seaice config/seaice-g02202.sh SEAICE_HEM=north,SEAICE_MIRROR=/rdsi/PUBLIC/raad/data
+asi-amsr2-v5.4-daily-south seaice config/seaice-asi-amsr2.sh SEAICE_HEM=south,SEAICE_MIRROR=/rdsi/PUBLIC/raad/data
 oisst-v2.1-daily oisst config/oisst.sh -
 ghrsst-mur-cog-analysed_sst ghrsst config/ghrsst-cog.sh GHRSST_VAR=analysed_sst
 bluelink-daily-temp bluelink config/bluelink.sh BLUELINK_FREQ=daily,BRAN_VAR=temp
@@ -71,7 +74,7 @@ for ds in "${names[@]}"; do
           rm -f "$W/sources.meta.tsv"
         echo "assertion-republish: $ds fetched; render and verify (log: $W/log.txt)"
         bash hpc/vm/docker-run.sh run.sh "$config" config/source-coop.sh \
-          remap assert render icechunk grist stac verify ;;
+          remap assert render icechunk grist browser stac verify ;;
       publish)
         [ -f "$W/out/verify.json" ] || { echo "assertion-republish: $ds has no verify pass; run build first"; exit 1; }
         : "${AWS_ACCESS_KEY_ID:?export the scratch product keys}"

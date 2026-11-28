@@ -168,10 +168,19 @@ def read_classic(src, src_array, width):
             valid_range(md))
 
 
+def source_array_name(src_array):
+    """The array's name inside its source. A 2D array stacked on a new leading
+    axis (py/plan_lift.py) is placed as "lift:<array>" (R/mdimrefs.R), and
+    the source holds <array>, as the rendered VRT's <SourceArray> says."""
+    s = str(src_array)
+    return s[len("lift:"):] if s.startswith("lift:") else s
+
+
 def read_mdim(src, src_array, off, width):
     ds = gdal.OpenEx(src, gdal.OF_MULTIDIM_RASTER)
     rg = ds.GetRootGroup()
-    name = src_array if str(src_array).startswith("/") else "/" + str(src_array)
+    src_array = source_array_name(src_array)
+    name = src_array if src_array.startswith("/") else "/" + src_array
     arr = rg.OpenMDArrayFromFullname(name)
     if arr is None:
         sys.exit(f"thumbnail: {src} has no array {src_array}")
