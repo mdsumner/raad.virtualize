@@ -5,19 +5,18 @@ flight, the republish queue, open issues, decisions and dangling threads. A
 PR that starts, finishes or parks a thread updates this file. Facts learned
 on the way, each with its check, are in [LEDGER.md](LEDGER.md).
 
-Last updated 2026-11-28.
+Last updated 2026-11-28 (second update).
 
 ## Pull requests in flight
 
-| PR | What | State | Remaining |
-|---|---|---|---|
-| #132 | `py/thumbnail.py`: refuse a subdataset the driver chose itself; CF packing from the attributes | The five 4D Bluelink thumbnails rendered from the branch and checked; `tests/thumbnail_subdataset.py` | Merge, then `assertion-republish.sh stac` and `publish-stac` for `temp`, `salt`, `u`, `v` and `w` |
+None.
 
 Merged since the last update: #125 (assertion step), #128 (header-signed
 DeleteObject in `s3_sync.py`), #129 (`verify --plan-remap`), #130 (named
 remap roots, the `remap` step), #131 (`SOURCE_READ_REMAP` for the
-thumbnail). #126 (viewer, browser step, STAC renders and viewer link) and
-#127 (this file) merged on 2026-11-27. xpystac, checked before #126 merged,
+thumbnail), #132 (`thumbnail.py` reads 4D HDF5 fields and CF packing).
+#126 (viewer, browser step, STAC renders and viewer link) and #127 (this
+file) merged on 2026-11-27. xpystac, checked before #126 merged,
 opens an asset by media type: `application/vnd+zarr` opened the kerchunk
 Parquet folder as a plain Zarr store, and `application/x-kerchunk-parquet`
 matches no reader, so nothing that opened before stopped opening; the
@@ -48,7 +47,7 @@ needs no step.
 | seaice | asi-amsr2-v5.4-daily-south | done | n/a | relay; no browser rules yet | Republished with A; Icechunk cleaned 2026-11-27. Row chunks: 2,656 requests per field through the relay |
 | oisst | oisst-v2.1-daily | done | n/a | direct | Republished with A; Icechunk cleaned 2026-11-27 |
 | ghrsst | ghrsst-mur-cog-analysed_sst | done | done | done (link) | Republished 2026-11-27 from main `44e6bc0` (A, O, V): `verify-published` passes, 299 old Icechunk objects deleted, 644 files match the build with nothing extra, the repository opens anonymously at `main` `PXBQEF86` |
-| bluelink | bluelink-daily-{temp, salt, eta_t, mld, u, v, w, tx_trans_int_z, ty_trans_int_z} | done | n/a | direct, untested (THREDDS answers 403 to HEAD with an Origin) | Republished 2026-11-28 from main `9e747fc` (A, the `_FillValue` fix, absolute Icechunk refs, root `bran2023`), built on the VM through THREDDS (`SOURCE_READ_REMAP`). `verify` and `verify-published`: 29 SAME, 0 DIFFERENT for each. Old Icechunk objects deleted (43 each for the four 3D stores, 192 each for `temp`, `salt`, `u`, `v`, 163 for `w`). Thumbnails: `eta_t`, `mld`, `tx_trans_int_z`, `ty_trans_int_z` published from main `3896ff4`, each store matching its build by ETag with nothing extra; the five 4D stores wait on #132 and still serve the October `thumbnail.png`, which their collections do not list |
+| bluelink | bluelink-daily-{temp, salt, eta_t, mld, u, v, w, tx_trans_int_z, ty_trans_int_z} | done | n/a | direct, untested (THREDDS answers 403 to HEAD with an Origin) | Republished 2026-11-28 from main `9e747fc` (A, the `_FillValue` fix, absolute Icechunk refs, root `bran2023`), built on the VM through THREDDS (`SOURCE_READ_REMAP`). `verify` and `verify-published`: 29 SAME, 0 DIFFERENT for each. Old Icechunk objects deleted (43 each for the four 3D stores, 192 each for `temp`, `salt`, `u`, `v`, 163 for `w`). Thumbnails and collections republished (`publish-stac`): `eta_t`, `mld`, `tx_trans_int_z`, `ty_trans_int_z` from main `3896ff4`, `temp`, `salt`, `u`, `v`, `w` from main `f905e24`. Each store matches its build by ETag with nothing extra |
 | bedmap | bedmap3 | no document (EPSG:3031) | pending | direct | `hpc/vm/bedmap3-publish.sh` (production product; `assertion-republish.sh` refuses it) |
 | bedmachine | bedmachine-v4.1 | no document (EPSG:3031) | pending | direct | `hpc/vm/bedmachine-publish.sh` |
 | ibcso | ibcso-v2, ibcso-annual-2024, ibcso-annual-2025 | no documents (EPSG:9354) | pending | direct | `hpc/vm/ibcso-publish.sh` |
@@ -74,7 +73,7 @@ Suggested order:
 3. MUR: `assertion-republish.sh build` then `publish`. Done 2026-11-27.
 4. Bluelink, nine variables: one republish each with A and the
    `_FillValue` fix, absolute refs, verified on the VM through THREDDS.
-   Done 2026-11-28; five thumbnails wait on #132.
+   Done 2026-11-28, thumbnails included.
 5. COG products (Bedmap3, BedMachine, IBCSO, GEBCO): write assertion
    documents from each COG's CRS, then use each product's publish script.
 6. Sea ice viewer pass: the browser rules for ASI, then `remap browser stac`
