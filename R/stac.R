@@ -46,11 +46,26 @@ if (sys.nframe() == 0L) {
 
 STAC_VERSION <- "1.1.0"
 STAC_EXT <- c(
-  datacube   = "https://stac-extensions.github.io/datacube/v2.2.0/schema.json",
+  datacube   = "https://stac-extensions.github.io/datacube/v2.3.0/schema.json",
   file       = "https://stac-extensions.github.io/file/v2.1.0/schema.json",
   projection = "https://stac-extensions.github.io/projection/v2.0.0/schema.json",
   xarray     = "https://stac-extensions.github.io/xarray-assets/v1.0.0/schema.json",
   render     = "https://stac-extensions.github.io/render/v2.0.0/schema.json")
+
+## A no-data value as STAC writes it (common metadata `nodata`, in datacube
+## v2.3.0 variables and render v2): a number in the shortest form that reads
+## back as the same double, else "nan", "inf" or "-inf". The collection is
+## written with 15 significant digits, which changes a float32 fill such as
+## -1e20 (-1.0000000200408773e+20) to a value no float32 sample equals, so
+## the number goes in verbatim. NULL for anything that is not a number.
+.nodata_json <- function(x) {
+  v <- suppressWarnings(as.numeric(x))
+  if (length(v) != 1L || (is.na(v) && !is.nan(v))) return(NULL)
+  if (is.nan(v)) return("nan")
+  if (is.infinite(v)) return(if (v > 0) "inf" else "-inf")
+  for (d in 15:17) if (as.numeric(s <- sprintf("%.*g", d, v)) == v) break
+  structure(s, class = "json")
+}
 
 ## ---- the plan: dimension types, SRS, coordinate units ----------------------------
 .stac_plan <- function(file) {
@@ -366,12 +381,22 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
     if (!is.null(d$attrs$long_name)) x$description <- d$attrs$long_name
     Filter(Negate(is.null), x)
   })
-  cube_vars <- lapply(cube_data, function(a) Filter(Negate(is.null), list(
+  ## a variable's no-data value is the fill of its arrays (one per array: the
+  ## Zarr fill_value, which ingest checks against _FillValue and
+  ## missing_value), where they all have the same one; in stored units, as
+  ## `rescale` is
+  leaf_of <- if (grouped) .leaf(names(data)) else names(data)
+  nodata_of <- function(nm) {
+    f <- unique(vapply(data[leaf_of == nm], function(a) a$fill %||% NA_character_, ""))
+    if (length(f) == 1L) .nodata_json(f)
+  }
+  cube_vars <- Map(function(nm, a) Filter(Negate(is.null), list(
     dimensions = I(a$dims), type = "data",
-    description = a$attrs$long_name, unit = a$attrs$units,
-    `rv:dtype` = a$dtype, `rv:chunks` = if (!grouped) I(a$chunks))))
+    description = a$attrs$long_name, unit = a$attrs$units, nodata = nodata_of(nm),
+    `rv:dtype` = a$dtype, `rv:chunks` = if (!grouped) I(a$chunks))), names(cube_data), cube_data)
 
   js <- function(x, pretty = FALSE) jsonlite::toJSON(x, auto_unbox = TRUE, digits = I(15),
+                                                     json_verbatim = TRUE,
                                                      null = "null", na = "null", pretty = pretty)
   ## items: one per source granule, from its placements; sources that share
   ## a time and footprint are one item with an asset per source (a static
@@ -491,6 +516,12 @@ mr_write_stac <- function(con, out, target = NULL, base = NULL, plan_file = NULL
   forms <- .form_assets(out, base, .containers(unique(P$path)), bcont)
   renders <- if (nzchar(Sys.getenv("STAC_RENDERS")))
     jsonlite::fromJSON(Sys.getenv("STAC_RENDERS"), simplifyVector = FALSE)
+  ## a render's no-data values are written as given (.nodata_json)
+  exact <- function(x) .nodata_json(x) %||% x
+  if (!is.null(renders)) renders <- lapply(renders, function(r) {
+    if (!is.null(r$nodata)) r$nodata <- if (is.list(r$nodata)) lapply(r$nodata, exact) else exact(r$nodata)
+    r
+  })
   textent <- if (!is.null(ttime)) I(list(I(.iso(range(ttime))))) else
     if (length(interval)) I(list(I(interval))) else I(list(I(c(NA, NA))))
   coll <- list(

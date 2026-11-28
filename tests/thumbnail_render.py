@@ -2,6 +2,8 @@
 `rescale` is in stored units, so a CF-packed array's physical stretch is
 converted back with its scale_factor and add_offset; nothing is written for
 a palette other than viridis, a log10 stretch, no assets or an empty stretch.
+The store's fill is the render's `nodata`, written so that it reads back as
+the same double (a float32 fill), or as "nan".
 Run from the repository root:
   python tests/thumbnail_render.py
 """
@@ -40,6 +42,17 @@ assert r["rescale"] == [[-1.816, 0.8266]] and r["assets"] == ["icechunk", "brows
 
 # a negative scale keeps the range ordered
 assert written(scale=-2.0, offset=0.0)["temp"]["rescale"] == [[-15.1, 0.899]]
+
+# nodata: the store fill; a float32 -1e20 reads back exactly, an integer
+# fill is an integer, NaN is "nan", no fill writes no key
+f32 = float(np.float32(-1e20))
+text = open(path).read() if written(nodata=f32) else ""
+assert '"nodata": -1.0000000200408773e+20' in text, text
+assert json.loads(text)["temp"]["nodata"] == f32 and np.float32(f32) == np.float32(-1e20)
+assert written(nodata=-32768.0)["temp"]["nodata"] == -32768
+assert '"nodata": -32768,' in open(path).read() or '"nodata": -32768}' in open(path).read()
+assert written(nodata=float("nan"))["temp"]["nodata"] == "nan"
+assert "nodata" not in written()["temp"]
 
 # nothing written, and a stale file removed
 for kw in (dict(palette="topo"), dict(log10=True), dict(assets=[]),
