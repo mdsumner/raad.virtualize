@@ -12,7 +12,12 @@
 #   ESACCI_COG_ROOT  COG root as py/esacci_cog.py writes it (the directory
 #                    holding v6.0-release/), default $MYSCRATCH/esacci-oc/cog
 #                    on Setonix. A local directory is listed with find; a
-#                    /vsis3/ or /vsicurl/ root with gdal vsi ls -R.
+#                    /vsis3/ or /vsicurl/ root with gdal vsi ls -R. public:
+#                    the COGs at ESACCI_COG_URL, read over HTTPS from any
+#                    host; the bucket is listed through its S3 API,
+#                    anonymously (it serves no listing over HTTPS), and the
+#                    sources are /vsicurl/<ESACCI_COG_URL>/..., so no step
+#                    needs S3 settings beside a publish config's own
 #   ESACCI_COG_URL   public URL of the same root (default the Acacia bucket
 #                    aad-derived/esacci-oc); the remap rules give every form
 #                    this URL
@@ -35,6 +40,7 @@ ESACCI_COG_ROOT=${ESACCI_COG_ROOT:-${MYSCRATCH:-$HERE/work}/esacci-oc/cog}
 ESACCI_COG_ROOT=${ESACCI_COG_ROOT%/}
 ESACCI_COG_URL=${ESACCI_COG_URL:-https://projects.pawsey.org.au/aad-derived/esacci-oc}
 ESACCI_COG_URL=${ESACCI_COG_URL%/}
+if [ "$ESACCI_COG_ROOT" = public ]; then ESACCI_COG_ROOT=/vsicurl/$ESACCI_COG_URL; fi
 case "$ESACCI_CADENCE" in
   monthly) ESACCI_STEP=month; ESACCI_DATE='[0-9]{6}'; ESACCI_GAPS=0 ;;
   5day)    ESACCI_STEP=5day;  ESACCI_DATE='[0-9]{8}'; ESACCI_GAPS=60 ;;
@@ -55,6 +61,11 @@ sources() (
   root=$ESACCI_COG_ROOT/$ESACCI_DIR
   if [ -d "$root" ]; then
     find "$root" -name '*.tif'
+  elif [ "$ESACCI_COG_ROOT" = "/vsicurl/$ESACCI_COG_URL" ]; then
+    # the same prefix through the bucket's S3 API: host and bucket from the URL
+    u=${ESACCI_COG_URL#https://}
+    AWS_S3_ENDPOINT=${u%%/*} AWS_NO_SIGN_REQUEST=YES AWS_VIRTUAL_HOSTING=FALSE AWS_HTTPS=YES \
+      "$GDAL" vsi ls -R "/vsis3/${u#*/}/$ESACCI_DIR" | grep '\.tif$' | sed "s#^#$root/#"
   else
     "$GDAL" vsi ls -R "$root" | grep '\.tif$' | sed "s#^#$root/#"
   fi | while read -r f; do
