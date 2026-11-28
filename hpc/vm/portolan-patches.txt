@@ -1,0 +1,3 @@
+# Branches of mdsumner/portolan-browser that hpc/vm/portolan-site.sh merges
+# onto upstream main, in order, one per line. Each is also an upstream pull
+# request; remove a branch once upstream merges it.
