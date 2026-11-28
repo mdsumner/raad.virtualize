@@ -13,14 +13,16 @@
 # unit test or a failed build stops the script and leaves the published site
 # as it was. dist/vm-build.txt records the commits built.
 #
-# Publish target PORTOLAN_WWW (default /var/www/portolan), served by the
-# nginx site with:
-#   location /portolan/ { alias /var/www/portolan/; index index.html; }
+# Publish target PORTOLAN_WWW (default /var/www/html/portolan). The VM's
+# nginx site serves /var/www/html as its root (try_files, index.html), so the
+# build appears at https://<host>/portolan/ with no nginx change. Make the
+# directory once, as root:
+#   sudo install -d -o mdsumner -g mdsumner /var/www/html/portolan
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REPO=${PORTOLAN_REPO:-$HOME/Git/portolan-browser}
 BUILD=${PORTOLAN_BUILD:-$HOME/.cache/portolan-site/build}
-WWW=${PORTOLAN_WWW:-/var/www/portolan}
+WWW=${PORTOLAN_WWW:-/var/www/html/portolan}
 PREFIX=${PORTOLAN_PATH_PREFIX:-/portolan/}
 PATCHES=$HERE/hpc/vm/portolan-patches.txt
 publish=1
