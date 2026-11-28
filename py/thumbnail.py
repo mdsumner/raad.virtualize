@@ -77,18 +77,32 @@ def pick(store, array, source_rx=None):
     return array, src, src_array, json.loads(off)
 
 
+def num(x):
+    """The numbers in an attribute value: a number, a list, or a string such
+    as "{-1,1}"."""
+    if x is None:
+        return []
+    if isinstance(x, str):
+        x = x.replace("{", " ").replace("}", " ").replace(",", " ").split()
+    try:
+        return [float(u) for u in (x if isinstance(x, (list, tuple)) else [x])]
+    except (TypeError, ValueError):
+        return []
+
+
+def packing(scale, offset, md):
+    """The driver's scale and offset, else CF scale_factor and add_offset from
+    the attributes (the HDF5 driver leaves them there)."""
+    if scale is None and num(md.get("scale_factor")):
+        scale = num(md.get("scale_factor"))[0]
+    if offset is None and num(md.get("add_offset")):
+        offset = num(md.get("add_offset"))[0]
+    return scale, offset
+
+
 def valid_range(md):
     """(min, max) from CF valid_range, valid_min and valid_max, in stored
     (packed) units, so flag values such as land and pole hole are not drawn."""
-    def num(x):
-        if x is None:
-            return []
-        if isinstance(x, str):
-            x = x.replace("{", " ").replace("}", " ").replace(",", " ").split()
-        try:
-            return [float(u) for u in (x if isinstance(x, (list, tuple)) else [x])]
-        except (TypeError, ValueError):
-            return []
     lo, hi = -np.inf, np.inf
     vr = num(md.get("valid_range"))
     if len(vr) == 2:
@@ -100,9 +114,22 @@ def valid_range(md):
     return lo, hi
 
 
+def own_subdataset(desc, src, src_array):
+    """False when a driver opened a subdataset of its own choosing that is not
+    src_array. The HDF5 driver lists only 2D and 3D datasets, so a BRAN file
+    with a 4D field opens as its one 2D dataset, Time_bnds (description
+    HDF5:"<file>"://Time_bnds)."""
+    if desc == src or str(src_array).isdigit():
+        return True
+    leaf = str(src_array).strip("/").split("/")[-1]
+    return re.search(r"[:/]" + re.escape(leaf) + r"$", desc) is not None
+
+
 def read_classic(src, src_array, width):
     ds = gdal.OpenEx(src, gdal.OF_RASTER)
     if ds.RasterCount < 1 or ds.GetMetadata("SUBDATASETS"):
+        return None
+    if not own_subdataset(ds.GetDescription(), src, src_array):
         return None
     band = int(src_array) if str(src_array).isdigit() else 1
     b = ds.GetRasterBand(band)
@@ -111,7 +138,8 @@ def read_classic(src, src_array, width):
     v = small.GetRasterBand(1).ReadAsArray().astype("float64")
     gt = ds.GetGeoTransform()
     md = {k.split("#")[-1]: val for k, val in b.GetMetadata().items()}
-    return v, b.GetNoDataValue(), b.GetScale(), b.GetOffset(), gt[5] > 0, None, valid_range(md)
+    return (v, b.GetNoDataValue(), *packing(b.GetScale(), b.GetOffset(), md), gt[5] > 0, None,
+            valid_range(md))
 
 
 def read_mdim(src, src_array, off, width):
@@ -140,7 +168,7 @@ def read_mdim(src, src_array, off, width):
     south_up = yv is not None and len(yv) > 1 and yv[1] > yv[0]
     nd = arr.GetNoDataValueAsDouble() if arr.GetNoDataValueAsRaw() is not None else None
     md = {at.GetName(): at.Read() for at in (arr.GetAttributes() or [])}
-    return v, nd, arr.GetScale(), arr.GetOffset(), south_up, xv, valid_range(md)
+    return v, nd, *packing(arr.GetScale(), arr.GetOffset(), md), south_up, xv, valid_range(md)
 
 
 def colour(v, valid, palette, log10):
