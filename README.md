@@ -94,7 +94,8 @@ Six renderings, all from the store and none derived from another:
    the items in one stac-geoparquet file (`stac/items.parquet`, written
    with the `rustac` Python package, collection asset `geoparquet-items`)
    and as `stac/items.ndjson`. The collection describes the whole cube
-   with the datacube extension and carries one asset per form above (VRT,
+   with the datacube extension, each variable's fill value as its
+   `nodata`, and carries one asset per form above (VRT,
    kerchunk, Icechunk, flat refs, store, plan) and a `thumbnail` PNG of one
    field (`py/thumbnail.py`). An item is one source granule, or the sources
    that share a time and footprint, with one asset per source: a static
