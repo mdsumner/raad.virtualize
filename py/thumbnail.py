@@ -180,9 +180,18 @@ def main():
     ap.add_argument("--log10", action="store_true")
     ap.add_argument("--source", help="regex: draw the last placement among matching sources")
     ap.add_argument("--transpose", action="store_true", help="last dimension down the image")
+    ap.add_argument("--source-remap", action="append", default=[], metavar="FROM=TO",
+                    help="open the source with the path prefix FROM replaced by TO, for a source "
+                         "not mounted here (run.sh: SOURCE_READ_REMAP)")
     a = ap.parse_args()
 
     array, src, src_array, off = pick(a.store, a.array, a.source)
+    for rule in a.source_remap:
+        frm, sep, to = rule.partition("=")
+        if not sep or not frm:
+            sys.exit(f"thumbnail: --source-remap {rule!r} is not FROM=TO")
+        if src.startswith(frm):
+            src = to + src[len(frm):]
     def read():
         got = read_classic(src, src_array, a.width)
         return got if got is not None else read_mdim(src, src_array, off, a.width)

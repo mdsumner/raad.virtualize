@@ -9,7 +9,7 @@
 #
 # Settings exported on the host are passed in by name: AWS_* (publish keys),
 # the dataset settings (GHRSST_*, BRAN_*, BLUELINK_*, OISST_*, SEAICE_*, BEDMAP3_*, BEDMACHINE_*, IBCSO_*, ESACCI_*, GEBCO_*, MEOP_*), the run.sh settings
-# (E2E_WORK, WORKERS, HARVEST_*, VERIFY_WINDOWS, VERIFY_PLAN_REMAP, GRIST_*, STAC_*,
+# (E2E_WORK, WORKERS, HARVEST_*, VERIFY_WINDOWS, SOURCE_READ_REMAP, GRIST_*, STAC_*,
 # ICECHUNK_ARGS, S3_SYNC_ARGS, FLAT_ROW_GROUP_ROWS, KERCHUNK_RECORD_SIZE) and the publish target (SOURCECOOP_*,
 # AADC_PREFIX). The Python packages the image lacks (obstore for source.coop
 # publish, imagecodecs and fastparquet for TIFF predictor sources, rustac
@@ -32,7 +32,7 @@ envs=()
 for v in $(compgen -e); do
   case $v in
     AWS_*|GHRSST_*|BRAN_*|BLUELINK_*|OISST_*|SEAICE_*|BEDMAP3_*|BEDMACHINE_*|IBCSO_*|ESACCI_*|GEBCO_*|MEOP_*|HARVEST_*|GRIST_*|STAC_*|SOURCECOOP_*|\
-    E2E_WORK|WORKERS|VERIFY_WINDOWS|VERIFY_PLAN_REMAP|ICECHUNK_ARGS|S3_SYNC_ARGS|AADC_PREFIX|FLAT_ROW_GROUP_ROWS|KERCHUNK_RECORD_SIZE) envs+=(-e "$v") ;;
+    E2E_WORK|WORKERS|VERIFY_WINDOWS|SOURCE_READ_REMAP|ICECHUNK_ARGS|S3_SYNC_ARGS|AADC_PREFIX|FLAT_ROW_GROUP_ROWS|KERCHUNK_RECORD_SIZE) envs+=(-e "$v") ;;
   esac
 done
 mounts=()
