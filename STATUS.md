@@ -5,7 +5,7 @@ flight, the republish queue, open issues, decisions and dangling threads. A
 PR that starts, finishes or parks a thread updates this file. Facts learned
 on the way, each with its check, are in [LEDGER.md](LEDGER.md).
 
-Last updated 2026-11-28 (sixth update).
+Last updated 2026-11-28 (seventh update).
 
 ## Pull requests in flight
 
@@ -19,7 +19,8 @@ thumbnail), #132 (`thumbnail.py` reads 4D HDF5 fields and CF packing),
 registration at `v0.1`, Portolan findings), #136 and #137 (the VM's
 portolan-browser site with `fix/geozarr-0.10`), #138 (a `renders` entry
 from the thumbnail stretch), #139 (step 5 published), #140 (`nodata` from
-the store's fill, Bluelink republished).
+the store's fill, Bluelink republished), #141 (step 5 leftovers deleted,
+sea ice browser forms).
 #126 (viewer, browser step, STAC renders and viewer link) and #127 (this
 file) merged on 2026-11-27. xpystac, checked before #126 merged,
 opens an asset by media type: `application/vnd+zarr` opened the kerchunk
