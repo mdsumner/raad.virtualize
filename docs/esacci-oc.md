@@ -21,7 +21,7 @@ reference the COGs (the GHRSST pattern), not the netCDF files. Monthly
 | `SPARSE_OK` | FALSE | every tile has a reference; an all-NaN tile is a few hundred bytes |
 | Type and values | as in the netCDF (Float32 for `chlor_a`) | |
 | Nodata | NaN, from the netCDF `_FillValue` 9.96921e+36 | becomes the Zarr `fill_value`; `--fill source` keeps the netCDF value |
-| CRS, geotransform | EPSG:4326, (-180, 1/24, 0, 90, 0, -1/24) | the netCDF has no CRS; its coordinates are checked to 1e-6 degree |
+| CRS, geotransform | EPSG:4326, (-180, 1/24, 0, 90, 0, -1/24) | the netCDF's grid mapping (`crs`, `latitude_longitude`) has no datum and no data variable refers to it; the Product User Guide (D4.2, issue 6.5, section 7.4) gives WGS 84. Its coordinates are checked to 1e-6 degree |
 | Overviews | AVERAGE, x2 to x32 | indexed as arrays `<var>_x2` .. `<var>_x32` on dims `y_x<f>`, `x_x<f>` (`ESACCI_OVERVIEWS`, default 1; py/plan_cog.py --overviews) |
 
 Each COG is read back and compared with the netCDF array before it is

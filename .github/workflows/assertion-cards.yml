@@ -136,6 +136,30 @@ jobs:
             config: config/gebco.sh
             env: GEBCO_YEAR=2026
             base: https://data.source.coop/ausantarctic/gebco/virtual/gebco-2026
+          - dataset: esacci-oc-v6.0-monthly-chlor_a
+            group: oceancolour
+            config: config/esacci-oc.sh
+            env: ESACCI_CADENCE=monthly ESACCI_VAR=chlor_a
+          - dataset: esacci-oc-v6.0-monthly-chlor_a_log10_bias
+            group: oceancolour
+            config: config/esacci-oc.sh
+            env: ESACCI_CADENCE=monthly ESACCI_VAR=chlor_a_log10_bias
+          - dataset: esacci-oc-v6.0-monthly-chlor_a_log10_rmsd
+            group: oceancolour
+            config: config/esacci-oc.sh
+            env: ESACCI_CADENCE=monthly ESACCI_VAR=chlor_a_log10_rmsd
+          - dataset: esacci-oc-v6.0-5day-chlor_a
+            group: oceancolour
+            config: config/esacci-oc.sh
+            env: ESACCI_CADENCE=5day ESACCI_VAR=chlor_a
+          - dataset: esacci-oc-v6.0-5day-chlor_a_log10_bias
+            group: oceancolour
+            config: config/esacci-oc.sh
+            env: ESACCI_CADENCE=5day ESACCI_VAR=chlor_a_log10_bias
+          - dataset: esacci-oc-v6.0-5day-chlor_a_log10_rmsd
+            group: oceancolour
+            config: config/esacci-oc.sh
+            env: ESACCI_CADENCE=5day ESACCI_VAR=chlor_a_log10_rmsd
     env:
       SCRATCH: https://data.source.coop/ausantarctic/ausantarctic-scratch
     steps:

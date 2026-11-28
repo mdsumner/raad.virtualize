@@ -1,0 +1,51 @@
+{
+ "assertion_version": "0",
+ "kind": "grid",
+ "subject": {
+  "dataset": "esacci-oc-v6.0-monthly-chlor_a",
+  "variable": "chlor_a"
+ },
+ "asserts": {
+  "spatial:transform": [
+   0.041666666666666664,
+   0.0,
+   -180.0,
+   0.0,
+   -0.041666666666666664,
+   90.0
+  ],
+  "spatial:shape": [
+   4320,
+   8640
+  ],
+  "spatial:dimensions": [
+   "y",
+   "x"
+  ],
+  "spatial:transform_type": "affine",
+  "spatial:registration": "pixel",
+  "proj:code": "EPSG:4326"
+ },
+ "crs_axes": [
+  "y",
+  "x"
+ ],
+ "evidence": {
+  "method": "transform restated from the source COGs' geotransform, which the store's regular 1-D coordinates agree with; CRS restated from the source grid mapping (latitude_longitude) and the datum its user guide states",
+  "axes": {
+   "x": "x",
+   "y": "y"
+  },
+  "crs_from": "the 349 source COGs (https://projects.pawsey.org.au/aad-derived/esacci-oc/v6.0-release/geographic/monthly/chlor_a/<year>/*.tif) declare EPSG:4326 (WGS 84), origin -180, 90, cell 0.041666666666666664 degrees, 4320 x 8640, AREA_OR_POINT=Area (gdal.Open on each COG, GDAL 3.13.3, PROJ 9.9.0, 2026-11-28). py/esacci_cog.py writes EPSG:4326 and the geotransform (-180, 1/24, 0, 90, 0, -1/24) into each COG, after checking the netCDF lat and lon against it to 1e-6 degree. The netCDF files (https://www.oceancolour.org/thredds/fileServer/cci/v6.0-release/geographic/<cadence>/chlor_a/<year>/) hold a CF grid mapping variable crs with grid_mapping_name latitude_longitude and no datum or ellipsoid parameters, and no data variable names it in a grid_mapping attribute (OPeNDAP DAS of the 1997-09 and 2026-09 monthly and the 2026-09-18 5-day files, 2026-11-28). The Product User Guide for v6.0 Dataset (ESA OC-CCI, D4.2, issue 6.5, 2024-04-11), section 7.4: \"All latitudes and longitudes are given in WGS/84 datum\"; section 7.5 shows chlor_a:grid_mapping = \"crs\", which the served files do not carry",
+  "plan": "https://data.source.coop/ausantarctic/ausantarctic-scratch/oceancolour/esacci-oc-v6.0-monthly-chlor_a/plan.vrt (<SRS> EPSG:4326 for every array)",
+  "note": "the published store's coordinates (built 2026-11-03) were written with 10 significant digits (0.04166666667 for 1/24) and restate the corner 8e-07 of a cell from the COG's; py/plan_cog.py writes 17 from 2026-11-28; overview levels (<array>_x<f>, byterefs decision 0006) have no documents of their own: py/assertions.py applies this assertion scaled to each level",
+  "dataset": "esacci-oc-v6.0-monthly-chlor_a",
+  "era": "all"
+ },
+ "by": {
+  "name": "raad.virtualize assertion step",
+  "kind": "known source CRS"
+ },
+ "made_at": "2026-11-28T19:56:23Z",
+ "status": "proposed"
+}

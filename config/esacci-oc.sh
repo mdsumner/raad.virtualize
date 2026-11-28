@@ -43,6 +43,8 @@ case "$ESACCI_CADENCE" in
 esac
 ESACCI_DIR=v6.0-release/geographic/$ESACCI_CADENCE/$ESACCI_VAR
 DATASET=esacci-oc-v6.0-$ESACCI_CADENCE-$ESACCI_VAR${ESACCI_YEARS:+-$(echo $ESACCI_YEARS | tr ' ' '-')}
+# assertions/<ASSERT_DATASET>/ (py/assertions.py), also for a subset of years
+ASSERT_DATASET=esacci-oc-v6.0-$ESACCI_CADENCE-$ESACCI_VAR
 # product group (products/oceancolour/): the scratch prefix on source.coop
 PRODUCT_GROUP=oceancolour
 ARRAYS=$ESACCI_VAR
