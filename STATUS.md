@@ -5,7 +5,7 @@ flight, the republish queue, open issues, decisions and dangling threads. A
 PR that starts, finishes or parks a thread updates this file. Facts learned
 on the way, each with its check, are in [LEDGER.md](LEDGER.md).
 
-Last updated 2026-11-28 (sixth update).
+Last updated 2026-11-28 (seventh update).
 
 ## Pull requests in flight
 
@@ -19,7 +19,8 @@ thumbnail), #132 (`thumbnail.py` reads 4D HDF5 fields and CF packing),
 registration at `v0.1`, Portolan findings), #136 and #137 (the VM's
 portolan-browser site with `fix/geozarr-0.10`), #138 (a `renders` entry
 from the thumbnail stretch), #139 (step 5 published), #140 (`nodata` from
-the store's fill, Bluelink republished).
+the store's fill, Bluelink republished), #141 (step 5 leftovers deleted,
+sea ice browser forms).
 #126 (viewer, browser step, STAC renders and viewer link) and #127 (this
 file) merged on 2026-11-27. xpystac, checked before #126 merged,
 opens an asset by media type: `application/vnd+zarr` opened the kerchunk
@@ -194,11 +195,6 @@ Metadata and specification:
 
 Upstream:
 
-- The Portolan issue drafts of 2026-11-28 (`browser-geozarr-0.10-issue.md`,
-  `renovate-hold-0.10-issue.md` and their scripts, commits `741ef80` and
-  `56c1286`) are only on the branch `spatial-convention-tag`. They were
-  pushed after #135 merged, so `upstream/portolan/` on main holds only the
-  classification draft.
 - GDAL, index and strided reads of `<SourceBand>` VRT sources (README known
   limit, #123). The issue draft is in mdsumner/osgeo-upstream
   `notes/2026-11-26-mdim-classic-strided-read-issue.md`; not filed.
@@ -213,10 +209,18 @@ Upstream:
   (`yt_ocean`, `xt_ocean` rejected). Fixed upstream in geozarr 0.10.0
   (deck.gl-raster #785); portolan-browser needs `@developmentseed/geozarr`
   and `@developmentseed/deck.gl-zarr` raised to `^0.10.0` (LEDGER,
-  2026-11-28). The sea ice Icechunk assets pass the same check. The fork
-  branch `fix/geozarr-0.10` (`2755c5cd`) makes that change and runs on the
+  2026-11-28), a 0.10 upgrade with breaking API changes on the Zarr and COG
+  paths. The sea ice Icechunk assets pass the same check. Renovate's
+  grouped non-major update carries the four packages at 0.10 and would merge
+  them with the old props, which blanks every COG and Zarr layer without an
+  error; on 2026-11-28 the Dependency Dashboard (portolan-browser #116)
+  lists it as awaiting its Monday 2026-11-30 (UTC) window. The fork branch
+  `fix/geozarr-0.10` (`2755c5cd`) makes the 0.10 change and runs on the
   VM's `/portolan/` site, where Bluelink `eta_t` draws with its render
-  (2026-11-28). The upstream pull request is not filed.
+  (2026-11-28). Drafts in `upstream/portolan/`: the hold (issue and PR, rule
+  on the fork branch `chore/hold-deck-gl-raster-0.10`, `f2d0b58c`) and the
+  geozarr issue, with their check scripts. None is filed, and the
+  `fix/geozarr-0.10` pull request is not opened.
 - GDAL's Icechunk driver does not resolve relocatable `vcc://<container>/`
   refs through the repository's named containers ("Cannot open vcc://..."),
   so relocatable stores are for icechunk-python and icechunk-js readers.
