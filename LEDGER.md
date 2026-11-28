@@ -58,6 +58,7 @@ fact is learned; open work goes in [STATUS.md](STATUS.md).
 | 2026-11-27 | A kerchunk asset typed `application/vnd+zarr` makes the Portolan browser open it as a plain Zarr store, find `.zmetadata`, then 404 on the chunks | #126 (asset type `application/x-kerchunk-parquet`) |
 | 2026-11-27 | ASI south through the relay takes 2,656 chunk requests per field (one per row chunk), about 26 s; icechunk-js does not merge them | #126 test table |
 | 2026-11-28 | `py/thumbnail.py` rotated polar stereographic grids as if x were 0..360 longitude. Rotation is removed; the preview is the array as stored, with only the south-up flip | #125 log, 2026-11-28 |
+| 2026-11-28 | Bluelink `eta_t` draws in portolan-browser built with deck.gl-raster 0.10 and the layers' `source` props (fork branch `fix/geozarr-0.10`, `2755c5cd`, on upstream `026734e`), at the VM's `/portolan/` site, with chunks read from THREDDS. Upstream `026734e` (geozarr 0.9) reports the same collection as declaring no spatial reference | Michael, in a browser, 2026-11-28: `https://ace-ecostats.ace-eco-stats.cloud.edu.au/portolan/#/external/data.source.coop/ausantarctic/ausantarctic-scratch/bluelink/bluelink-daily-eta_t/stac/collection.json`, layer `eta_t` |
 
 ## Conventions
 
