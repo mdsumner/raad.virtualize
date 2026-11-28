@@ -5,7 +5,7 @@ flight, the republish queue, open issues, decisions and dangling threads. A
 PR that starts, finishes or parks a thread updates this file. Facts learned
 on the way, each with its check, are in [LEDGER.md](LEDGER.md).
 
-Last updated 2026-11-28 (second update).
+Last updated 2026-11-28 (third update).
 
 ## Pull requests in flight
 
@@ -181,6 +181,12 @@ Upstream:
   sea ice, Bedmap3, BedMachine and IBCSO stores
   ([docs/viewer-strategy.md](docs/viewer-strategy.md)).
 - icechunk-js does not merge chunk requests (ASI: 2,656 requests per field).
+- Portolan browser: the Bluelink stores fail its georeference check because
+  `@developmentseed/geozarr` 0.9.0 matches `spatial:dimensions` by label
+  (`yt_ocean`, `xt_ocean` rejected). Fixed upstream in geozarr 0.10.0
+  (deck.gl-raster #785); portolan-browser needs `@developmentseed/geozarr`
+  and `@developmentseed/deck.gl-zarr` raised to `^0.10.0` (LEDGER,
+  2026-11-28). The sea ice Icechunk assets pass the same check.
 - GDAL's Icechunk driver does not resolve relocatable `vcc://<container>/`
   refs through the repository's named containers ("Cannot open vcc://..."),
   so relocatable stores are for icechunk-python and icechunk-js readers.

@@ -112,8 +112,8 @@ mr_ingest_scan_dir <- function(con, dir, verbose = TRUE, batch = 2000L,
 ## registrations, and its CRS the variable's <SRS> in the mdim VRT.
 MR_CONVENTIONS <- list(
   `spatial:` = list(uuid = "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4",
-    schema_url = "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v1/schema.json",
-    spec_url = "https://github.com/zarr-conventions/spatial/blob/v1/README.md",
+    schema_url = "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v0.1/schema.json",
+    spec_url = "https://github.com/zarr-conventions/spatial/blob/v0.1/README.md",
     name = "spatial:", description = "Spatial coordinate information"),
   `proj:` = list(uuid = "f17cb550-5864-4468-aeb7-f3180cfb622f",
     schema_url = "https://raw.githubusercontent.com/zarr-conventions/proj/refs/tags/v0.1/schema.json",
