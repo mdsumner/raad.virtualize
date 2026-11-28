@@ -5,7 +5,7 @@ flight, the republish queue, open issues, decisions and dangling threads. A
 PR that starts, finishes or parks a thread updates this file. Facts learned
 on the way, each with its check, are in [LEDGER.md](LEDGER.md).
 
-Last updated 2026-11-28 (third update).
+Last updated 2026-11-28 (fourth update).
 
 ## Pull requests in flight
 
@@ -14,7 +14,11 @@ None.
 Merged since the last update: #125 (assertion step), #128 (header-signed
 DeleteObject in `s3_sync.py`), #129 (`verify --plan-remap`), #130 (named
 remap roots, the `remap` step), #131 (`SOURCE_READ_REMAP` for the
-thumbnail), #132 (`thumbnail.py` reads 4D HDF5 fields and CF packing).
+thumbnail), #132 (`thumbnail.py` reads 4D HDF5 fields and CF packing),
+#134 (assertion documents for the COG products), #135 (`spatial:`
+registration at `v0.1`, Portolan findings), #136 and #137 (the VM's
+portolan-browser site with `fix/geozarr-0.10`), #138 (a `renders` entry
+from the thumbnail stretch).
 #126 (viewer, browser step, STAC renders and viewer link) and #127 (this
 file) merged on 2026-11-27. xpystac, checked before #126 merged,
 opens an asset by media type: `application/vnd+zarr` opened the kerchunk
@@ -48,10 +52,10 @@ needs no step.
 | oisst | oisst-v2.1-daily | done | n/a | direct | Republished with A; Icechunk cleaned 2026-11-27 |
 | ghrsst | ghrsst-mur-cog-analysed_sst | done | done | done (link) | Republished 2026-11-27 from main `44e6bc0` (A, O, V): `verify-published` passes, 299 old Icechunk objects deleted, 644 files match the build with nothing extra, the repository opens anonymously at `main` `PXBQEF86` |
 | bluelink | bluelink-daily-{temp, salt, eta_t, mld, u, v, w, tx_trans_int_z, ty_trans_int_z} | done | n/a | direct, untested (THREDDS answers 403 to HEAD with an Origin) | Republished 2026-11-28 from main `9e747fc` (A, the `_FillValue` fix, absolute Icechunk refs, root `bran2023`), built on the VM through THREDDS (`SOURCE_READ_REMAP`). `verify` and `verify-published`: 29 SAME, 0 DIFFERENT for each. Old Icechunk objects deleted (43 each for the four 3D stores, 192 each for `temp`, `salt`, `u`, `v`, 163 for `w`). Thumbnails and collections republished (`publish-stac`): `eta_t`, `mld`, `tx_trans_int_z`, `ty_trans_int_z` from main `3896ff4`, `temp`, `salt`, `u`, `v`, `w` from main `f905e24`. Each store matches its build by ETag with nothing extra |
-| bedmap | bedmap3 | documents ready (EPSG:3031, 7 arrays) | pending | direct | `hpc/vm/bedmap3-publish.sh` (production product; `assertion-republish.sh` refuses it) |
-| bedmachine | bedmachine-v4.1 | documents ready (EPSG:3031, 10 arrays) | pending | direct | `hpc/vm/bedmachine-publish.sh` |
-| ibcso | ibcso-v2, ibcso-annual-2024, ibcso-annual-2025 | documents ready (EPSG:9354, 4 arrays each) | pending | direct | `hpc/vm/ibcso-publish.sh` |
-| gebco | gebco-2024, gebco-2025, gebco-2026 | documents ready (EPSG:4326, `elevation`) | pending | direct | `hpc/vm/gebco-publish.sh` |
+| bedmap | bedmap3 | done (EPSG:3031, 7 arrays) | done | direct | Republished 2026-11-28 from main `c764490` (A, O): fresh builds in `work/step5-<dataset>`, then the publish script's steps after the COG upload (the published COGs equal the local ones by ETag). `verify` and `verify-published` pass; every build file is published with the same ETag. Remote only: 83 old Icechunk objects |
+| bedmachine | bedmachine-v4.1 | done (EPSG:3031, 10 arrays) | done | direct | Republished 2026-11-28 from main `c764490` (A, O): fresh builds in `work/step5-<dataset>`, then the publish script's steps after the COG upload (the published COGs equal the local ones by ETag). `verify` and `verify-published` pass; every build file is published with the same ETag. The local COGs were fetched from the product (LEDGER, 2026-11-28). Remote only: 87 old Icechunk objects |
+| ibcso | ibcso-v2, ibcso-annual-2024, ibcso-annual-2025 | done (EPSG:9354, 4 arrays each) | done | direct | Republished 2026-11-28 from main `c764490` (A, O): fresh builds in `work/step5-<dataset>`, then the publish script's steps after the COG upload (the published COGs equal the local ones by ETag). `verify` and `verify-published` pass; every build file is published with the same ETag. Remote only, each: 70 old Icechunk objects and 4 per-array STAC items (`stac/items/{bed,ice_surface,rid,tid}.json`) from an earlier build. `v2/cog/` also holds two `.aux.xml` sidecars (metadata and band statistics) from that build |
+| gebco | gebco-2024, gebco-2025, gebco-2026 | done (EPSG:4326, `elevation`) | done | direct | Republished 2026-11-28 from main `c764490` (A, O): fresh builds in `work/step5-<dataset>`, then the publish script's steps after the COG upload (the published COGs equal the local ones by ETag). `verify` and `verify-published` pass; every build file is published with the same ETag. Remote only: 48, 43 and 43 old Icechunk objects. The COGs at the product root are not touched |
 | oceancolour | esacci-oc-v6.0-{monthly, 5day}-{chlor_a, chlor_a_log10_bias, chlor_a_log10_rmsd} | no documents (EPSG:4326) | pending | direct (Pawsey) | Built on Pawsey (`hpc/pawsey/`) |
 | imos-tracking | meop-ctd-2024, meop-ctd-tags | n/a (profiles) | n/a | n/a (not a grid) | Nothing to republish |
 | access-esm | access-esm1-6.historical.ocean-3d-temp-1mon-mean | n/a (tripolar ocean grid) | n/a | not drawable as an affine grid | Nothing to republish |
@@ -78,14 +82,19 @@ Suggested order:
    documents from each COG's CRS, then use each product's publish script.
    Documents written 2026-11-28 (32, one per base array; each applies to
    the published store and plan, overview levels included); the cards
-   workflow covers the eight datasets. The publishes are next.
+   workflow covers the eight datasets. Published 2026-11-28 (see the
+   table). The published mdim.vrt and Icechunk forms read anonymously
+   with the asserted CRS: EPSG:3031 and EPSG:9354 with axis mapping 2,1,
+   EPSG:4326 with 1,2.
 6. Sea ice viewer pass: the browser rules for ASI, then `remap browser stac`
    and a publish for each sea ice store (`remap` sets the config's rules in
    the published store, so no re-collate).
 7. ESA CCI: assertion documents, then a build on Pawsey.
 
 Credentials: `eval "$(source-coop creds --format env)"` on the VM (CLI 0.3.0,
-signed in 2026-11-27; credentials for 12 hours, renewed by `creds`). Each
+signed in 2026-11-27; credentials for 12 hours, renewed by `creds` only
+once expired, so read their `Expiration` before a long publish; LEDGER,
+2026-11-28). Each
 publish that replaces an Icechunk repository ends with `s3_sync.py --delete`
 on its `icechunk/` prefix (`delete_one` sends a header-signed DeleteObject
 through boto3; the proxy refuses the presigned DELETE it sent before). See [docs/production.md](docs/production.md).
@@ -102,6 +111,8 @@ plain `xr.open_zarr(..., chunks=None)`.
 
 | Issue | What | Next |
 |---|---|---|
+| - | Step 5 leftovers in the production products: 514 old Icechunk objects, 12 stale IBCSO STAC items and the 2 IBCSO v2 `.aux.xml` sidecars (table above) | Delete on Michael's go (`s3_sync.py --delete` per `icechunk/` prefix, `aws s3 rm` for the rest). Dashboard keys could not delete in these products on 2026-11-03; CLI credentials there are untested |
+| - | portolan-browser draws Bluelink land in the colormap's lowest colour: the collections declare no `nodata` (LEDGER, 2026-11-28) | Declare it in the STAC (`nodata` in the render and the variable) at the float32 value, then `stac` and `publish-stac` |
 | #99 | storecard findings on the scratch stores | 1 (no CRS): fixed by A where republished. 2 (BRAN `coordinates` names absent arrays): open. 3 (kerchunk form drops CF `_FillValue`): open. 4 (hosts without CORS): the relay (#126) |
 
 ## Decisions
@@ -189,7 +200,10 @@ Upstream:
   (`yt_ocean`, `xt_ocean` rejected). Fixed upstream in geozarr 0.10.0
   (deck.gl-raster #785); portolan-browser needs `@developmentseed/geozarr`
   and `@developmentseed/deck.gl-zarr` raised to `^0.10.0` (LEDGER,
-  2026-11-28). The sea ice Icechunk assets pass the same check.
+  2026-11-28). The sea ice Icechunk assets pass the same check. The fork
+  branch `fix/geozarr-0.10` (`2755c5cd`) makes that change and runs on the
+  VM's `/portolan/` site, where Bluelink `eta_t` draws with its render
+  (2026-11-28). The upstream pull request is not filed.
 - GDAL's Icechunk driver does not resolve relocatable `vcc://<container>/`
   refs through the repository's named containers ("Cannot open vcc://..."),
   so relocatable stores are for icechunk-python and icechunk-js readers.

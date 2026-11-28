@@ -50,7 +50,7 @@ bash hpc/vm/docker-run.sh run.sh config/bedmap3.sh prepare
 BEDMAP3_LOCAL=1 bash hpc/vm/docker-run.sh run.sh config/bedmap3.sh
 export SOURCECOOP_REPO=ausantarctic/bedmap SOURCECOOP_PRODUCTION=1
 bash hpc/vm/docker-run.sh run.sh config/bedmap3.sh config/source-coop.sh \
-  plan harvest collate render icechunk stac
+  plan harvest collate assert render icechunk stac
 ```
 
 Publication is `hpc/vm/bedmap3-publish.sh`, with the product keys exported. It

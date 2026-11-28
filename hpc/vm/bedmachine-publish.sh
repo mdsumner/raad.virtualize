@@ -14,7 +14,7 @@ export AWS_S3_ENDPOINT=data.source.coop AWS_HTTPS=YES AWS_VIRTUAL_HOSTING=FALSE 
 dr() { bash hpc/vm/docker-run.sh "$@"; }
 cat > work/bedmachine-upload.sh <<'INNER'
 set -euo pipefail
-python py/s3_sync.py work/bedmachine-cog /vsis3/ausantarctic/bedmachine/v4.1/cog
+python py/s3_sync.py --skip-same-size work/bedmachine-cog /vsis3/ausantarctic/bedmachine/v4.1/cog
 INNER
 dr work/bedmachine-upload.sh
 # the public forms reference the COG URLs, so their verify (the publish

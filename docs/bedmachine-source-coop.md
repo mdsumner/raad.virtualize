@@ -92,7 +92,7 @@ bash hpc/vm/docker-run.sh run.sh config/bedmachine.sh prepare
 BEDMACHINE_LOCAL=1 bash hpc/vm/docker-run.sh run.sh config/bedmachine.sh
 export SOURCECOOP_REPO=ausantarctic/bedmachine SOURCECOOP_PRODUCTION=1
 bash hpc/vm/docker-run.sh run.sh config/bedmachine.sh config/source-coop.sh \
-  plan harvest collate render icechunk stac
+  plan harvest collate assert render icechunk stac
 ```
 
 Publication is `hpc/vm/bedmachine-publish.sh`, with the product keys
