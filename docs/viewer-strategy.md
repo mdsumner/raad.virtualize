@@ -73,7 +73,7 @@ header. CORS was checked with a GET carrying an `Origin` header (LEDGER,
 | ASI AMSR2 v5.4 daily south | EPSG:3976 | none (Bremen) | `browser`, relay | Draws through a relay stand-in, about 26 s | Browser rules. Row chunks: 2,656 requests per field; icechunk-js merges none. Portolan: polar |
 | OISST v2.1 daily | EPSG:4326 | `*` (NOAA S3) | `icechunk` | Untested | Longitude 0 to 360 |
 | GHRSST MUR | EPSG:4326 | `*` (source.coop) | `icechunk` | `analysed_sst_x16` draws (#126 test; `imagecodecs_delta` in JS) | Republish with assertions |
-| Bluelink BRAN daily, nine variables | EPSG:4326 | `*` on GET; 403 on HEAD with an Origin (THREDDS) | `icechunk` | Untested | Republish with assertions; check that the reader sends no HEAD. Longitude 0 to 360 |
+| Bluelink BRAN daily, nine variables | EPSG:4326 | `*` on GET; 403 on HEAD with an Origin (THREDDS) | `icechunk` | Untested | Check that the reader sends no HEAD. Longitude 0 to 360. A `renders` entry. Portolan: needs geozarr 0.10 (`spatial:dimensions` by position) |
 | Bedmap3 | EPSG:3031 | `*` (source.coop) | `icechunk` | `bed_topography_x8` draws (#126 test) | Assertion document. Portolan: polar |
 | BedMachine v4.1 | EPSG:3031 | `*` (source.coop) | `icechunk` | Untested | Assertion document. Portolan: polar |
 | IBCSO v2, annual 2024 and 2025 | EPSG:9354 | `*` (source.coop) | `icechunk` | Untested | Assertion documents; the viewer needs a proj4 definition for EPSG:9354. Portolan: polar |

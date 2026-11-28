@@ -51,10 +51,19 @@ fact is learned; open work goes in [STATUS.md](STATUS.md).
 
 | Date | Fact | Check |
 |---|---|---|
+| 2026-11-28 | The Portolan browser (browser.portolan-sdi.org, portolan-browser `026734e`, deployed 2026-11-26) reports every Bluelink variable as declaring "no spatial reference". Its GeoZarr parser, `@developmentseed/geozarr` 0.9.0, matches `spatial:dimensions` by label (`y`/`lat`/`latitude`, `x`/`lon`/`longitude`) and rejects `["yt_ocean","xt_ocean"]`. The browser's fallback from coordinate arrays matches the same names, and reads a CF grid mapping only after they match. The spatial convention orders `spatial:dimensions` by role (Y, then X), with any names. geozarr 0.10.0 reads them by position (developmentseed/deck.gl-raster #785, from #451), and deck.gl-zarr 0.10.0 depends on it; the browser pins `^0.9.0` for both | portolan-browser's `makeZarrLayerProps` run in Node against each published collection, with zarrita, icechunk-js and geozarr at the browser's versions: Bluelink `zarr-no-geo` with geozarr 0.9.0, passes with 0.10.0 |
+| 2026-11-28 | In the same check the G02202 south and north, ASI south and G02202 south `browser/` test copy Icechunk assets pass the georeference checks (no `zarr-no-geo`, no `zarr-crs`). Their collections, published before #126, still type the kerchunk asset `application/vnd+zarr`, which the browser lists as Zarr and fails to open (OISST too); the next `stac` render fixes it | As above |
+| 2026-11-28 | Bluelink collections have no `renders` entry, so the Portolan browser draws with a colour ramp from 0 to 1 ("the image may saturate"). Only `config/seaice-g02202.sh` sets `STAC_RENDERS` | As above: the browser's warning |
 | 2026-11-27 | GET with an `Origin` returns `Access-Control-Allow-Origin: *` from data.source.coop, the NOAA OISST bucket, the IMOS bucket, projects.pawsey.org.au and thredds.nci.org.au. THREDDS answers 403 to HEAD with an Origin. noaadata.apps.nsidc.org and data.seaice.uni-bremen.de send no CORS header | `curl -s -o /dev/null -r 0-15 -H 'Origin: https://example.org' -D - <url>`; #99, item 4 |
 | 2026-11-27 | A kerchunk asset typed `application/vnd+zarr` makes the Portolan browser open it as a plain Zarr store, find `.zmetadata`, then 404 on the chunks | #126 (asset type `application/x-kerchunk-parquet`) |
 | 2026-11-27 | ASI south through the relay takes 2,656 chunk requests per field (one per row chunk), about 26 s; icechunk-js does not merge them | #126 test table |
 | 2026-11-28 | `py/thumbnail.py` rotated polar stereographic grids as if x were 0..360 longitude. Rotation is removed; the preview is the array as stored, with only the south-up flip | #125 log, 2026-11-28 |
+
+## Conventions
+
+| Date | Fact | Check |
+|---|---|---|
+| 2026-11-28 | zarr-conventions/spatial has one tag, `v0.1`. The `zarr_conventions` registration written since #125 named `refs/tags/v1` and `blob/v1`, both 404 (the UUID is right). Fixed to `v0.1`; stores published before the fix carry the 404 URLs until their next render | `gh api repos/zarr-conventions/spatial/tags`; `curl -o /dev/null -w '%{http_code}'` on each URL |
 
 ## Store and pipeline scale
 
