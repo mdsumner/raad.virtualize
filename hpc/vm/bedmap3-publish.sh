@@ -17,7 +17,7 @@ dr() { bash hpc/vm/docker-run.sh "$@"; }
 cat > work/bedmap3-upload.sh <<INNER
 set -euo pipefail
 [ "${BEDMAP_WRITE_CHECK:-0}" != 1 ] || python py/sourcecoop_check.py ausantarctic/bedmap
-python py/s3_sync.py work/bedmap3-cog /vsis3/ausantarctic/bedmap/bedmap3/cog
+python py/s3_sync.py --skip-same-size work/bedmap3-cog /vsis3/ausantarctic/bedmap/bedmap3/cog
 INNER
 dr work/bedmap3-upload.sh
 # the public forms reference the COG URLs, so their verify (the publish

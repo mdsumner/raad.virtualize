@@ -19,7 +19,7 @@ for rel in "$@"; do
   cat > work/ibcso-upload.sh <<INNER
 set -euo pipefail
 export AWS_S3_ENDPOINT=data.source.coop AWS_HTTPS=YES AWS_VIRTUAL_HOSTING=FALSE AWS_REGION=us-west-2
-python py/s3_sync.py work/ibcso-$prefix-cog /vsis3/ausantarctic/ibcso/$prefix/cog
+python py/s3_sync.py --skip-same-size work/ibcso-$prefix-cog /vsis3/ausantarctic/ibcso/$prefix/cog
 INNER
   dr work/ibcso-upload.sh
   # the public forms reference the COG URLs, so their verify (the publish
