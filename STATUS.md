@@ -213,10 +213,12 @@ Upstream:
   (`yt_ocean`, `xt_ocean` rejected). Fixed upstream in geozarr 0.10.0
   (deck.gl-raster #785); portolan-browser needs `@developmentseed/geozarr`
   and `@developmentseed/deck.gl-zarr` raised to `^0.10.0` (LEDGER,
-  2026-11-28). The sea ice Icechunk assets pass the same check. The fork
-  branch `fix/geozarr-0.10` (`2755c5cd`) makes that change and runs on the
-  VM's `/portolan/` site, where Bluelink `eta_t` draws with its render
-  (2026-11-28). The upstream pull request is not filed.
+  2026-11-28), a 0.10 upgrade with breaking API changes on the Zarr and COG
+  paths. The sea ice Icechunk assets pass the same check. The fork branch
+  `fix/geozarr-0.10` (`2755c5cd`) makes that change and runs on the VM's
+  `/portolan/` site, where Bluelink `eta_t` draws with its render
+  (2026-11-28). Issue draft and check script in `upstream/portolan/`; the
+  issue and the upstream pull request are not filed.
 - GDAL's Icechunk driver does not resolve relocatable `vcc://<container>/`
   refs through the repository's named containers ("Cannot open vcc://..."),
   so relocatable stores are for icechunk-python and icechunk-js readers.
