@@ -177,20 +177,31 @@ for s in $STEPS; do
       # a failure leaves the collection without one. STAC_THUMBNAIL=0 skips,
       # STAC_THUMB_ARRAY (default the first of ARRAYS), STAC_THUMB_PALETTE,
       # STAC_THUMB_LOG10=1, STAC_THUMB_WIDTH, STAC_THUMB_SOURCE (regex on the
-      # source path) and STAC_THUMB_TRANSPOSE=1 choose what is drawn
-      rm -f "$WORK/out/thumbnail.png"
+      # source path) and STAC_THUMB_TRANSPOSE=1 choose what is drawn.
+      # Where the config sets no STAC_RENDERS, the thumbnail's stretch is
+      # also the collection's `renders` entry (py/thumbnail.py --render), for
+      # the icechunk asset and the browser asset where they exist;
+      # STAC_THUMB_RENDER=0 leaves it out
+      rm -f "$WORK/out/thumbnail.png" "$WORK/thumbnail-render.json"
+      render_assets=$(for k in icechunk browser/icechunk; do if [ -d "$WORK/out/$k" ]; then echo "${k%%/*}"; fi; done | paste -sd, -)
       if [ "${STAC_THUMBNAIL:-1}" = 1 ]; then
         if desc=$("$PYTHON" "$HERE/py/thumbnail.py" "$WORK/store.sqlite" "$WORK/out/thumbnail.png" \
               --array "${STAC_THUMB_ARRAY:-${ARRAYS%% *}}" --palette "${STAC_THUMB_PALETTE:-viridis}" \
               --width "${STAC_THUMB_WIDTH:-512}" $([ "${STAC_THUMB_LOG10:-0}" = 1 ] && echo --log10) \
               ${STAC_THUMB_SOURCE:+--source "$STAC_THUMB_SOURCE"} $([ "${STAC_THUMB_TRANSPOSE:-0}" = 1 ] && echo --transpose) \
               $(read_remap --source-remap) \
+              ${render_assets:+--render "$WORK/thumbnail-render.json" --render-assets "$render_assets"} \
               2>> "$LOG"); then
           export STAC_THUMB_DESCRIPTION="Overview of $desc (py/thumbnail.py)."
           echo "stac: thumbnail $desc" | tee -a "$LOG"
         else
           rm -f "$WORK/out/thumbnail.png"; echo "stac: no thumbnail (py/thumbnail.py failed, see $LOG)" | tee -a "$LOG"
         fi
+      fi
+      if [ -z "${STAC_RENDERS:-}" ] && [ "${STAC_THUMB_RENDER:-1}" = 1 ] && [ -s "$WORK/thumbnail-render.json" ]; then
+        STAC_RENDERS=$(cat "$WORK/thumbnail-render.json")
+        export STAC_RENDERS
+        echo "stac: renders from the thumbnail stretch: $STAC_RENDERS" | tee -a "$LOG"
       fi
       # items as stac-geoparquet (rustac); the collection lists it only when
       # it is written. STAC_GEOPARQUET=0 skips

@@ -208,6 +208,12 @@ def main():
     ap.add_argument("--log10", action="store_true")
     ap.add_argument("--source", help="regex: draw the last placement among matching sources")
     ap.add_argument("--transpose", action="store_true", help="last dimension down the image")
+    ap.add_argument("--render", metavar="PATH",
+                    help="also write a STAC `renders` object (render extension) with the "
+                         "thumbnail's stretch, for viewers that draw the store (run.sh: "
+                         "STAC_RENDERS when the config sets none)")
+    ap.add_argument("--render-assets", default="icechunk",
+                    help="comma-separated asset keys the render targets")
     ap.add_argument("--source-remap", action="append", default=[], metavar="FROM=TO",
                     help="open the source with the path prefix FROM replaced by TO, for a source "
                          "not mounted here (run.sh: SOURCE_READ_REMAP)")
@@ -256,7 +262,36 @@ def main():
     elem = ",".join(str(i) for i in off[:-2]) if len(off) > 2 else ""
     what = f"{array}{' [' + elem + ']' if elem else ''} from {os.path.basename(src)}"
     stretch = f"{'log10 ' if a.log10 else ''}{lo:.4g} to {hi:.4g}"
+    if a.render:
+        write_render(a.render, array, (lo, hi), scale, offset, a.palette, a.log10,
+                     [k for k in a.render_assets.split(",") if k], what)
     print(f"{what}; {a.palette}, {stretch}")
+
+
+def write_render(path, array, stretch, scale, offset, palette, log10, assets, what):
+    """A STAC `renders` object (render extension v2) for array, from the
+    thumbnail's stretch. `rescale` applies to the stored values: the
+    collection declares no `raster:bands` scale and offset for a renderer to
+    unscale by, and the viewers that read it (portolan-browser, docs/viewer)
+    colour stored values. The stretch is in physical units, so a CF-packed
+    array's is converted back with its scale_factor and add_offset. Written
+    only for the viridis palette (the one colormap name both viewers share)
+    and not for a log10 stretch, which `rescale` cannot state."""
+    if os.path.exists(path):
+        os.remove(path)
+    lo, hi = stretch
+    if palette != "viridis" or log10 or not assets or not (np.isfinite(lo) and np.isfinite(hi)) or hi <= lo:
+        return
+    s, o = (scale or 1.0), (offset or 0.0)
+    stored = sorted(((lo - o) / s, (hi - o) / s))
+    render = {array: {
+        "title": f"{array}, 2nd to 98th percentile of {what}",
+        "assets": assets,
+        "rescale": [[float(f"{v:.6g}") for v in stored]],
+        "colormap_name": palette,
+    }}
+    with open(path, "w") as f:
+        json.dump(render, f)
 
 
 if __name__ == "__main__":
