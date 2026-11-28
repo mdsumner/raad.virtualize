@@ -1,7 +1,9 @@
 name: assertion-cards
 
 # The done test of the assertion step (requests/assertion-step.md): for each
-# dataset, the published store.sqlite and plan.vrt are fetched, the assert,
+# dataset, the published store.sqlite and plan.vrt are fetched (from the
+# scratch product, or from `base` for a dataset published in its own
+# product), the assert,
 # render, icechunk and stac steps run from them (no harvest, no source
 # reads), and py/assertion_cards.py compares every projection with the
 # dataset's assertions. The report is the job summary and an artifact
@@ -94,6 +96,46 @@ jobs:
             group: bluelink
             config: config/bluelink.sh
             env: BLUELINK_FREQ=daily BRAN_VAR=ty_trans_int_z
+          - dataset: bedmap3
+            group: bedmap
+            config: config/bedmap3.sh
+            env: ""
+            base: https://data.source.coop/ausantarctic/bedmap/virtual/bedmap3
+          - dataset: bedmachine-v4.1
+            group: bedmachine
+            config: config/bedmachine.sh
+            env: ""
+            base: https://data.source.coop/ausantarctic/bedmachine/virtual/bedmachine-v4.1
+          - dataset: ibcso-v2
+            group: ibcso
+            config: config/ibcso.sh
+            env: IBCSO_RELEASE=v2
+            base: https://data.source.coop/ausantarctic/ibcso/virtual/ibcso-v2
+          - dataset: ibcso-annual-2024
+            group: ibcso
+            config: config/ibcso.sh
+            env: IBCSO_RELEASE=2024
+            base: https://data.source.coop/ausantarctic/ibcso/virtual/ibcso-annual-2024
+          - dataset: ibcso-annual-2025
+            group: ibcso
+            config: config/ibcso.sh
+            env: IBCSO_RELEASE=2025
+            base: https://data.source.coop/ausantarctic/ibcso/virtual/ibcso-annual-2025
+          - dataset: gebco-2024
+            group: gebco
+            config: config/gebco.sh
+            env: GEBCO_YEAR=2024
+            base: https://data.source.coop/ausantarctic/gebco/virtual/gebco-2024
+          - dataset: gebco-2025
+            group: gebco
+            config: config/gebco.sh
+            env: GEBCO_YEAR=2025
+            base: https://data.source.coop/ausantarctic/gebco/virtual/gebco-2025
+          - dataset: gebco-2026
+            group: gebco
+            config: config/gebco.sh
+            env: GEBCO_YEAR=2026
+            base: https://data.source.coop/ausantarctic/gebco/virtual/gebco-2026
     env:
       SCRATCH: https://data.source.coop/ausantarctic/ausantarctic-scratch
     steps:
@@ -106,7 +148,7 @@ jobs:
       - name: Published store and plan
         run: |
           W=work/${{ matrix.dataset }}; mkdir -p "$W"
-          B=$SCRATCH/${{ matrix.group }}/${{ matrix.dataset }}
+          B="${{ matrix.base }}"; B=${B:-$SCRATCH/${{ matrix.group }}/${{ matrix.dataset }}}
           curl -fsSL -o "$W/store.sqlite" "$B/store.sqlite"
           curl -fsSL -o "$W/plan.vrt" "$B/plan.vrt"
           ls -la "$W"
@@ -118,9 +160,10 @@ jobs:
       - name: Cards
         run: |
           W=work/${{ matrix.dataset }}
+          B="${{ matrix.base }}"; B=${B:-$SCRATCH/${{ matrix.group }}/${{ matrix.dataset }}}
           mkdir -p cards
           python py/assertion_cards.py --out "$W/out" --assertions assertions/${{ matrix.dataset }} \
-            --before "$SCRATCH/${{ matrix.group }}/${{ matrix.dataset }}" \
+            --before "$B" \
             --overlay /tmp/storecard/assertions/ausantarctic/${{ matrix.dataset }} \
             --md cards/${{ matrix.dataset }}.md --json cards/${{ matrix.dataset }}.json || status=$?
           cat cards/${{ matrix.dataset }}.md >> "$GITHUB_STEP_SUMMARY"
