@@ -1,0 +1,51 @@
+{
+ "assertion_version": "0",
+ "kind": "grid",
+ "subject": {
+  "dataset": "gebco-2025",
+  "variable": "elevation"
+ },
+ "asserts": {
+  "spatial:transform": [
+   0.004166666666666667,
+   0.0,
+   -180.0,
+   0.0,
+   -0.004166666666666667,
+   90.0
+  ],
+  "spatial:shape": [
+   43200,
+   86400
+  ],
+  "spatial:dimensions": [
+   "y",
+   "x"
+  ],
+  "spatial:transform_type": "affine",
+  "spatial:registration": "pixel",
+  "proj:code": "EPSG:4326"
+ },
+ "crs_axes": [
+  "y",
+  "x"
+ ],
+ "evidence": {
+  "method": "transform restated from the regular 1-D coordinates; CRS restated from the source",
+  "axes": {
+   "x": "x",
+   "y": "y"
+  },
+  "crs_from": "the source COG (ausantarctic/gebco/GEBCO_2025.tif) declares EPSG:4326 (WGS 84), origin -180, 90, cell 0.0041666666666666666 degrees, 43200 x 86400, AREA_OR_POINT=Area (gdal.Open on each COG, GDAL 3.13.3, PROJ 9.9.0, 2026-11-28). the COG is made by github.com/AustralianAntarcticDivision/gebco from the GEBCO Compilation Group GEBCO_2025 Grid, a 15 arc-second grid on WGS 84 geographic coordinates",
+  "plan": "https://data.source.coop/ausantarctic/gebco/virtual/gebco-2025/plan.vrt (<SRS> EPSG:4326 for every array)",
+  "note": "overview levels (<array>_x<f>, byterefs decision 0006) have no documents of their own: py/assertions.py applies this assertion scaled to each level",
+  "dataset": "gebco-2025",
+  "era": "all"
+ },
+ "by": {
+  "name": "raad.virtualize assertion step",
+  "kind": "known source CRS"
+ },
+ "made_at": "2026-11-28T02:14:04Z",
+ "status": "proposed"
+}

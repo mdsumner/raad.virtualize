@@ -5,7 +5,7 @@ flight, the republish queue, open issues, decisions and dangling threads. A
 PR that starts, finishes or parks a thread updates this file. Facts learned
 on the way, each with its check, are in [LEDGER.md](LEDGER.md).
 
-Last updated 2026-11-28 (second update).
+Last updated 2026-11-28 (third update).
 
 ## Pull requests in flight
 
@@ -48,10 +48,10 @@ needs no step.
 | oisst | oisst-v2.1-daily | done | n/a | direct | Republished with A; Icechunk cleaned 2026-11-27 |
 | ghrsst | ghrsst-mur-cog-analysed_sst | done | done | done (link) | Republished 2026-11-27 from main `44e6bc0` (A, O, V): `verify-published` passes, 299 old Icechunk objects deleted, 644 files match the build with nothing extra, the repository opens anonymously at `main` `PXBQEF86` |
 | bluelink | bluelink-daily-{temp, salt, eta_t, mld, u, v, w, tx_trans_int_z, ty_trans_int_z} | done | n/a | direct, untested (THREDDS answers 403 to HEAD with an Origin) | Republished 2026-11-28 from main `9e747fc` (A, the `_FillValue` fix, absolute Icechunk refs, root `bran2023`), built on the VM through THREDDS (`SOURCE_READ_REMAP`). `verify` and `verify-published`: 29 SAME, 0 DIFFERENT for each. Old Icechunk objects deleted (43 each for the four 3D stores, 192 each for `temp`, `salt`, `u`, `v`, 163 for `w`). Thumbnails and collections republished (`publish-stac`): `eta_t`, `mld`, `tx_trans_int_z`, `ty_trans_int_z` from main `3896ff4`, `temp`, `salt`, `u`, `v`, `w` from main `f905e24`. Each store matches its build by ETag with nothing extra |
-| bedmap | bedmap3 | no document (EPSG:3031) | pending | direct | `hpc/vm/bedmap3-publish.sh` (production product; `assertion-republish.sh` refuses it) |
-| bedmachine | bedmachine-v4.1 | no document (EPSG:3031) | pending | direct | `hpc/vm/bedmachine-publish.sh` |
-| ibcso | ibcso-v2, ibcso-annual-2024, ibcso-annual-2025 | no documents (EPSG:9354) | pending | direct | `hpc/vm/ibcso-publish.sh` |
-| gebco | gebco-2024, gebco-2025, gebco-2026 | no documents (EPSG:4326) | pending | direct | `hpc/vm/gebco-publish.sh` |
+| bedmap | bedmap3 | documents ready (EPSG:3031, 7 arrays) | pending | direct | `hpc/vm/bedmap3-publish.sh` (production product; `assertion-republish.sh` refuses it) |
+| bedmachine | bedmachine-v4.1 | documents ready (EPSG:3031, 10 arrays) | pending | direct | `hpc/vm/bedmachine-publish.sh` |
+| ibcso | ibcso-v2, ibcso-annual-2024, ibcso-annual-2025 | documents ready (EPSG:9354, 4 arrays each) | pending | direct | `hpc/vm/ibcso-publish.sh` |
+| gebco | gebco-2024, gebco-2025, gebco-2026 | documents ready (EPSG:4326, `elevation`) | pending | direct | `hpc/vm/gebco-publish.sh` |
 | oceancolour | esacci-oc-v6.0-{monthly, 5day}-{chlor_a, chlor_a_log10_bias, chlor_a_log10_rmsd} | no documents (EPSG:4326) | pending | direct (Pawsey) | Built on Pawsey (`hpc/pawsey/`) |
 | imos-tracking | meop-ctd-2024, meop-ctd-tags | n/a (profiles) | n/a | n/a (not a grid) | Nothing to republish |
 | access-esm | access-esm1-6.historical.ocean-3d-temp-1mon-mean | n/a (tripolar ocean grid) | n/a | not drawable as an affine grid | Nothing to republish |
@@ -76,6 +76,9 @@ Suggested order:
    Done 2026-11-28, thumbnails included.
 5. COG products (Bedmap3, BedMachine, IBCSO, GEBCO): write assertion
    documents from each COG's CRS, then use each product's publish script.
+   Documents written 2026-11-28 (32, one per base array; each applies to
+   the published store and plan, overview levels included); the cards
+   workflow covers the eight datasets. The publishes are next.
 6. Sea ice viewer pass: the browser rules for ASI, then `remap browser stac`
    and a publish for each sea ice store (`remap` sets the config's rules in
    the published store, so no re-collate).
