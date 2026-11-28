@@ -187,7 +187,11 @@ Upstream:
   (deck.gl-raster #785); portolan-browser needs `@developmentseed/geozarr`
   and `@developmentseed/deck.gl-zarr` raised to `^0.10.0` (LEDGER,
   2026-11-28), a 0.10 upgrade with breaking API changes on the Zarr and COG
-  paths. Issue draft and check script in `upstream/portolan/`; not filed.
+  paths. Renovate's grouped update, due Monday 2026-11-30 (UTC), would merge
+  0.10 with the old props and blank every COG and Zarr layer without an
+  error. Drafts in `upstream/portolan/`: the hold (issue and PR, rule on the
+  fork branch `chore/hold-deck-gl-raster-0.10`) and the geozarr issue; not
+  filed. The 0.10 migration starts on the fork branch `fix/geozarr-0.10`.
   The sea ice Icechunk assets pass the same check.
 - GDAL's Icechunk driver does not resolve relocatable `vcc://<container>/`
   refs through the repository's named containers ("Cannot open vcc://..."),
