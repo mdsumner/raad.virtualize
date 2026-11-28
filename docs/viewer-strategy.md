@@ -68,9 +68,9 @@ header. CORS was checked with a GET carrying an `Origin` header (LEDGER,
 
 | Stores | CRS | Chunk host CORS | Read path | Viewer | Open |
 |---|---|---|---|---|---|
-| G02202 v6 daily south | EPSG:3412 | none (NSIDC) | `browser`, relay | Draws (#126 test) | Re-collate for the browser rules, then `browser stac publish`. Portolan: polar |
-| G02202 v6 daily north | EPSG:3411 | none (NSIDC) | `browser`, relay | Not yet | As south |
-| ASI AMSR2 v5.4 daily south | EPSG:3976 | none (Bremen) | `browser`, relay | Draws through a relay stand-in, about 26 s | Browser rules. Row chunks: 2,656 requests per field; icechunk-js merges none. Portolan: polar |
+| G02202 v6 daily south | EPSG:3412 | none (NSIDC) | `browser`, relay | Draws (#126 test) | Browser form published 2026-11-28. Portolan: polar; the flags 251 to 254 draw in colour (`nodata` is 255 only) |
+| G02202 v6 daily north | EPSG:3411 | none (NSIDC) | `browser`, relay | Not yet in the page; the browser form reads through the relay (LEDGER, 2026-11-28) | As south |
+| ASI AMSR2 v5.4 daily south | EPSG:3976 | none (Bremen) | `browser`, relay | Draws through a relay stand-in, about 26 s | Browser form published 2026-11-28. Row chunks: 2,656 requests per field; icechunk-js merges none. Portolan: polar |
 | OISST v2.1 daily | EPSG:4326 | `*` (NOAA S3) | `icechunk` | Untested | Longitude 0 to 360 |
 | GHRSST MUR | EPSG:4326 | `*` (source.coop) | `icechunk` | `analysed_sst_x16` draws (#126 test; `imagecodecs_delta` in JS) | Republish with assertions |
 | Bluelink BRAN daily, nine variables | EPSG:4326 | `*` on GET; 403 on HEAD with an Origin (THREDDS) | `icechunk` | Untested | Check that the reader sends no HEAD. Longitude 0 to 360. A `renders` entry. Portolan: needs geozarr 0.10 (`spatial:dimensions` by position) |

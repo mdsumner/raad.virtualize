@@ -91,8 +91,11 @@ if [ -n "$CORS_RELAY" ]; then
 fi
 # map rendering for viewers (STAC render extension): concentration is stored
 # as 0-100 (scale_factor 0.01); 251-255 are flag values (pole hole, coast,
-# land, missing)
-export STAC_RENDERS=${STAC_RENDERS-'{"concentration":{"title":"Sea ice concentration (percent)","assets":["browser"],"rescale":[[0,100]],"nodata":[251,252,253,254,255],"colormap_name":"viridis"}}'}
+# land, missing). Render v2.0.0 takes one `nodata` value, the fill 255; the
+# store's valid_range (0-100) states the flags, and a viewer that reads only
+# `nodata` (portolan-browser) draws 251-254 in the ramp's top colour (LEDGER,
+# 2026-11-28)
+export STAC_RENDERS=${STAC_RENDERS-'{"concentration":{"title":"Sea ice concentration (percent)","assets":["browser"],"rescale":[[0,100]],"nodata":255,"colormap_name":"viridis"}}'}
 # one STAC item file per day is 17,500 uploads: keep the ndjson and
 # stac-geoparquet item forms only, so a publish fits the source.coop key hour
 if [ "$SEAICE_FREQ" = daily ]; then export STAC_ITEM_FILES=${STAC_ITEM_FILES:-0}; fi
