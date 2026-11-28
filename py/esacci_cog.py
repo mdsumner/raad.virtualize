@@ -8,9 +8,12 @@ removed. Re-running skips every COG already written, locally (--out) or in
 the bucket (--done, a listing of COG names already uploaded).
 
 The geographic grids are 8640 x 4320 (1/24 degree, -180..180, -90..90).
-The netCDF files carry no CRS; the COGs are EPSG:4326 with the geotransform
-(-180, 1/24, 0, 90, 0, -1/24), after checking that the file's own
-coordinates agree to 1e-6 degree.
+The netCDF files name no datum: their grid mapping variable crs is
+latitude_longitude with no parameters, and no data variable refers to it
+(Product User Guide for v6.0, D4.2 issue 6.5, section 7.4: "All latitudes
+and longitudes are given in WGS/84 datum"). The COGs are EPSG:4326 with the
+geotransform (-180, 1/24, 0, 90, 0, -1/24), after checking that the file's
+own coordinates agree to 1e-6 degree.
 
 COG settings, for the byte-reference forms built on these files (see
 docs/esacci-oc.md):

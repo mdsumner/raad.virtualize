@@ -21,7 +21,11 @@ are not evenly spaced in days). The time index of a file is its month minus
 the first month. --cadence 5day: one step per 5-day period, by either of the
 calendars axis() recognises from the file dates (per month, per year, or
 continuous). Steps evenly spaced in days
-are written as RegularlySpacedValues, others as InlineValues.
+are written as RegularlySpacedValues, others as InlineValues. The x and y
+coordinates (cell centres, from the first file's geotransform) are written
+with 17 significant digits, so they read back as the same doubles: with 10, a
+1/24 degree cell reads as 0.04166666667 and the corner it restates is 8e-7
+of a cell off (ESA CCI, 2026-11-28).
 
 Steps (days or months) between the first and last date with no file are
 listed on stderr. --max-missing N stops (exit 1, no plan written) when more
@@ -205,7 +209,7 @@ def plan(sources, array, pattern, cadence="day", overviews=False, resampling="un
                 f'    <Array name="{name}">',
                 "      <DataType>Float64</DataType>",
                 f'      <DimensionRef ref="{name}"/>',
-                f'      <RegularlySpacedValues start="{start:.10g}" increment="{inc:.10g}"/>',
+                f'      <RegularlySpacedValues start="{start:.17g}" increment="{inc:.17g}"/>',
                 "    </Array>",
             ]
         return out

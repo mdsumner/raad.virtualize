@@ -21,7 +21,7 @@ reference the COGs (the GHRSST pattern), not the netCDF files. Monthly
 | `SPARSE_OK` | FALSE | every tile has a reference; an all-NaN tile is a few hundred bytes |
 | Type and values | as in the netCDF (Float32 for `chlor_a`) | |
 | Nodata | NaN, from the netCDF `_FillValue` 9.96921e+36 | becomes the Zarr `fill_value`; `--fill source` keeps the netCDF value |
-| CRS, geotransform | EPSG:4326, (-180, 1/24, 0, 90, 0, -1/24) | the netCDF has no CRS; its coordinates are checked to 1e-6 degree |
+| CRS, geotransform | EPSG:4326, (-180, 1/24, 0, 90, 0, -1/24) | the netCDF's grid mapping (`crs`, `latitude_longitude`) has no datum and no data variable refers to it; the Product User Guide (D4.2, issue 6.5, section 7.4) gives WGS 84. Its coordinates are checked to 1e-6 degree |
 | Overviews | AVERAGE, x2 to x32 | indexed as arrays `<var>_x2` .. `<var>_x32` on dims `y_x<f>`, `x_x<f>` (`ESACCI_OVERVIEWS`, default 1; py/plan_cog.py --overviews) |
 
 Each COG is read back and compared with the netCDF array before it is
@@ -88,6 +88,26 @@ sbatch --export=ALL,ESACCI_CADENCE=5day,RUN_ARGS="config/esacci-oc.sh config/sou
 
 The local `verify` step reads the forms, which reference the public URL, so
 the COGs are uploaded before the index is built.
+
+## Build from the public COGs
+
+`ESACCI_COG_ROOT=public` reads the COGs at `ESACCI_COG_URL` over HTTPS, so
+the index builds on any host with the image (the Nectar VM, for example) and
+does not depend on the Setonix scratch copy. The bucket serves no listing
+over HTTPS, so `sources` lists it once through its S3 API, anonymously;
+every other step reads `/vsicurl/<ESACCI_COG_URL>/...`, the path each source
+is stored as, and needs no S3 settings beside the publish config's own:
+
+```sh
+export ESACCI_COG_ROOT=public ESACCI_CADENCE=5day ESACCI_VAR=chlor_a
+bash hpc/vm/docker-run.sh run.sh config/esacci-oc.sh config/source-coop.sh
+# with source.coop credentials exported
+bash hpc/vm/docker-run.sh run.sh config/esacci-oc.sh config/source-coop.sh publish verify-published
+```
+
+A republish leaves the previous Icechunk repository's objects behind:
+`py/s3_sync.py --delete` on the dataset's `icechunk/` prefix removes them
+(the republish queue in `STATUS.md` of the repository).
 
 ## Open points
 
