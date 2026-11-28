@@ -1,0 +1,51 @@
+{
+ "assertion_version": "0",
+ "kind": "grid",
+ "subject": {
+  "dataset": "ibcso-annual-2025",
+  "variable": "tid"
+ },
+ "asserts": {
+  "spatial:transform": [
+   500.0,
+   0.0,
+   -4800000.0,
+   0.0,
+   -500.0,
+   4800000.0
+  ],
+  "spatial:shape": [
+   19200,
+   19200
+  ],
+  "spatial:dimensions": [
+   "y",
+   "x"
+  ],
+  "spatial:transform_type": "affine",
+  "spatial:registration": "pixel",
+  "proj:code": "EPSG:9354"
+ },
+ "crs_axes": [
+  "x",
+  "y"
+ ],
+ "evidence": {
+  "method": "transform restated from the regular 1-D coordinates; CRS restated from the source",
+  "axes": {
+   "x": "x",
+   "y": "y"
+  },
+  "crs_from": "the source COGs (ausantarctic/ibcso/annual-2025/cog/<array>.tif) declare EPSG:9354 (WGS 84 / IBCSO Polar Stereographic), origin -4800000, 4800000, cell 500 m, 19200 x 19200, AREA_OR_POINT=Area (gdal.Open on each COG, GDAL 3.13.3, PROJ 9.9.0, 2026-11-28). py/ibcso_cog.py keeps the CRS of the release GeoTIFFs (IBCSO 2025 annual release, from ibcso.org)",
+  "plan": "https://data.source.coop/ausantarctic/ibcso/virtual/ibcso-annual-2025/plan.vrt (<SRS> EPSG:9354 for every array)",
+  "note": "overview levels (<array>_x<f>, byterefs decision 0006) have no documents of their own: py/assertions.py applies this assertion scaled to each level",
+  "dataset": "ibcso-annual-2025",
+  "era": "all"
+ },
+ "by": {
+  "name": "raad.virtualize assertion step",
+  "kind": "known source CRS"
+ },
+ "made_at": "2026-11-28T02:14:04Z",
+ "status": "proposed"
+}

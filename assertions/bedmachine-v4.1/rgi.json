@@ -1,0 +1,51 @@
+{
+ "assertion_version": "0",
+ "kind": "grid",
+ "subject": {
+  "dataset": "bedmachine-v4.1",
+  "variable": "rgi"
+ },
+ "asserts": {
+  "spatial:transform": [
+   500.0,
+   0.0,
+   -3333250.0,
+   0.0,
+   -500.0,
+   3333250.0
+  ],
+  "spatial:shape": [
+   13333,
+   13333
+  ],
+  "spatial:dimensions": [
+   "y",
+   "x"
+  ],
+  "spatial:transform_type": "affine",
+  "spatial:registration": "pixel",
+  "proj:code": "EPSG:3031"
+ },
+ "crs_axes": [
+  "x",
+  "y"
+ ],
+ "evidence": {
+  "method": "transform restated from the regular 1-D coordinates; CRS restated from the source",
+  "axes": {
+   "x": "x",
+   "y": "y"
+  },
+  "crs_from": "the source COGs (ausantarctic/bedmachine/v4.1/cog/<array>.tif) declare EPSG:3031 (WGS 84 / Antarctic Polar Stereographic), origin -3333250, 3333250, cell 500 m, 13333 x 13333, AREA_OR_POINT=Area (gdal.Open on each COG, GDAL 3.13.3, PROJ 9.9.0, 2026-11-28). py/bedmachine_cog.py writes EPSG:3031 into each COG (outputSRS). The NSIDC-0756 v4.1 netCDF (doi:10.5067/POJQI54A45HX) states a CF polar_stereographic grid mapping (latitude_of_projection_origin -90, standard_parallel -71, straight_vertical_longitude_from_pole 0) with crs_wkt \"WGS 84 / Antarctic Polar Stereographic\" and geospatial_bounds_crs EPSG:3031; GDAL reads that grid mapping with a warning about its axis unit and does not identify it as EPSG:3031, so the COG script states the code",
+  "plan": "https://data.source.coop/ausantarctic/bedmachine/virtual/bedmachine-v4.1/plan.vrt (<SRS> EPSG:3031 for every array)",
+  "note": "overview levels (<array>_x<f>, byterefs decision 0006) have no documents of their own: py/assertions.py applies this assertion scaled to each level",
+  "dataset": "bedmachine-v4.1",
+  "era": "all"
+ },
+ "by": {
+  "name": "raad.virtualize assertion step",
+  "kind": "known source CRS"
+ },
+ "made_at": "2026-11-28T02:14:04Z",
+ "status": "proposed"
+}
